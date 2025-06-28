@@ -1,8 +1,15 @@
 import json
 import tempfile
 import webbrowser
-import curses
 from pathlib import Path
+
+try:
+    import curses
+except ImportError:
+    raise RuntimeError(
+        "❗ This feature requires curses. On Windows, install windows-curses."
+    )
+
 
 try:
     import matplotlib.pyplot as plt

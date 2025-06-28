@@ -29,6 +29,8 @@ setuptools==80.9.0
 matplotlib==3.10.3
 ```
 
+> 💡 On Windows, the `windows-curses` package will be installed automatically to enable terminal UI features.
+
 ---
 
 ## 📥 Installation
