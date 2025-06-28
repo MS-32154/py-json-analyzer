@@ -1,0 +1,4 @@
+.vscode/
+temp/
+venv/
+__pycache__/
