@@ -1,0 +1,156 @@
+{
+  "projectId": 12345,
+  "projectName": "Alpha Project",
+  "isActive": true,
+  "startDate": "2025-06-01T08:00:00Z",
+  "endDate": null,
+  "budget": 250000.75,
+  "team": {
+    "teamLead": {
+      "id": 1001,
+      "name": "Alice Johnson",
+      "email": "alice.johnson@example.com",
+      "roles": ["Developer", "Architect"],
+      "contact": {
+        "phone": "+1-555-0123",
+        "address": {
+          "line1": "123 Main St",
+          "line2": "",
+          "city": "Metropolis",
+          "state": "NY",
+          "zip": "10001",
+          "country": "USA"
+        }
+      }
+    },
+    "members": [
+      {
+        "id": 1002,
+        "name": "Bob Smith",
+        "email": "bob.smith@example.com",
+        "roles": ["Developer"],
+        "skills": ["JavaScript", "React", "Node.js"],
+        "available": true,
+        "spam": [1, 2, 3]
+      },
+      {
+        "id": 1003,
+        "name": "Carol Lee",
+        "email": "carol.lee@example.com",
+        "roles": ["QA Engineer"],
+        "skills": ["Selenium", "Cypress", "Postman"],
+        "available": false,
+        "unavailableReason": "On leave",
+        "spam": [1, 2, 3]
+      },
+      {
+        "id": 1004,
+        "name": "David Kim",
+        "email": "david.kim@example.com",
+        "roles": ["DevOps"],
+        "skills": ["Docker", "Kubernetes", "AWS"],
+        "spam": [1, 2, 3],
+        "certifications": [
+          {
+            "name": "AWS Certified Solutions Architect",
+            "issuedBy": "AWS",
+            "date": "2023-11-15"
+          },
+          {
+            "name": "CKA",
+            "issuedBy": "CNCF",
+            "date": "2024-04-22"
+          }
+        ]
+      }
+    ]
+  },
+  "milestones": [
+    {
+      "id": "M1",
+      "description": "Initial design",
+      "dueDate": "2025-07-15",
+      "status": "Completed",
+      "deliverables": [
+        { "name": "DesignDoc.pdf", "sizeMB": 2.3 },
+        { "name": "Wireframes.zip", "sizeMB": 5.8 }
+      ]
+    },
+    {
+      "id": "M2",
+      "description": "Prototype",
+      "dueDate": "2025-09-01",
+      "status": "In Progress",
+      "deliverables": []
+    }
+  ],
+  "tasks": [
+    {
+      "taskId": "T100",
+      "title": "Set up repo",
+      "assignedTo": 1001,
+      "estimatedHours": 8,
+      "loggedHours": 8,
+      "status": "Done",
+      "comments": [
+        { "userId": 1002, "comment": "Looks good!", "timestamp": "2025-06-02T10:15:00Z" }
+      ]
+    },
+    {
+      "taskId": "T101",
+      "title": "API endpoints",
+      "assignedTo": 1002,
+      "estimatedHours": 40,
+      "loggedHours": 12,
+      "status": "In Progress",
+      "comments": []
+    },
+    {
+      "taskId": "T102",
+      "title": "Set up CI/CD",
+      "assignedTo": 1004,
+      "estimatedHours": 24,
+      "loggedHours": 6,
+      "status": "In Progress",
+      "comments": [
+        { "userId": 1004, "comment": "Started pipeline config", "timestamp": "2025-06-10T14:00:00Z" }
+      ]
+    }
+  ],
+  "risks": [
+    { "id": "R1", "description": "Server cost overrun", "impact": "Medium", "mitigation": "Monitor usage" },
+    { "id": "R2", "description": "Third-party API delay", "impact": "High", "mitigation": "Have backup provider" }
+  ],
+  "metadata": {
+    "createdBy": "admin",
+    "createdAt": "2025-05-20T09:30:00Z",
+    "lastUpdatedBy": "Alice Johnson",
+    "lastUpdatedAt": "2025-06-12T16:45:00Z",
+    "tags": ["frontend", "backend", "devops"],
+    "version": "1.3.0"
+  },
+  "settings": {
+    "notifications": {
+      "email": true,
+      "sms": false,
+      "weeklySummary": true
+    },
+    "features": {
+      "enableBeta": false,
+      "maxConcurrentUsers": 500
+    }
+  },
+  "logs": [
+    { "timestamp": "2025-06-01T08:00:00Z", "message": "Project created" },
+    { "timestamp": "2025-06-02T12:30:00Z", "message": "Repository initialized" },
+    { "timestamp": "2025-06-10T14:00:00Z", "message": "CI/CD pipeline configured" }
+  ],
+  "statistics": {
+    "totalTasks": 3,
+    "completedTasks": 1,
+    "pendingTasks": 2,
+    "totalLoggedHours": 26
+  },
+  "notes": null,
+  "priority": "High"
+}

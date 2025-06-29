@@ -121,6 +121,10 @@ Examples:
   json_explorer --url https://api.example.com/data --plot --tree-results
 ```
 
+### Interactive-mode Preview
+
+![interactive-mode](/screenshots/screenshots.gif)
+
 ---
 
 ## 📚 Library Usage
