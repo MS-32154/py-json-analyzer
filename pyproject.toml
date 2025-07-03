@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "py-json-analyzer"
-version = "0.1.2"
+version = "0.1.3"
 description = "Analyze, visualize, and explore JSON data from files or URLs"
 authors = [
     { name="MS-32154", email="msttoffg@gmail.com" }
