@@ -50,7 +50,7 @@ pip install --upgrade py-json-analyzer
 ### 🔹 From Source
 
 ```bash
-git clone https://github.com/MS-32154/json_explorer.git
+git clone https://github.com/MS-32154/py-json-analyzer
 cd json_explorer
 pip install .
 ```
