@@ -1,4 +1,12 @@
 from collections import Counter
+import dateparser
+
+
+def detect_timestamp(value):
+    if not isinstance(value, str):
+        return False
+    parsed = dateparser.parse(value)
+    return parsed is not None
 
 
 def analyze_json(data):
@@ -47,7 +55,13 @@ def analyze_json(data):
 
             return {"type": "list", "child_type": "mixed"}
         else:
-            return {"type": type(node).__name__}
+            if isinstance(node, str):
+                if detect_timestamp(node):
+                    return {"type": "timestamp"}
+                else:
+                    return {"type": "str"}
+            else:
+                return {"type": type(node).__name__}
 
     def merge_object_summaries(summaries):
         key_structures = {}
@@ -173,6 +187,7 @@ if __name__ == "__main__":
                     "settings": {"theme": "dark", "notifications": True},
                 },
                 "tags": ["admin", "user"],
+                "last_login": "2024-07-15T12:30:00Z",
             },
             {
                 "id": 2,
@@ -187,6 +202,7 @@ if __name__ == "__main__":
                 },
                 "tags": ["user"],
                 "email": "bob@example.com",
+                "last_login": "not a date",
             },
         ],
         "metadata": {"total": 2, "created": "2024-01-01"},
