@@ -5,6 +5,8 @@ from .search import JsonSearcher, SearchMode
 from .stats import DataStatsAnalyzer
 from .visualizer import JSONVisualizer
 from .filter_parser import FilterExpressionParser
+from .analyzer import analyze_json
+from .codegen import MultiTargetGenerator, parse_config_string
 
 
 class CLIHandler:
@@ -26,7 +28,7 @@ class CLIHandler:
     def run(self, args):
         """Run CLI mode operations based on arguments."""
         if not self.data:
-            self.console.print("❌ [red]No data loaded[/red]")
+            self.console.print("⌛ [red]No data loaded[/red]")
             return 1
 
         self.console.print(f"📄 Loaded: {self.source}")
@@ -46,6 +48,10 @@ class CLIHandler:
         # Visualization
         if args.plot:
             self._handle_visualization(args)
+
+        # Code generation
+        if args.codegen:
+            self._handle_codegen(args)
 
         return 0
 
@@ -80,7 +86,7 @@ class CLIHandler:
         elif args.search_type == "pair":
             if not args.search_value:
                 self.console.print(
-                    "❌ [red]--search-value required for pair search[/red]"
+                    "⌛ [red]--search-value required for pair search[/red]"
                 )
                 return
             results = self.searcher.search_key_value_pairs(
@@ -91,10 +97,10 @@ class CLIHandler:
                 filter_func = FilterExpressionParser.parse_filter(search_term)
                 results = self.searcher.search_with_filter(self.data, filter_func)
             except Exception as e:
-                self.console.print(f"❌ [red]Filter error: {e}[/red]")
+                self.console.print(f"⌛ [red]Filter error: {e}[/red]")
                 return
         else:
-            self.console.print(f"❌ [red]Unknown search type: {args.search_type}[/red]")
+            self.console.print(f"⌛ [red]Unknown search type: {args.search_type}[/red]")
             return
 
         # Display results
@@ -134,4 +140,72 @@ class CLIHandler:
                 "✅ [green]Visualizations generated successfully[/green]"
             )
         except Exception as e:
-            self.console.print(f"❌ [red]Visualization error: {e}[/red]")
+            self.console.print(f"⌛ [red]Visualization error: {e}[/red]")
+
+    def _handle_codegen(self, args):
+        """Handle code generation."""
+        self.console.print("\n🔧 Generating code from JSON schema...")
+
+        try:
+            # Analyze JSON to generate schema
+            schema = analyze_json(self.data)
+
+            # Create generator
+            root_name = getattr(args, "codegen_root", "Root")
+            generator = MultiTargetGenerator(schema, root_name=root_name)
+
+            # Parse configuration if provided
+            config_dict = {}
+            if hasattr(args, "codegen_config") and args.codegen_config:
+                config_dict = parse_config_string(args.codegen_config)
+
+            # Handle target selection
+            if args.codegen == "all":
+                # Generate all targets
+                self.console.print("📝 Generating code for all supported targets...")
+                results = generator.generate_all(config_dict)
+
+                for target, code in results.items():
+                    self.console.print(f"\n{'='*60}")
+                    self.console.print(
+                        f"🎯 [bold cyan]TARGET: {target.upper()}[/bold cyan]"
+                    )
+                    self.console.print("=" * 60)
+                    print(code)
+
+                self.console.print(
+                    f"\n✅ [green]Generated code for {len(results)} targets[/green]"
+                )
+
+            elif args.codegen in generator.list_targets():
+                # Generate specific target
+                self.console.print(f"📝 Generating {args.codegen.upper()} code...")
+                code = generator.generate(args.codegen, config_dict)
+
+                self.console.print(
+                    f"\n🎯 [bold cyan]{args.codegen.upper()} Code:[/bold cyan]"
+                )
+                self.console.print("-" * 50)
+                print(code)
+
+                self.console.print(f"\n✅ [green]Code generated successfully[/green]")
+
+            else:
+                available = ", ".join(generator.list_targets())
+                self.console.print(f"⌛ [red]Unknown target: {args.codegen}[/red]")
+                self.console.print(
+                    f"[yellow]Available targets: {available}, all[/yellow]"
+                )
+
+        except Exception as e:
+            self.console.print(f"⌛ [red]Code generation error: {e}[/red]")
+
+    def list_codegen_targets(self):
+        """List available code generation targets."""
+        generator = MultiTargetGenerator({})
+        targets = generator.list_targets()
+
+        self.console.print("\n🎯 [bold]Available Code Generation Targets:[/bold]")
+        for target in targets:
+            self.console.print(f"  • [cyan]{target}[/cyan]")
+        self.console.print("  • [cyan]all[/cyan] - Generate code for all targets")

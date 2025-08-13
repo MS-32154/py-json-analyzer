@@ -37,11 +37,16 @@ class JSONExplorer:
             self.source, self.data = load_json(file_path, url)
             return True
         except Exception as e:
-            self.console.print(f"❌ [red]Error loading data: {e}[/red]")
+            self.console.print(f"⌛ [red]Error loading data: {e}[/red]")
             return False
 
     def run(self, args):
         """Main execution method."""
+        # Handle special commands that don't require data
+        if args.list_codegen_targets:
+            self.cli_handler.list_codegen_targets()
+            return 0
+
         if not self.load_data(args.file, args.url):
             return 1
 
@@ -55,7 +60,7 @@ class JSONExplorer:
 
     def _has_cli_actions(self, args) -> bool:
         """Check if any CLI-specific actions are requested."""
-        return any([args.tree, args.search, args.stats, args.plot])
+        return any([args.tree, args.search, args.stats, args.plot, args.codegen])
 
 
 def create_parser():
@@ -70,6 +75,8 @@ Examples:
   %(prog)s data.json --search "name" --search-type key
   %(prog)s data.json --search "isinstance(value, int) and value > 10" --search-type filter
   %(prog)s --url https://api.example.com/data --plot --tree-results
+  %(prog)s data.json --codegen java --codegen-root User --codegen-config "lombok=true,jackson=true"
+  %(prog)s data.json --codegen all --codegen-root ApiResponse
         """,
     )
 
@@ -150,6 +157,30 @@ Examples:
         help="Don't open browser for HTML visualizations",
     )
 
+    # Code generation options
+    codegen_group = parser.add_argument_group("code generation options")
+    codegen_group.add_argument(
+        "--codegen",
+        type=str,
+        help="Generate code for target language (java, python, typescript, go, rust, openapi, graphql, all)",
+    )
+    codegen_group.add_argument(
+        "--codegen-root",
+        type=str,
+        default="Root",
+        help="Root class/type name for generated code (default: Root)",
+    )
+    codegen_group.add_argument(
+        "--codegen-config",
+        type=str,
+        help="Code generation configuration (key=value,key2=value2). Example: lombok=true,jackson=true,package=com.example",
+    )
+    codegen_group.add_argument(
+        "--list-codegen-targets",
+        action="store_true",
+        help="List all available code generation targets",
+    )
+
     return parser
 
 
@@ -162,8 +193,13 @@ def main():
         parser.print_help()
         return 1
 
+    # Handle special commands that don't need file/url
+    if args.list_codegen_targets:
+        explorer = JSONExplorer()
+        return explorer.run(args)
+
     if not (args.file or args.url):
-        print("❌ Error: You must provide a file path or --url")
+        print("⌛ Error: You must provide a file path or --url")
         parser.print_help()
         return 1
 
