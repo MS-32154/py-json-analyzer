@@ -7,9 +7,9 @@ Entry point for the JSON Explorer CLI tool.
 
 Author: MS-32154
 email: msttoffg@gmail.com
-Version: 0.1.3
+Version: 0.2.0
 License: MIT
-Date: 2025-07-03
+Date: 2025-09-01
 """
 
 import argparse

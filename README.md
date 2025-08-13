@@ -1,5 +1,6 @@
-[![Python 3.12+](https://img.shields.io/badge/python-3.12+-blue.svg)](https://www.python.org/downloads/) [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-![Alpha](https://img.shields.io/badge/Status-Alpha-red)
+[![PyPI version](https://img.shields.io/pypi/v/py-json-analyzer.svg)](https://pypi.org/project/py-json-analyzer/)
+[![Python 3.12+](https://img.shields.io/badge/python-3.12+-blue.svg)](https://www.python.org/downloads/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 # 🔍 JSON Explorer
 
@@ -30,6 +31,7 @@ requests==2.32.4
 rich==14.0.0
 setuptools==80.9.0
 matplotlib==3.10.3
+dateparser==1.2.2
 ```
 
 > 💡 On Windows, the `windows-curses` package will be installed automatically to enable terminal UI features.
