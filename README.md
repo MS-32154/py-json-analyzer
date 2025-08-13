@@ -1,3 +1,6 @@
+[![Python 3.12+](https://img.shields.io/badge/python-3.12+-blue.svg)](https://www.python.org/downloads/) [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+![Alpha](https://img.shields.io/badge/Status-Alpha-red)
+
 # 🔍 JSON Explorer
 
 **JSON Explorer** is a powerful CLI and Python library for analyzing, visualizing, and exploring JSON data from files, URLs, or Python objects.
@@ -228,7 +231,7 @@ print_compact_tree(test_data, "Sample Data (Compact)")
 ### Visualizations
 
 ```python
-Generates visual representations of statistics and insights
+# Generates visual representations of statistics and insights
 from json_explorer.visualizer import JSONVisualizer
 
 visualizer = JSONVisualizer()
