@@ -3,3 +3,4 @@ temp/
 venv/
 __pycache__/
 *.egg-info/
+codegen_*_test.py

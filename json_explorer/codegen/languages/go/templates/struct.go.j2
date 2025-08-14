@@ -1,0 +1,9 @@
+{{- "// " + description if description }}
+type {{ struct_name }} struct {
+{%- for field in fields %}
+    {%- if field.comment %}
+    // {{ field.comment }}
+    {%- endif %}
+    {{ field.name }} {{ field.type }}{% if field.json_tag %} {{ field.json_tag }}{% endif %}
+{%- endfor %}
+}
