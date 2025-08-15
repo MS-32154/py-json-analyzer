@@ -17,28 +17,27 @@ from .config import GeneratorConfig, ConfigManager, ConfigError, load_config
 from .templates import TemplateEngine, TemplateError, get_default_template_engine
 
 __all__ = [
-    # Base classes
+    # Base generator interface
     "CodeGenerator",
     "GeneratorError",
     "GenerationResult",
-    # Schema system
+    "generate_code",
+    # Schema system - core data structures
     "Schema",
     "Field",
     "FieldType",
     "convert_analyzer_output",
     "extract_all_schemas",
-    # Naming utilities
+    # Naming utilities - language-agnostic
     "NameSanitizer",
     "NamingCase",
-    # Configuration
+    # Configuration system
     "GeneratorConfig",
     "ConfigManager",
     "ConfigError",
     "load_config",
-    # Templates
+    # Template system
     "TemplateEngine",
     "TemplateError",
     "get_default_template_engine",
-    # Main function
-    "generate_code",
 ]
