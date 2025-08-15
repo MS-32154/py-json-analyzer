@@ -162,9 +162,15 @@ class TemplateEngine:
 
 # Built-in templates for common patterns
 GO_STRUCT_TEMPLATE = """
+{%- if description %}
+// {{ description }}
+{%- endif %}
 type {{ struct_name }} struct {
 {%- for field in fields %}
-    {{ field.name }} {{ field.type }}{% if field.json_tag %} {{ field.json_tag }}{% endif %}
+    {%- if field.comment %}
+    // {{ field.comment }}
+    {%- endif %}
+    {{ field.name }} {{ field.type }} {% if field.json_tag %} {{ field.json_tag }} {% endif %}
 {%- endfor %}
 }
 """
