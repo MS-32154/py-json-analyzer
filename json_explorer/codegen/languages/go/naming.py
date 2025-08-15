@@ -81,18 +81,6 @@ def create_go_sanitizer() -> NameSanitizer:
     return NameSanitizer(GO_RESERVED_WORDS, GO_BUILTIN_TYPES)
 
 
-def sanitize_go_struct_name(name: str) -> str:
-    """Sanitize name for Go struct (PascalCase, exported)."""
-    sanitizer = create_go_sanitizer()
-    return sanitizer.sanitize_name(name, NamingCase.PASCAL_CASE)
-
-
-def sanitize_go_field_name(name: str) -> str:
-    """Sanitize name for Go struct field (PascalCase, exported)."""
-    sanitizer = create_go_sanitizer()
-    return sanitizer.sanitize_name(name, NamingCase.PASCAL_CASE)
-
-
 def validate_go_package_name(name: str) -> list[str]:
     """
     (NOT USED YET)

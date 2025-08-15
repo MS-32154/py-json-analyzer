@@ -5,7 +5,7 @@ Generates Go structs with JSON tags from JSON schema analysis.
 """
 
 from .generator import GoGenerator
-from .naming import create_go_sanitizer, sanitize_go_struct_name, sanitize_go_field_name
+from .naming import create_go_sanitizer
 
 # Default configuration
 DEFAULT_CONFIG = {
@@ -30,11 +30,4 @@ def create_generator(config=None):
     return GoGenerator(final_config)
 
 
-__all__ = [
-    "GoGenerator",
-    "create_generator",
-    "DEFAULT_CONFIG",
-    "create_go_sanitizer",
-    "sanitize_go_struct_name",
-    "sanitize_go_field_name",
-]
+__all__ = ["GoGenerator", "create_generator", "DEFAULT_CONFIG", "create_go_sanitizer"]
