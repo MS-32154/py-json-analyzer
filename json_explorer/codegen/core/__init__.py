@@ -12,16 +12,7 @@ from .schema import (
     convert_analyzer_output,
     extract_all_schemas,
 )
-from .naming import (
-    NameSanitizer,
-    NamingCase,
-    create_go_sanitizer,
-    create_python_sanitizer,
-    sanitize_go_struct_name,
-    sanitize_go_field_name,
-    sanitize_python_class_name,
-    sanitize_python_field_name,
-)
+from .naming import NameSanitizer, NamingCase
 from .config import GeneratorConfig, ConfigManager, ConfigError, load_config
 from .templates import TemplateEngine, TemplateError, get_default_template_engine
 
@@ -39,12 +30,6 @@ __all__ = [
     # Naming utilities
     "NameSanitizer",
     "NamingCase",
-    "create_go_sanitizer",
-    "create_python_sanitizer",
-    "sanitize_go_struct_name",
-    "sanitize_go_field_name",
-    "sanitize_python_class_name",
-    "sanitize_python_field_name",
     # Configuration
     "GeneratorConfig",
     "ConfigManager",

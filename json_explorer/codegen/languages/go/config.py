@@ -63,68 +63,6 @@ class GoConfig(GeneratorConfig):
             raise ValueError(f"Invalid float_type: {float_type}")
 
 
-def validate_go_package_name(name: str) -> List[str]:
-    """
-    Validate Go package name according to Go naming rules.
-
-    Returns:
-        List of validation errors (empty if valid)
-    """
-    errors = []
-
-    if not name:
-        errors.append("Package name cannot be empty")
-        return errors
-
-    # Check basic identifier rules
-    if not name.isidentifier():
-        errors.append(f"'{name}' is not a valid Go identifier")
-
-    # Go-specific rules
-    if name[0].isupper():
-        errors.append("Package names should be lowercase")
-
-    if "_" in name:
-        errors.append("Package names should not contain underscores")
-
-    if "-" in name:
-        errors.append("Package names should not contain hyphens")
-
-    # Reserved names
-    go_reserved = {
-        "break",
-        "case",
-        "chan",
-        "const",
-        "continue",
-        "default",
-        "defer",
-        "else",
-        "fallthrough",
-        "for",
-        "func",
-        "go",
-        "goto",
-        "if",
-        "import",
-        "interface",
-        "map",
-        "package",
-        "range",
-        "return",
-        "select",
-        "struct",
-        "switch",
-        "type",
-        "var",
-    }
-
-    if name.lower() in go_reserved:
-        errors.append(f"'{name}' is a Go reserved word")
-
-    return errors
-
-
 def get_go_type_imports(fields_data: List[Dict[str, Any]]) -> List[str]:
     """
     Determine what imports are needed based on field types.

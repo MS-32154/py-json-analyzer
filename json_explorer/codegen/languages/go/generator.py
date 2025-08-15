@@ -7,7 +7,8 @@ Generates Go structs with JSON tags from JSON schema analysis.
 from typing import Dict, List, Optional, Any
 from ...core.generator import CodeGenerator
 from ...core.schema import Schema, Field, FieldType
-from ...core.naming import create_go_sanitizer, NamingCase
+from ...core.naming import NamingCase
+from .naming import create_go_sanitizer
 from ...core.templates import get_default_template_engine
 
 
