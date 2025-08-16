@@ -1,16 +1,16 @@
 """
-Go code generator implementation - Integrated with new type system.
+Go code generator implementation.
 
 Generates Go structs with JSON tags from JSON schema analysis.
 """
 
 from typing import Dict, List, Optional, Any
+from pathlib import Path
 from ...core.generator import CodeGenerator
 from ...core.schema import Schema, Field
 from ...core.naming import NamingCase
 from .naming import create_go_sanitizer
 from .types import GoTypeMapper, GoTypeConfig, GoType, PointerStrategy, ConflictStrategy
-from ...core.templates import get_default_template_engine
 
 
 class GoGenerator(CodeGenerator):
@@ -22,7 +22,6 @@ class GoGenerator(CodeGenerator):
 
         # Initialize naming
         self.sanitizer = create_go_sanitizer()
-        self.template_engine = get_default_template_engine()
 
         # Extract configuration
         self.package_name = self.config.get("package_name", "main")
@@ -36,9 +35,15 @@ class GoGenerator(CodeGenerator):
         # State tracking
         self.generated_structs = set()
 
+    def get_template_directory(self) -> Optional[Path]:
+        """Return the Go templates directory."""
+        # Get the directory containing this file, then go to templates/
+        current_file = Path(__file__)
+        template_dir = current_file.parent / "templates"
+        return template_dir if template_dir.exists() else None
+
     def _build_type_config(self) -> GoTypeConfig:
         """Build GoTypeConfig from generator config."""
-        # Map old config format to new type config
         config = self.config
 
         # Determine pointer strategy
@@ -76,7 +81,7 @@ class GoGenerator(CodeGenerator):
         return ".go"
 
     def generate(self, schemas: Dict[str, Schema], root_schema_name: str) -> str:
-        """Generate complete Go code for all schemas."""
+        """Generate complete Go code for all schemas using templates."""
         # Reset state
         self.generated_structs.clear()
         self.sanitizer.reset_used_names()
@@ -96,19 +101,19 @@ class GoGenerator(CodeGenerator):
                     struct_definitions.append(struct_code)
                     self.generated_structs.add(schema_name)
 
-        # Build complete file
+        # Build complete file using templates
         parts = []
 
         # Package declaration
-        package_decl = self.get_package_declaration()
+        package_decl = self._render_package_declaration()
         if package_decl:
-            parts.append(package_decl)
+            parts.append(package_decl.strip())
             parts.append("")  # Empty line
 
-        # Imports - using type system
-        imports = self.get_import_statements(schemas)
-        if imports:
-            parts.extend(imports)
+        # Imports
+        imports_section = self._render_imports_section(schemas)
+        if imports_section:
+            parts.append(imports_section.strip())
             parts.append("")  # Empty line
 
         # Struct definitions
@@ -117,10 +122,10 @@ class GoGenerator(CodeGenerator):
         return "\n".join(parts)
 
     def generate_single_schema(self, schema: Schema) -> str:
-        """Generate Go struct for a single schema."""
+        """Generate Go struct for a single schema using templates."""
         struct_name = self.sanitizer.sanitize_name(schema.name, NamingCase.PASCAL_CASE)
 
-        # Generate fields using new type system
+        # Generate fields using type system
         field_data_list = []
         go_types_used = []
 
@@ -130,24 +135,23 @@ class GoGenerator(CodeGenerator):
                 field_data_list.append(field_data)
                 go_types_used.append(go_type)
 
-        # Build template data
-        template_data = {
+        # Build template context
+        template_context = {
             "struct_name": struct_name,
             "description": schema.description if self.add_comments else None,
             "fields": field_data_list,
         }
 
-        # Use template if available, otherwise generate manually
-        try:
-            return self.template_engine.render_template("go_struct", template_data)
-        except:
-            # Fallback to manual generation
-            return self._generate_struct_manually(template_data)
+        # Render using struct template
+        if self.template_exists("struct.go.j2"):
+            return self.render_template("struct.go.j2", template_context)
+        else:
+            raise RuntimeError("struct.go.j2 template not found")
 
     def _generate_field_data(
         self, field: Field, schema_context: str
     ) -> tuple[Optional[Dict[str, Any]], GoType]:
-        """Generate field data for template using new type system."""
+        """Generate field data for template using type system."""
         # Use type system to map the field
         go_type = self.type_mapper.map_field_type(field, schema_context)
 
@@ -165,22 +169,29 @@ class GoGenerator(CodeGenerator):
         if self.add_comments and field.description:
             field_data["comment"] = field.description
 
-        # Generate JSON tag
+        # Generate JSON tag using template
         if self.generate_json_tags:
-            field_data["json_tag"] = self._generate_json_tag(field, go_type)
+            field_data["json_tag"] = self._render_json_tag(field, go_type)
 
         return field_data, go_type
 
-    def map_field_type(self, field: Field) -> str:
-        """
-        Legacy method for backwards compatibility.
-        Delegates to the type system.
-        """
-        go_type = self.type_mapper.map_field_type(field, "")
-        return go_type.name
+    def _render_json_tag(self, field: Field, go_type: GoType) -> str:
+        """Render JSON tag using template."""
+        if not self.template_exists("json_tag.go.j2"):
+            # Fallback to manual generation if template doesn't exist
+            return self._generate_json_tag_fallback(field, go_type)
 
-    def _generate_json_tag(self, field: Field, go_type: GoType) -> str:
-        """Generate JSON struct tag for field using type information."""
+        tag_context = {
+            "original_name": field.original_name,
+            "optional": field.optional,
+            "omitempty": self.type_config.omit_empty_optional,
+            "custom_options": go_type.custom_json_tag,
+        }
+
+        return self.render_template("json_tag.go.j2", tag_context)
+
+    def _generate_json_tag_fallback(self, field: Field, go_type: GoType) -> str:
+        """Fallback JSON tag generation if template is missing."""
         tag_parts = [f'"{field.original_name}"']
 
         # Add omitempty for optional fields if configured
@@ -194,6 +205,36 @@ class GoGenerator(CodeGenerator):
         tag_content = ",".join(tag_parts)
         return f"`json:{tag_content}`"
 
+    def _render_package_declaration(self) -> str:
+        """Render package declaration using template."""
+        if self.template_exists("package.go.j2"):
+            context = {"package_name": self.package_name}
+            return self.render_template("package.go.j2", context)
+        else:
+            # Fallback
+            return f"package {self.package_name}"
+
+    def _render_imports_section(self, schemas: Dict[str, Schema]) -> str:
+        """Render imports section using template."""
+        imports = self.get_import_statements(schemas)
+
+        if not imports:
+            return ""
+
+        if self.template_exists("imports.go.j2"):
+            context = {"imports": imports}
+            return self.render_template("imports.go.j2", context)
+        else:
+            # Fallback
+            if len(imports) == 1:
+                return f"import {imports[0]}"
+
+            lines = ["import ("]
+            for imp in imports:
+                lines.append(f"\t{imp}")
+            lines.append(")")
+            return "\n".join(lines)
+
     def get_import_statements(self, schemas: Dict[str, Schema]) -> List[str]:
         """Get required import statements using type system."""
         # Collect all types used across all schemas
@@ -206,25 +247,11 @@ class GoGenerator(CodeGenerator):
 
         # Use type system to determine imports
         imports_needed = self.type_mapper.get_all_imports(all_go_types)
-
-        if not imports_needed:
-            return []
-
-        # Format imports
-        if len(imports_needed) == 1:
-            return [f"import {list(imports_needed)[0]}"]
-
-        # Multiple imports
-        lines = ["import ("]
-        for imp in sorted(imports_needed):
-            lines.append(f"\t{imp}")
-        lines.append(")")
-
-        return lines
+        return sorted(imports_needed)
 
     def get_package_declaration(self) -> Optional[str]:
         """Get Go package declaration."""
-        return f"package {self.package_name}"
+        return self._render_package_declaration()
 
     def validate_schemas(self, schemas: Dict[str, Schema]) -> List[str]:
         """Validate schemas for Go generation using type system."""
@@ -265,29 +292,15 @@ class GoGenerator(CodeGenerator):
         if not self.package_name.isidentifier():
             warnings.append(f"Invalid Go package name: {self.package_name}")
 
+        # Validate template availability
+        required_templates = ["struct.go.j2"]
+        for template_name in required_templates:
+            if not self.template_exists(template_name):
+                warnings.append(
+                    f"Template {template_name} not found - using fallback generation"
+                )
+
         return warnings
-
-    def _generate_struct_manually(self, data: Dict[str, Any]) -> str:
-        """Manual struct generation fallback."""
-        lines = []
-
-        if data.get("description"):
-            lines.append(f"// {data['description']}")
-
-        lines.append(f"type {data['struct_name']} struct {{")
-
-        for field in data["fields"]:
-            if field.get("comment"):
-                lines.append(f"\t// {field['comment']}")
-
-            field_line = f"\t{field['name']} {field['type']}"
-            if field.get("json_tag"):
-                field_line += f" {field['json_tag']}"
-            lines.append(field_line)
-
-        lines.append("}")
-
-        return "\n".join(lines)
 
     def _get_generation_order(
         self, schemas: Dict[str, Schema], root_name: str
@@ -362,7 +375,7 @@ class GoGenerator(CodeGenerator):
         return "\n".join(result_lines)
 
 
-# Factory function with type system integration
+# Factory functions with template-based generators
 def create_go_generator(config: Optional[Dict[str, Any]] = None) -> GoGenerator:
     """Create a Go generator with default configuration."""
     default_config = {

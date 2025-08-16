@@ -14,7 +14,7 @@ from .schema import (
 )
 from .naming import NameSanitizer, NamingCase
 from .config import GeneratorConfig, ConfigManager, ConfigError, load_config
-from .templates import TemplateEngine, TemplateError, get_default_template_engine
+from .templates import TemplateEngine, TemplateError, create_template_engine
 
 __all__ = [
     # Base generator interface
@@ -36,8 +36,8 @@ __all__ = [
     "ConfigManager",
     "ConfigError",
     "load_config",
-    # Template system
+    # Template system - language-agnostic
     "TemplateEngine",
     "TemplateError",
-    "get_default_template_engine",
+    "create_template_engine",
 ]

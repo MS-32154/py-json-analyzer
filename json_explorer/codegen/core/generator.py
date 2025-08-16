@@ -2,12 +2,13 @@
 Base generator interface for all code generation targets.
 
 Defines the contract that all language generators must implement.
-Focuses on schema-level concerns while leaving type mapping to language generators.
 """
 
 from abc import ABC, abstractmethod
 from typing import Dict, List, Any, Optional
+from pathlib import Path
 from .schema import Schema, Field, FieldType
+from .templates import TemplateEngine, create_template_engine
 
 
 class GeneratorError(Exception):
@@ -22,6 +23,17 @@ class CodeGenerator(ABC):
     def __init__(self, config: Optional[Dict[str, Any]] = None):
         """Initialize generator with optional configuration."""
         self.config = config or {}
+        self._template_engine = None
+        self._setup_templates()
+
+    def _setup_templates(self):
+        """Setup template engine for this generator."""
+        template_dir = self.get_template_directory()
+        if template_dir:
+            self._template_engine = create_template_engine(template_dir)
+        else:
+            # Fallback to in-memory templates
+            self._template_engine = create_template_engine()
 
     @property
     @abstractmethod
@@ -34,6 +46,25 @@ class CodeGenerator(ABC):
     def file_extension(self) -> str:
         """Return the file extension for generated files (e.g., '.go', '.py')."""
         pass
+
+    def get_template_directory(self) -> Optional[Path]:
+        """
+        Return the directory containing templates for this generator.
+
+        Subclasses should override this to provide their template directory.
+        Return None to use in-memory templates only.
+
+        Returns:
+            Path to template directory or None
+        """
+        return None
+
+    @property
+    def template_engine(self) -> TemplateEngine:
+        """Get the template engine for this generator."""
+        if self._template_engine is None:
+            self._setup_templates()
+        return self._template_engine
 
     @abstractmethod
     def generate(self, schemas: Dict[str, Schema], root_schema_name: str) -> str:
@@ -158,6 +189,25 @@ class CodeGenerator(ABC):
 
         return "\n".join(formatted_lines)
 
+    # Template helper methods
+
+    def render_template(self, template_name: str, context: Dict[str, Any]) -> str:
+        """
+        Render a template with context.
+
+        Args:
+            template_name: Template file name
+            context: Template variables
+
+        Returns:
+            Rendered content
+        """
+        return self.template_engine.render_template(template_name, context)
+
+    def template_exists(self, template_name: str) -> bool:
+        """Check if a template exists."""
+        return self.template_engine.template_exists(template_name)
+
 
 class GenerationResult:
     """Container for generation results and metadata."""
@@ -186,14 +236,6 @@ class GenerationResult:
         result.error_message = message
         result.exception = exception
         return result
-
-    def add_warning(self, warning: str):
-        """Add a warning to the result."""
-        self.warnings.append(warning)
-
-    def add_metadata(self, key: str, value: Any):
-        """Add metadata to the result."""
-        self.metadata[key] = value
 
 
 def generate_code(

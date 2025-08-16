@@ -1,0 +1,14 @@
+{# Complete Go file template - combines all sections #}
+{%- include "package.go.j2" %}
+
+{%- include "imports.go.j2" -%}
+{%- if imports %}
+
+{%- endif %}
+
+{%- for struct in structs %}
+{%- include "struct.go.j2" -%}
+{%- if not loop.last %}
+
+{%- endif %}
+{%- endfor %}

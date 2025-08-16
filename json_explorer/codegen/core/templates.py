@@ -1,19 +1,18 @@
 """
 Template engine wrapper for code generation.
 
-Provides a simple interface for Jinja2 template rendering
+Provides a clean, language-agnostic interface for Jinja2 template rendering
 with common utilities for code generation.
 """
 
-import os
 from typing import Dict, Any, Optional
 from pathlib import Path
+from .naming import NameSanitizer
 
 try:
     from jinja2 import (
         Environment,
         FileSystemLoader,
-        BaseLoader,
         DictLoader,
         select_autoescape,
     )
@@ -33,7 +32,7 @@ class TemplateError(Exception):
 
 
 class TemplateEngine:
-    """Wrapper for Jinja2 template engine with code generation utilities."""
+    """Language-agnostic wrapper for Jinja2 template engine."""
 
     def __init__(self, template_dir: Optional[Path] = None):
         """
@@ -42,6 +41,8 @@ class TemplateEngine:
         Args:
             template_dir: Directory containing template files
         """
+        self._name_sanitizer = NameSanitizer()
+
         if Environment is None:
             raise TemplateError(
                 "Jinja2 is required for template functionality. "
@@ -57,17 +58,17 @@ class TemplateEngine:
         if self.template_dir and self.template_dir.exists():
             loader = FileSystemLoader(str(self.template_dir))
         else:
-            # Use in-memory templates
+            # Use in-memory templates as fallback
             loader = DictLoader({})
 
         self._env = Environment(
             loader=loader,
             autoescape=select_autoescape(["html", "xml"]),
-            # trim_blocks=True,
             lstrip_blocks=True,
+            # trim_blocks=True,
         )
 
-        # Add custom filters for code generation
+        # Add language-agnostic filters for code generation
         self._env.filters["snake_case"] = self._snake_case_filter
         self._env.filters["camel_case"] = self._camel_case_filter
         self._env.filters["pascal_case"] = self._pascal_case_filter
@@ -79,7 +80,7 @@ class TemplateEngine:
         Render a template with the given context.
 
         Args:
-            template_name: Name of template file
+            template_name: Name of template file (e.g., 'struct.go.j2')
             context: Variables to pass to template
 
         Returns:
@@ -122,31 +123,31 @@ class TemplateEngine:
 
         self._env.loader.mapping[name] = content
 
-    # Template filters for code generation
+    def template_exists(self, template_name: str) -> bool:
+        """Check if a template exists."""
+        try:
+            self._env.get_template(template_name)
+            return True
+        except:
+            return False
+
+    def list_templates(self) -> list[str]:
+        """List all available templates."""
+        try:
+            return self._env.list_templates()
+        except:
+            return []
+
+    # Language-agnostic template filters
 
     def _snake_case_filter(self, value: str) -> str:
-        """Convert string to snake_case."""
-        import re
-
-        # Insert underscore before uppercase letters
-        s1 = re.sub("([a-z0-9])([A-Z])", r"\1_\2", str(value))
-        # Replace spaces and hyphens with underscores
-        s2 = re.sub(r"[-\s]+", "_", s1)
-        return s2.lower()
+        return self._name_sanitizer._to_snake_case(value)
 
     def _camel_case_filter(self, value: str) -> str:
-        """Convert string to camelCase."""
-        snake = self._snake_case_filter(value)
-        parts = snake.split("_")
-        if not parts:
-            return str(value)
-        return parts[0].lower() + "".join(p.capitalize() for p in parts[1:])
+        return self._name_sanitizer._to_camel_case(value)
 
     def _pascal_case_filter(self, value: str) -> str:
-        """Convert string to PascalCase."""
-        snake = self._snake_case_filter(value)
-        parts = snake.split("_")
-        return "".join(p.capitalize() for p in parts if p)
+        return self._name_sanitizer._to_pascal_case(value)
 
     def _indent_filter(self, value: str, spaces: int = 4) -> str:
         """Indent all lines in a string."""
@@ -160,61 +161,14 @@ class TemplateEngine:
         return "\n".join(f"{style} {line}" if line.strip() else line for line in lines)
 
 
-# Built-in templates for common patterns
-GO_STRUCT_TEMPLATE = """
-{%- if description %}
-// {{ description }}
-{%- endif %}
-type {{ struct_name }} struct {
-{%- for field in fields %}
-    {%- if field.comment %}
-    // {{ field.comment }}
-    {%- endif %}
-    {{ field.name }} {{ field.type }} {% if field.json_tag %} {{ field.json_tag }} {% endif %}
-{%- endfor %}
-}
-"""
-
-PYTHON_DATACLASS_TEMPLATE = """
-@dataclass
-class {{ class_name }}:
-{%- for field in fields %}
-    {{ field.name }}: {{ field.type }}{% if field.optional %} = None{% endif %}
-{%- endfor %}
-"""
-
-# Default template engine instance
-_default_engine = None
-
-
-def get_default_template_engine() -> TemplateEngine:
-    """Get the default template engine instance."""
-    global _default_engine
-    if _default_engine is None:
-        _default_engine = TemplateEngine()
-
-        # Add built-in templates
-        _default_engine.add_template("go_struct", GO_STRUCT_TEMPLATE)
-        _default_engine.add_template("python_dataclass", PYTHON_DATACLASS_TEMPLATE)
-
-    return _default_engine
-
-
-def render_go_struct(
-    struct_name: str, fields: list, context: Dict[str, Any] = None
-) -> str:
+def create_template_engine(template_dir: Optional[Path] = None) -> TemplateEngine:
     """
-    Convenience function to render a Go struct.
+    Create a template engine instance.
 
     Args:
-        struct_name: Name of the struct
-        fields: List of field dictionaries
-        context: Additional context variables
+        template_dir: Directory containing template files
 
     Returns:
-        Rendered Go struct code
+        Configured TemplateEngine instance
     """
-    engine = get_default_template_engine()
-    template_context = {"struct_name": struct_name, "fields": fields, **(context or {})}
-
-    return engine.render_template("go_struct", template_context)
+    return TemplateEngine(template_dir)

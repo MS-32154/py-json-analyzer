@@ -1,1 +1,1 @@
-`json:"{{ field.original_name }}{% if field.optional and omitempty %},omitempty{% endif %}{% if field.custom_tag_options %},{{ field.custom_tag_options }}{% endif %}"`
+`json:"{{ original_name }}{%- if optional and omitempty %},omitempty{%- endif %}{%- if custom_options %},{{ custom_options }}{%- endif %}"`

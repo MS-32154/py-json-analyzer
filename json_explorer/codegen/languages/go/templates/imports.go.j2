@@ -1,0 +1,11 @@
+{%- if imports %}
+{%- if imports|length == 1 %}
+import {{ imports[0] }}
+{%- else %}
+import (
+{%- for import_stmt in imports %}
+	{{ import_stmt }}
+{%- endfor %}
+)
+{%- endif %}
+{%- endif %}
