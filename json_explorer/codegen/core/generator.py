@@ -5,9 +5,10 @@ Defines the contract that all language generators must implement.
 """
 
 from abc import ABC, abstractmethod
-from typing import Dict, List, Any, Optional
+from typing import Dict, List, Any
 from pathlib import Path
-from .schema import Schema, Field, FieldType
+from .schema import Schema, FieldType
+from .config import GeneratorConfig
 from .templates import TemplateEngine, create_template_engine
 
 
@@ -20,20 +21,19 @@ class GeneratorError(Exception):
 class CodeGenerator(ABC):
     """Abstract base class for all code generators."""
 
-    def __init__(self, config: Optional[Dict[str, Any]] = None):
-        """Initialize generator with optional configuration."""
-        self.config = config or {}
+    def __init__(self, config: GeneratorConfig):
+        """Initialize generator with configuration."""
+        self.config = config
         self._template_engine = None
         self._setup_templates()
 
     def _setup_templates(self):
         """Setup template engine for this generator."""
         template_dir = self.get_template_directory()
-        if template_dir:
+        if template_dir and template_dir.exists():
             self._template_engine = create_template_engine(template_dir)
         else:
-            # Fallback to in-memory templates
-            self._template_engine = create_template_engine()
+            raise GeneratorError(f"Template directory not found: {template_dir}")
 
     @property
     @abstractmethod
@@ -47,23 +47,14 @@ class CodeGenerator(ABC):
         """Return the file extension for generated files (e.g., '.go', '.py')."""
         pass
 
-    def get_template_directory(self) -> Optional[Path]:
-        """
-        Return the directory containing templates for this generator.
-
-        Subclasses should override this to provide their template directory.
-        Return None to use in-memory templates only.
-
-        Returns:
-            Path to template directory or None
-        """
-        return None
+    @abstractmethod
+    def get_template_directory(self) -> Path:
+        """Return the directory containing templates for this generator."""
+        pass
 
     @property
     def template_engine(self) -> TemplateEngine:
         """Get the template engine for this generator."""
-        if self._template_engine is None:
-            self._setup_templates()
         return self._template_engine
 
     @abstractmethod
@@ -80,19 +71,6 @@ class CodeGenerator(ABC):
         """
         pass
 
-    @abstractmethod
-    def generate_single_schema(self, schema: Schema) -> str:
-        """
-        Generate code for a single schema.
-
-        Args:
-            schema: Schema to generate code for
-
-        Returns:
-            Generated code for this schema only
-        """
-        pass
-
     def get_import_statements(self, schemas: Dict[str, Schema]) -> List[str]:
         """
         Get any required import statements for the generated code.
@@ -105,20 +83,9 @@ class CodeGenerator(ABC):
         """
         return []
 
-    def get_package_declaration(self) -> Optional[str]:
-        """
-        Get package/namespace declaration if needed.
-
-        Returns:
-            Package declaration string or None
-        """
-        return None
-
     def validate_schemas(self, schemas: Dict[str, Schema]) -> List[str]:
         """
         Validate schemas for basic structural issues.
-
-        Language generators should override this to add language-specific validation.
 
         Args:
             schemas: Schemas to validate
@@ -147,24 +114,11 @@ class CodeGenerator(ABC):
                 elif field.type == FieldType.UNKNOWN:
                     warnings.append(f"Unknown type in {schema.name}.{field.name}")
 
-                # Check for missing nested schemas
-                if field.type == FieldType.OBJECT and not field.nested_schema:
-                    warnings.append(
-                        f"Object field {schema.name}.{field.name} has no nested schema"
-                    )
-
-                # Check for array fields with unclear element types
-                if field.type == FieldType.ARRAY:
-                    if not field.array_element_type and not field.array_element_schema:
-                        warnings.append(
-                            f"Array field {schema.name}.{field.name} has no element type information"
-                        )
-
         return warnings
 
     def format_code(self, code: str) -> str:
         """
-        Apply language-specific formatting to generated code.
+        Apply basic formatting to generated code.
 
         Args:
             code: Raw generated code
@@ -172,7 +126,6 @@ class CodeGenerator(ABC):
         Returns:
             Formatted code
         """
-        # Basic cleanup - remove excessive blank lines
         lines = code.split("\n")
         formatted_lines = []
         blank_count = 0
@@ -190,18 +143,8 @@ class CodeGenerator(ABC):
         return "\n".join(formatted_lines)
 
     # Template helper methods
-
     def render_template(self, template_name: str, context: Dict[str, Any]) -> str:
-        """
-        Render a template with context.
-
-        Args:
-            template_name: Template file name
-            context: Template variables
-
-        Returns:
-            Rendered content
-        """
+        """Render a template with context."""
         return self.template_engine.render_template(template_name, context)
 
     def template_exists(self, template_name: str) -> bool:
@@ -215,14 +158,7 @@ class GenerationResult:
     def __init__(
         self, code: str, warnings: List[str] = None, metadata: Dict[str, Any] = None
     ):
-        """
-        Initialize generation result.
-
-        Args:
-            code: Generated code
-            warnings: Any warnings from generation
-            metadata: Additional metadata about generation
-        """
+        """Initialize generation result."""
         self.code = code
         self.warnings = warnings or []
         self.metadata = metadata or {}
@@ -253,7 +189,7 @@ def generate_code(
         GenerationResult with code, warnings, and metadata
     """
     try:
-        # Validate schemas at the base level
+        # Validate schemas
         warnings = generator.validate_schemas(schemas)
 
         # Generate code
@@ -268,21 +204,9 @@ def generate_code(
             "file_extension": generator.file_extension,
             "schema_count": len(schemas),
             "root_schema": root_schema_name,
-            "has_conflicts": any(
-                field.type == FieldType.CONFLICT
-                for schema in schemas.values()
-                for field in schema.fields
-            ),
-            "has_unknowns": any(
-                field.type == FieldType.UNKNOWN
-                for schema in schemas.values()
-                for field in schema.fields
-            ),
         }
 
-        result = GenerationResult(formatted_code, warnings, metadata)
-
-        return result
+        return GenerationResult(formatted_code, warnings, metadata)
 
     except Exception as e:
         return GenerationResult.error(f"Code generation failed: {str(e)}", exception=e)

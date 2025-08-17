@@ -1,14 +1,34 @@
-{# Complete Go file template - combines all sections #}
-{%- include "package.go.j2" %}
+package {{ package_name }}
 
-{%- include "imports.go.j2" -%}
 {%- if imports %}
 
-{%- endif %}
+{%- if imports|length == 1 %}
 
+import {{ imports[0] }}
+{%- else %}
+
+import (
+{%- for import_stmt in imports %}
+	{{ import_stmt }}
+{%- endfor %}
+)
+
+{%- endif %}
+{%- endif %}
+{# #}
 {%- for struct in structs %}
-{%- include "struct.go.j2" -%}
-{%- if not loop.last %}
 
+{%- if struct.description %}
+// {{ struct.description }}
 {%- endif %}
+type {{ struct.struct_name }} struct {
+{%- for field in struct.fields %}
+{%- if field.comment %}
+	// {{ field.comment }}
+{%- endif %}
+	{{ field.name }} {{ field.type }}
+{%- if field.json_tag %} {{ field.json_tag }}{%- endif %}
+{%- endfor %}
+}
+{# #}
 {%- endfor %}

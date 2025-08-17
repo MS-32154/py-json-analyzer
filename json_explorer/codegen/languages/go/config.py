@@ -1,144 +1,115 @@
 """
-Go-specific configuration and validation.
+Go-specific configuration and type mappings.
 
-Extends the base configuration system with Go-specific settings.
+Provides simple type mapping and Go-specific configuration.
 """
 
-from typing import Dict, Any, List
-from json_explorer.codegen.core.config import GeneratorConfig
+from typing import Set
+from ...core.schema import FieldType
+from .naming import GO_BUILTIN_TYPES, GO_RESERVED_WORDS
 
 
-class GoConfig(GeneratorConfig):
+# Go type mappings
+GO_TYPE_MAP = {
+    FieldType.STRING: "string",
+    FieldType.INTEGER: "int64",
+    FieldType.FLOAT: "float64",
+    FieldType.BOOLEAN: "bool",
+    FieldType.TIMESTAMP: "time.Time",
+    FieldType.UNKNOWN: "interface{}",
+    FieldType.CONFLICT: "interface{}",
+}
+
+# Types that require imports
+GO_IMPORT_MAP = {"time.Time": '"time"'}
+
+
+class GoConfig:
     """Go-specific configuration."""
 
     def __init__(self, **kwargs):
-        """Initialize Go configuration with defaults."""
-        super().__init__(**kwargs)
+        """Initialize Go configuration."""
+        # Type preferences
+        self.int_type = kwargs.get("int_type", "int64")
+        self.float_type = kwargs.get("float_type", "float64")
+        self.string_type = kwargs.get("string_type", "string")
+        self.bool_type = kwargs.get("bool_type", "bool")
+        self.time_type = kwargs.get("time_type", "time.Time")
+        self.unknown_type = kwargs.get("unknown_type", "interface{}")
 
-        # Go-specific defaults
-        if not self.custom:
-            self.custom = {}
+        # Pointer settings
+        self.use_pointers_for_optional = kwargs.get("use_pointers_for_optional", True)
 
-        # Set Go defaults
-        self.custom.setdefault("time_format", "RFC3339")
-        self.custom.setdefault("int_type", "int64")
-        self.custom.setdefault("float_type", "float64")
-        self.custom.setdefault("string_type", "string")
-        self.custom.setdefault("bool_type", "bool")
+        # Build type map with configured types
+        self.type_map = GO_TYPE_MAP.copy()
+        self.type_map[FieldType.INTEGER] = self.int_type
+        self.type_map[FieldType.FLOAT] = self.float_type
+        self.type_map[FieldType.STRING] = self.string_type
+        self.type_map[FieldType.BOOLEAN] = self.bool_type
+        self.type_map[FieldType.TIMESTAMP] = self.time_type
+        self.type_map[FieldType.UNKNOWN] = self.unknown_type
+        self.type_map[FieldType.CONFLICT] = self.unknown_type
 
-        # Validate Go-specific settings
-        self._validate_go_settings()
+    def get_go_type(
+        self,
+        field_type: FieldType,
+        is_optional: bool = False,
+        is_array: bool = False,
+        element_type: str = None,
+    ) -> str:
+        """Get Go type string for a field type."""
+        if is_array:
+            if element_type:
+                base_type = element_type
+            else:
+                base_type = self.type_map.get(field_type, self.unknown_type)
+            go_type = f"[]{base_type}"
+        else:
+            go_type = self.type_map.get(field_type, self.unknown_type)
 
-    def _validate_go_settings(self):
-        """Validate Go-specific configuration."""
-        # Validate time format
-        valid_time_formats = {
-            "RFC3339",
-            "RFC3339Nano",
-            "RFC822",
-            "RFC822Z",
-            "RFC850",
-            "RFC1123",
-            "RFC1123Z",
-            "Kitchen",
-            "Stamp",
-            "StampMilli",
-            "StampMicro",
-            "StampNano",
-        }
+        # Add pointer for optional fields if configured
+        if is_optional and self.use_pointers_for_optional and not is_array:
+            if not go_type.startswith("[]") and go_type not in ["interface{}", "any"]:
+                go_type = f"*{go_type}"
 
-        time_format = self.custom.get("time_format")
-        if time_format and time_format not in valid_time_formats:
-            raise ValueError(f"Invalid time_format: {time_format}")
+        return go_type
 
-        # Validate numeric types
-        valid_int_types = {"int", "int8", "int16", "int32", "int64"}
-        int_type = self.custom.get("int_type")
-        if int_type and int_type not in valid_int_types:
-            raise ValueError(f"Invalid int_type: {int_type}")
-
-        valid_float_types = {"float32", "float64"}
-        float_type = self.custom.get("float_type")
-        if float_type and float_type not in valid_float_types:
-            raise ValueError(f"Invalid float_type: {float_type}")
-
-
-def get_go_type_imports(fields_data: List[Dict[str, Any]]) -> List[str]:
-    """
-    Determine what imports are needed based on field types.
-
-    Args:
-        fields_data: List of field information
-
-    Returns:
-        List of import statements needed
-    """
-    imports = set()
-
-    for field in fields_data:
-        field_type = field.get("type", "")
-
-        # Time package
-        if "time.Time" in field_type:
-            imports.add('"time"')
-
-        # JSON package (if using custom marshal/unmarshal)
-        if field.get("needs_json_import"):
-            imports.add('"encoding/json"')
-
-        # String manipulation
-        if field.get("needs_strings_import"):
-            imports.add('"strings"')
-
-        # Regex
-        if field.get("needs_regexp_import"):
-            imports.add('"regexp"')
-
-    return sorted(imports)
+    def get_required_imports(self, types_used: Set[str]) -> Set[str]:
+        """Get required imports for the given types."""
+        imports = set()
+        for go_type in types_used:
+            # Remove pointer prefix and array prefix
+            clean_type = go_type.lstrip("*").lstrip("[]")
+            if clean_type in GO_IMPORT_MAP:
+                imports.add(GO_IMPORT_MAP[clean_type])
+        return imports
 
 
-def format_go_imports(imports: List[str]) -> str:
-    """Format import statements for Go."""
-    if not imports:
-        return ""
-
-    if len(imports) == 1:
-        return f"import {imports[0]}\n"
-
-    # Multiple imports
-    lines = ["import ("]
-    for imp in imports:
-        lines.append(f"\t{imp}")
-    lines.append(")\n")
-
-    return "\n".join(lines)
+def get_go_reserved_words() -> Set[str]:
+    """Get Go reserved words."""
+    return GO_RESERVED_WORDS
 
 
-# Default configurations for different Go use cases
-WEB_API_CONFIG = {
-    "package_name": "models",
-    "generate_json_tags": True,
-    "json_tag_omitempty": True,
-    "use_pointers_for_optional": True,
-    "add_comments": True,
-    "add_validation": True,
-    "time_format": "RFC3339",
-}
+def get_go_builtin_types() -> Set[str]:
+    """Get Go builtin types."""
+    return GO_BUILTIN_TYPES
 
-CLI_TOOL_CONFIG = {
-    "package_name": "main",
-    "generate_json_tags": False,
-    "use_pointers_for_optional": False,
-    "add_comments": False,
-    "time_format": "RFC3339",
-}
 
-LIBRARY_CONFIG = {
-    "package_name": "types",
-    "generate_json_tags": True,
-    "json_tag_omitempty": False,
-    "use_pointers_for_optional": False,
-    "add_comments": True,
-    "add_validation": False,
-    "time_format": "RFC3339",
-}
+# Default configurations for different use cases
+def get_web_api_config() -> GoConfig:
+    """Configuration optimized for web API models."""
+    return GoConfig(
+        int_type="int64", float_type="float64", use_pointers_for_optional=True
+    )
+
+
+def get_strict_config() -> GoConfig:
+    """Configuration with strict types (no pointers)."""
+    return GoConfig(use_pointers_for_optional=False)
+
+
+def get_modern_config() -> GoConfig:
+    """Configuration using modern Go features."""
+    return GoConfig(
+        unknown_type="any", int_type="int"  # Go 1.18+  # Modern Go prefers int
+    )
