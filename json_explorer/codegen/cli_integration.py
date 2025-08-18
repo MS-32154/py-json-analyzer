@@ -8,6 +8,7 @@ import argparse
 import sys
 import json
 from pathlib import Path
+from rich.console import Console
 
 from . import (
     generate_from_analysis,
@@ -96,6 +97,12 @@ def add_codegen_args(parser: argparse.ArgumentParser):
         "--field-case",
         choices=["pascal", "camel", "snake"],
         help="Case style for field names",
+    )
+
+    common_group.add_argument(
+        "--verbose",
+        action="store_true",
+        help="Show generation result metadata",
     )
 
     # Go-specific options
@@ -394,9 +401,9 @@ def _get_input_data(args: argparse.Namespace):
     """Get JSON input data from various sources."""
     try:
         if hasattr(args, "file") and args.file:
-            return load_json(args.file)
+            return load_json(args.file)[1]
         elif hasattr(args, "url") and args.url:
-            return load_json(args.url)
+            return load_json(args.url)[1]
         else:
             # Try to read from stdin
             return json.load(sys.stdin)
@@ -412,9 +419,9 @@ def _get_subcommand_input(args: argparse.Namespace):
     """Get input data for subcommand."""
     try:
         if args.file:
-            return load_json(args.file)
+            return load_json(args.file)[1]
         elif args.url:
-            return load_json(args.url)
+            return load_json(args.url)[1]
         elif args.stdin:
             return json.load(sys.stdin)
         else:
@@ -604,38 +611,3 @@ def validate_cli_config(args: argparse.Namespace) -> bool:
         return False
 
     return True
-
-
-def get_cli_help_text() -> str:
-    """Get formatted help text for CLI integration."""
-    return """
-Code Generation Options:
-
-  --generate LANGUAGE     Generate code in specified language
-  --output FILE          Save generated code to file
-  --config FILE          Load configuration from JSON file
-  --package-name NAME    Set package/namespace name
-  --root-name NAME       Set name for root structure
-  --list-languages       List all supported languages
-  --language-info LANG   Show detailed language information
-
-Common Generation Options:
-
-  --no-comments          Don't add comments to generated code
-  --struct-case CASE     Naming case for structs (pascal/camel/snake)
-  --field-case CASE      Naming case for fields (pascal/camel/snake)
-
-Go-Specific Options:
-
-  --no-pointers          Don't use pointers for optional fields
-  --no-json-tags         Don't generate JSON struct tags
-  --no-omitempty         Don't add omitempty to JSON tags
-  --json-tag-case CASE   Case style for JSON tags (original/snake/camel)
-
-Examples:
-
-  json_explorer --generate go --package main data.json
-  json_explorer --generate go --no-pointers --output types.go data.json
-  json_explorer --list-languages
-  json_explorer --language-info go
-    """.strip()
