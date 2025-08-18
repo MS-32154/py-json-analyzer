@@ -43,16 +43,17 @@ class JSONExplorer:
 
     def run(self, args):
         """Main execution method."""
-        # Handle codegen commands (which may not require data for --list-languages)
-        if hasattr(args, "generate") or hasattr(args, "list_languages"):
-            if args.list_languages:
-                # List languages doesn't need data
-                return handle_codegen_command(args)
-            elif args.generate:
-                # Code generation needs data
-                if not self.load_data(args.file, args.url):
-                    return 1
-                return handle_codegen_command(args)
+        # Handle codegen commands
+        if self._is_codegen_command(args):
+            # Some codegen commands don't need data (like --list-languages)
+            if hasattr(args, "list_languages") and args.list_languages:
+                return handle_codegen_command(args, None)
+
+            # Load data for generation commands
+            if not self.load_data(args.file, args.url):
+                return 1
+
+            return handle_codegen_command(args, self.data)
 
         # For other operations, load data first
         if not self.load_data(args.file, args.url):
@@ -65,6 +66,14 @@ class JSONExplorer:
             return self.interactive_handler.run()
         else:
             return self.cli_handler.run(args)
+
+    def _is_codegen_command(self, args) -> bool:
+        """Check if this is a code generation command."""
+        return (
+            (hasattr(args, "generate") and args.generate)
+            or (hasattr(args, "list_languages") and args.list_languages)
+            or (hasattr(args, "language_info") and args.language_info)
+        )
 
     def _has_cli_actions(self, args) -> bool:
         """Check if any CLI-specific actions are requested."""
@@ -169,7 +178,7 @@ Code Generation:
         help="Don't open browser for HTML visualizations",
     )
 
-    # Add codegen arguments from the dedicated module
+    # Add codegen arguments
     add_codegen_args(parser)
 
     return parser
@@ -189,7 +198,11 @@ def main():
         explorer = JSONExplorer()
         return explorer.run(args)
 
-    # For codegen, we need either file or url (unless just listing languages)
+    if hasattr(args, "language_info") and args.language_info:
+        explorer = JSONExplorer()
+        return explorer.run(args)
+
+    # For codegen, we need either file or url
     if hasattr(args, "generate") and args.generate:
         if not (args.file or args.url):
             print("❌ Error: Code generation requires a file path or --url")
@@ -197,10 +210,15 @@ def main():
             return 1
 
     # For other operations, file or url is required
-    if not hasattr(args, "generate") and not (args.file or args.url):
-        print("❌ Error: You must provide a file path or --url")
-        parser.print_help()
-        return 1
+    if (
+        not hasattr(args, "generate")
+        and not hasattr(args, "list_languages")
+        and not hasattr(args, "language_info")
+    ):
+        if not (args.file or args.url):
+            print("❌ Error: You must provide a file path or --url")
+            parser.print_help()
+            return 1
 
     explorer = JSONExplorer()
     return explorer.run(args)

@@ -25,8 +25,8 @@ from . import (
     load_config,
     GeneratorError,
 )
-from json_explorer.analyzer import analyze_json
-from json_explorer.utils import load_json
+from ..analyzer import analyze_json
+from ..utils import load_json
 
 
 class CLIError(Exception):
@@ -109,9 +109,7 @@ def add_codegen_args(parser: argparse.ArgumentParser):
     )
 
     common_group.add_argument(
-        "--verbose",
-        action="store_true",
-        help="Show generation result metadata",
+        "--verbose", action="store_true", help="Show generation result metadata"
     )
 
     # Go-specific options
@@ -141,12 +139,13 @@ def add_codegen_args(parser: argparse.ArgumentParser):
     )
 
 
-def handle_codegen_command(args: argparse.Namespace) -> int:
+def handle_codegen_command(args: argparse.Namespace, json_data=None) -> int:
     """
     Handle code generation command from CLI arguments.
 
     Args:
         args: Parsed command line arguments
+        json_data: Optional pre-loaded JSON data
 
     Returns:
         Exit code (0 for success, non-zero for error)
@@ -168,10 +167,11 @@ def handle_codegen_command(args: argparse.Namespace) -> int:
         if not _validate_language(language):
             return 1
 
-        # Get input data
-        json_data = _get_input_data(args)
+        # Get input data if not provided
         if json_data is None:
-            return 1
+            json_data = _get_input_data(args)
+            if json_data is None:
+                return 1
 
         # Build configuration
         config = _build_config(args, language)
@@ -180,154 +180,10 @@ def handle_codegen_command(args: argparse.Namespace) -> int:
         return _generate_and_output(json_data, language, config, args)
 
     except CLIError as e:
-        console.print(f"[red]✗ Error:[/red] {e}")
+        console.print(f"[red]❌ Error:[/red] {e}")
         return 1
     except Exception as e:
-        console.print(f"[red]✗ Unexpected error:[/red] {e}")
-        return 1
-
-
-def create_codegen_subparser(subparsers) -> argparse.ArgumentParser:
-    """
-    Create a dedicated codegen subcommand parser.
-
-    For use with: json_explorer codegen [options]
-
-    Args:
-        subparsers: Subparser group from main parser
-
-    Returns:
-        Configured subparser for codegen command
-    """
-    parser = subparsers.add_parser(
-        "codegen",
-        help="Generate code from JSON schema",
-        description="Generate code structures from JSON data analysis",
-        formatter_class=argparse.RawDescriptionHelpFormatter,
-        epilog="""
-Examples:
-  json_explorer codegen --language go --package main data.json
-  json_explorer codegen -l python --output models.py --stdin < data.json
-  json_explorer codegen --list-languages
-  json_explorer codegen --language-info go
-        """.strip(),
-    )
-
-    # Input options (mutually exclusive)
-    input_group = parser.add_mutually_exclusive_group(required=False)
-    input_group.add_argument("file", nargs="?", help="JSON file to analyze")
-    input_group.add_argument("--url", help="URL to fetch JSON from")
-    input_group.add_argument(
-        "--stdin", action="store_true", help="Read JSON from standard input"
-    )
-
-    # Core generation options
-    parser.add_argument("--language", "-l", help="Target language for code generation")
-
-    parser.add_argument("--output", "-o", help="Output file (default: stdout)")
-
-    parser.add_argument("--config", help="Configuration file path (JSON)")
-
-    parser.add_argument(
-        "--root-name", default="Root", help="Name for root structure (default: Root)"
-    )
-
-    # Common options
-    parser.add_argument("--package-name", "--package", help="Package/namespace name")
-
-    parser.add_argument(
-        "--no-comments",
-        action="store_true",
-        help="Don't add comments to generated code",
-    )
-
-    parser.add_argument(
-        "--struct-case",
-        choices=["pascal", "camel", "snake"],
-        help="Naming case for structs/classes",
-    )
-
-    parser.add_argument(
-        "--field-case",
-        choices=["pascal", "camel", "snake"],
-        help="Naming case for fields",
-    )
-
-    # Go-specific options
-    go_group = parser.add_argument_group("Go-specific options")
-    go_group.add_argument(
-        "--no-pointers",
-        action="store_true",
-        help="Don't use pointers for optional fields",
-    )
-    go_group.add_argument(
-        "--no-json-tags", action="store_true", help="Don't generate JSON struct tags"
-    )
-    go_group.add_argument(
-        "--no-omitempty", action="store_true", help="Don't add omitempty to JSON tags"
-    )
-    go_group.add_argument(
-        "--json-tag-case",
-        choices=["original", "snake", "camel"],
-        help="Case style for JSON tag names",
-    )
-
-    # Informational commands
-    info_group = parser.add_argument_group("information")
-    info_group.add_argument(
-        "--list-languages",
-        action="store_true",
-        help="List supported languages and exit",
-    )
-    info_group.add_argument(
-        "--language-info",
-        metavar="LANGUAGE",
-        help="Show detailed info about a language and exit",
-    )
-
-    parser.set_defaults(func=_handle_codegen_subcommand)
-    return parser
-
-
-def _handle_codegen_subcommand(args: argparse.Namespace) -> int:
-    """Handle the codegen subcommand."""
-    try:
-        # Handle info commands
-        if args.list_languages:
-            return _list_languages()
-
-        if args.language_info:
-            return _show_language_info(args.language_info)
-
-        # Require language for generation
-        if not args.language:
-            console.print("[red]✗[/red] --language is required for code generation")
-            return 1
-
-        # Require input
-        if not (args.file or args.url or args.stdin):
-            console.print(
-                "[red]✗[/red] Input source required (file, --url, or --stdin)"
-            )
-            return 1
-
-        # Get input data
-        json_data = _get_subcommand_input(args)
-        if json_data is None:
-            return 1
-
-        # Validate language
-        if not _validate_language(args.language):
-            return 1
-
-        # Build config
-        config = _build_subcommand_config(args)
-
-        # Generate and output
-        return _generate_and_output(json_data, args.language, config, args)
-
-    except Exception as e:
-        console.print(f"[red]✗ Error:[/red] {e}")
+        console.print(f"[red]❌ Unexpected error:[/red] {e}")
         return 1
 
 
@@ -367,7 +223,7 @@ def _list_languages() -> int:
         console.print(
             Panel(
                 "[bold]Usage:[/bold] json_explorer [dim]input.json[/dim] --generate [cyan]LANGUAGE[/cyan]\n"
-                "[bold]Info:[/bold] json_explorer codegen --language-info [cyan]LANGUAGE[/cyan]",
+                "[bold]Info:[/bold] json_explorer --language-info [cyan]LANGUAGE[/cyan]",
                 title="💡 Quick Start",
                 border_style="blue",
             )
@@ -376,7 +232,7 @@ def _list_languages() -> int:
         return 0
 
     except Exception as e:
-        console.print(f"[red]✗ Error listing languages:[/red] {e}")
+        console.print(f"[red]❌ Error listing languages:[/red] {e}")
         return 1
 
 
@@ -384,7 +240,7 @@ def _show_language_info(language: str) -> int:
     """Show detailed information about a specific language."""
     try:
         if not _validate_language(language, silent=True):
-            console.print(f"[red]✗ Language '{language}' is not supported[/red]")
+            console.print(f"[red]❌ Language '{language}' is not supported[/red]")
             console.print("[dim]Use --list-languages to see available options[/dim]")
             return 1
 
@@ -414,7 +270,7 @@ def _show_language_info(language: str) -> int:
 
             # Create configuration table
             config_table = Table(
-                title="⚙️  Default Configuration",
+                title="⚙️ Default Configuration",
                 box=box.SIMPLE,
                 show_header=True,
                 header_style="bold cyan",
@@ -443,13 +299,13 @@ def _show_language_info(language: str) -> int:
 
         # Add examples panel
         examples_text = f"""Generate basic structure:
-[cyan]json_explorer codegen --language {language} data.json[/cyan]
+[cyan]json_explorer data.json --generate {language}[/cyan]
 
 Generate to file:
-[cyan]json_explorer codegen -l {language} -o output{info['file_extension']} data.json[/cyan]
+[cyan]json_explorer data.json --generate {language} --output output{info['file_extension']}[/cyan]
 
 Custom package name:
-[cyan]json_explorer codegen -l {language} --package mypackage data.json[/cyan]"""
+[cyan]json_explorer data.json --generate {language} --package-name mypackage[/cyan]"""
 
         console.print()
         console.print(
@@ -459,19 +315,24 @@ Custom package name:
         return 0
 
     except Exception as e:
-        console.print(f"[red]✗ Error getting language info:[/red] {e}")
+        console.print(f"[red]❌ Error getting language info:[/red] {e}")
         return 1
 
 
 def _validate_language(language: str, silent: bool = False) -> bool:
     """Validate that a language is supported."""
-    supported = list_supported_languages()
-    if language.lower() not in [lang.lower() for lang in supported]:
+    try:
+        supported = list_supported_languages()
+        if language.lower() not in [lang.lower() for lang in supported]:
+            if not silent:
+                console.print(f"[red]❌ Unsupported language '{language}'[/red]")
+                console.print(f"[dim]Supported languages: {', '.join(supported)}[/dim]")
+            return False
+        return True
+    except Exception:
         if not silent:
-            console.print(f"[red]✗ Unsupported language '{language}'[/red]")
-            console.print(f"[dim]Supported languages: {', '.join(supported)}[/dim]")
+            console.print("[red]❌ Failed to validate language[/red]")
         return False
-    return True
 
 
 def _get_input_data(args: argparse.Namespace):
@@ -485,28 +346,11 @@ def _get_input_data(args: argparse.Namespace):
             # Try to read from stdin
             return json.load(sys.stdin)
     except json.JSONDecodeError as e:
-        console.print(f"[red]✗ Invalid JSON input:[/red] {e}")
+        console.print(f"[red]❌ Invalid JSON input:[/red] {e}")
         return None
     except Exception as e:
-        console.print(f"[red]✗ Failed to load input:[/red] {e}")
+        console.print(f"[red]❌ Failed to load input:[/red] {e}")
         return None
-
-
-def _get_subcommand_input(args: argparse.Namespace):
-    """Get input data for subcommand."""
-    try:
-        if args.file:
-            return load_json(args.file)[1]
-        elif args.url:
-            return load_json(args.url)[1]
-        elif args.stdin:
-            return json.load(sys.stdin)
-        else:
-            raise CLIError("No input source specified")
-    except json.JSONDecodeError as e:
-        raise CLIError(f"Invalid JSON input: {e}")
-    except Exception as e:
-        raise CLIError(f"Failed to load input: {e}")
 
 
 def _build_config(args: argparse.Namespace, language: str) -> GeneratorConfig:
@@ -516,22 +360,7 @@ def _build_config(args: argparse.Namespace, language: str) -> GeneratorConfig:
     # Load from config file if provided
     if hasattr(args, "config") and args.config:
         try:
-            base_config = load_config(config_file=args.config)
-            # Convert to dict to merge with CLI options
-            config_dict.update(
-                {
-                    "package_name": base_config.package_name,
-                    "indent_size": base_config.indent_size,
-                    "use_tabs": base_config.use_tabs,
-                    "struct_case": base_config.struct_case,
-                    "field_case": base_config.field_case,
-                    "generate_json_tags": base_config.generate_json_tags,
-                    "json_tag_omitempty": base_config.json_tag_omitempty,
-                    "json_tag_case": base_config.json_tag_case,
-                    "add_comments": base_config.add_comments,
-                    **base_config.language_config,
-                }
-            )
+            config_dict = _load_config_file(args.config)
         except Exception as e:
             raise CLIError(f"Configuration error: {e}")
 
@@ -565,44 +394,20 @@ def _build_config(args: argparse.Namespace, language: str) -> GeneratorConfig:
     return load_config(custom_config=config_dict)
 
 
-def _build_subcommand_config(args: argparse.Namespace) -> GeneratorConfig:
-    """Build configuration for subcommand."""
-    config_dict = {}
+def _load_config_file(config_path: str) -> dict:
+    """Load configuration from JSON file."""
+    try:
+        with open(config_path, "r", encoding="utf-8") as f:
+            config = json.load(f)
 
-    # Load from config file if provided
-    if args.config:
-        try:
-            with open(args.config, "r", encoding="utf-8") as f:
-                file_config = json.load(f)
-            config_dict.update(file_config)
-        except Exception as e:
-            raise CLIError(f"Failed to load config file: {e}")
+        if not isinstance(config, dict):
+            raise CLIError(f"Configuration file must contain a JSON object")
 
-    # Override with CLI arguments
-    if args.package_name:
-        config_dict["package_name"] = args.package_name
-
-    if args.no_comments:
-        config_dict["add_comments"] = False
-
-    if args.struct_case:
-        config_dict["struct_case"] = args.struct_case
-
-    if args.field_case:
-        config_dict["field_case"] = args.field_case
-
-    # Go-specific config
-    if args.language.lower() == "go":
-        if args.no_pointers:
-            config_dict["use_pointers_for_optional"] = False
-        if args.no_json_tags:
-            config_dict["generate_json_tags"] = False
-        if args.no_omitempty:
-            config_dict["json_tag_omitempty"] = False
-        if args.json_tag_case:
-            config_dict["json_tag_case"] = args.json_tag_case
-
-    return load_config(custom_config=config_dict)
+        return config
+    except json.JSONDecodeError as e:
+        raise CLIError(f"Invalid JSON in configuration file: {e}")
+    except IOError as e:
+        raise CLIError(f"Failed to read configuration file: {e}")
 
 
 def _generate_and_output(
@@ -634,7 +439,7 @@ def _generate_and_output(
 
         if not result.success:
             console.print(
-                f"[red]✗ Code generation failed:[/red] {result.error_message}"
+                f"[red]❌ Code generation failed:[/red] {result.error_message}"
             )
             if hasattr(result, "exception") and result.exception:
                 console.print(f"[dim]Details: {result.exception}[/dim]")
@@ -650,56 +455,72 @@ def _generate_and_output(
                     f"[green]✓[/green] Generated {language} code saved to [cyan]{output_path}[/cyan]"
                 )
             except IOError as e:
-                console.print(f"[red]✗ Failed to write to {output_path}:[/red] {e}")
+                console.print(f"[red]❌ Failed to write to {output_path}:[/red] {e}")
                 return 1
         else:
-            top_border = "═" * 40
-            console.print(
-                f"[green]{top_border} 📄 Generated {language.title()} Code {top_border}[/green]\n"
-            )
-            # Display code with syntax highlighting
-            try:
-                syntax = Syntax(result.code, language, theme="monokai")
-                console.print(syntax)
+            # Display to stdout with rich formatting
+            _display_generated_code(result.code, language)
 
-            except Exception:
-                # Fallback to plain text if syntax highlighting fails
-                console.print(result.code)
-            console.print(f"\n[green]{top_border}{top_border}{top_border}[/green]")
+        # Show warnings if any
+        if result.warnings:
+            console.print("\n[yellow]⚠️ Warnings:[/yellow]")
+            for warning in result.warnings:
+                console.print(f"  [yellow]•[/yellow] {warning}")
 
         # Show metadata if verbose
         if hasattr(args, "verbose") and args.verbose and result.metadata:
-            metadata_table = Table(
-                title="📊 Generation Metadata",
-                box=box.SIMPLE,
-                show_header=True,
-                header_style="bold cyan",
-            )
-
-            metadata_table.add_column("Property", style="bold")
-            metadata_table.add_column("Value", style="green")
-
-            for key, value in result.metadata.items():
-                metadata_table.add_row(key.replace("_", " ").title(), str(value))
-
-            console.print()
-            console.print(metadata_table)
-
-        # Show warnings with rich formatting
-        if result.warnings:
-            console.print("\n[yellow]⚠️  Warnings:[/yellow]")
-            for warning in result.warnings:
-                console.print(f"  [yellow]•[/yellow] {warning}")
-            console.print()
+            _display_metadata(result.metadata)
 
         return 0
 
     except GeneratorError as e:
-        console.print(f"[red]✗[/red] {e}")
+        console.print(f"[red]❌[/red] {e}")
         return 1
     except Exception as e:
-        console.print(f"[red]✗ Unexpected failure:[/red] {e}")
+        console.print(f"[red]❌ Unexpected failure:[/red] {e}")
         return 1
+
+
+def _display_generated_code(code: str, language: str):
+    """Display generated code with syntax highlighting."""
+    border = "═" * 50
+    console.print(
+        f"\n[green]{border} 📄 Generated {language.title()} Code {border}[/green]"
+    )
+
+    try:
+        # Map language names for syntax highlighting
+        syntax_lang = language.lower()
+        if syntax_lang == "golang":
+            syntax_lang = "go"
+
+        syntax = Syntax(code, syntax_lang, theme="monokai", line_numbers=True)
+        console.print(syntax)
+    except Exception:
+        # Fallback to plain text if syntax highlighting fails
+        console.print(code)
+
+    console.print(f"[green]{border}{'═' * (22 + len(language))}{border}[/green]\n")
+
+
+def _display_metadata(metadata: dict):
+    """Display generation metadata in a formatted table."""
+    metadata_table = Table(
+        title="📊 Generation Metadata",
+        box=box.SIMPLE,
+        show_header=True,
+        header_style="bold cyan",
+    )
+
+    metadata_table.add_column("Property", style="bold")
+    metadata_table.add_column("Value", style="green")
+
+    for key, value in metadata.items():
+        display_key = key.replace("_", " ").title()
+        metadata_table.add_row(display_key, str(value))
+
+    console.print()
+    console.print(metadata_table)
 
 
 # Utility functions for testing and development
