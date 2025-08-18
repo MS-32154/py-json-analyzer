@@ -1,10 +1,13 @@
 import json
 from datetime import datetime
+from pathlib import Path
 
 from rich.console import Console
 from rich.prompt import Prompt, Confirm
 from rich.panel import Panel
 from rich.table import Table
+from rich.syntax import Syntax
+from rich import box
 
 from .tree_view import print_json_analysis, print_compact_tree
 from .search import JsonSearcher, SearchMode
@@ -12,6 +15,19 @@ from .stats import DataStatsAnalyzer
 from .visualizer import JSONVisualizer
 from .filter_parser import FilterExpressionParser
 from .utils import load_json
+
+# Import codegen functionality
+from .codegen import (
+    generate_from_analysis,
+    list_supported_languages,
+    get_generator,
+    get_language_info,
+    list_all_language_info,
+    GeneratorConfig,
+    load_config,
+    GeneratorError,
+)
+from .analyzer import analyze_json
 
 
 class InteractiveHandler:
@@ -33,7 +49,7 @@ class InteractiveHandler:
     def run(self):
         """Run interactive mode."""
         if not self.data:
-            self.console.print("❌ [red]No data loaded. Please load data first.[/red]")
+            self.console.print("⚠ [red]No data loaded. Please load data first.[/red]")
             return 1
 
         self.console.print(f"\n🎯 [bold green]Interactive JSON Explorer[/bold green]")
@@ -43,7 +59,7 @@ class InteractiveHandler:
             self._show_main_menu()
             choice = Prompt.ask(
                 "\n[bold]Choose an option[/bold]",
-                choices=["1", "2", "3", "4", "5", "6", "7", "8", "9", "q"],
+                choices=["1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "q"],
                 default="q",
             )
 
@@ -68,6 +84,8 @@ class InteractiveHandler:
                 self._load_new_data()
             elif choice == "9":
                 self._show_data_summary()
+            elif choice == "10":
+                self._interactive_codegen()
 
         return 0
 
@@ -85,6 +103,7 @@ class InteractiveHandler:
 [cyan]7.[/cyan] ❓ Filter Expression Help
 [cyan]8.[/cyan] 📁 Load New Data
 [cyan]9.[/cyan] 📋 Data Summary
+[cyan]10.[/cyan] ⚡ Code Generation
 [cyan]q.[/cyan] 🚪 Quit""",
             border_style="blue",
         )
@@ -136,25 +155,18 @@ class InteractiveHandler:
         if search_type == "key":
             self.console.print(f"\n🔍 Searching for key: '{search_term}'")
             results = self.searcher.search_keys(self.data, search_term, search_mode)
-            self.searcher.print_results(results, mode=search_mode)
 
         elif search_type == "value":
             limit_types = Confirm.ask("Limit search to specific data types?")
             value_types = None
 
             if limit_types:
-                type_choices = ["str", "int", "float", "bool", "list", "dict"]
-                selected_types = []
-                for type_name in type_choices:
-                    if Confirm.ask(f"Include {type_name} values?"):
-                        selected_types.append(eval(type_name))
-                value_types = set(selected_types) if selected_types else None
+                value_types = self._get_value_types()
 
             self.console.print(f"\n🔍 Searching for value: '{search_term}'")
             results = self.searcher.search_values(
                 self.data, search_term, search_mode, value_types=value_types
             )
-            self.searcher.print_results(results, mode=search_mode)
 
         elif search_type == "pair":
             value_term = Prompt.ask("Enter value to search for")
@@ -164,13 +176,15 @@ class InteractiveHandler:
             results = self.searcher.search_key_value_pairs(
                 self.data, search_term, value_term, search_mode, search_mode
             )
-            self.searcher.print_results(results, mode=search_mode)
+
+        self.searcher.print_results(results, mode=search_mode)
 
     def _interactive_stats(self):
         """Interactive statistics display."""
         self.console.print("\n📊 [bold]Statistics & Analysis[/bold]")
 
         detailed = Confirm.ask("Show detailed statistics?", default=False)
+
         self.analyzer.print_summary(self.data, detailed=detailed)
 
     def _interactive_visualization(self):
@@ -197,6 +211,7 @@ class InteractiveHandler:
             )
 
         try:
+
             self.visualizer.visualize(
                 self.data,
                 output=viz_format,
@@ -204,8 +219,9 @@ class InteractiveHandler:
                 detailed=detailed,
                 open_browser=open_browser,
             )
+
         except Exception as e:
-            self.console.print(f"❌ [red]Visualization error: {e}[/red]")
+            self.console.print(f"⚠ [red]Visualization error: {e}[/red]")
 
     def _interactive_filter_search(self):
         """Interactive filter search with expression builder."""
@@ -235,7 +251,7 @@ class InteractiveHandler:
                 self.console.print("[yellow]No results found.[/yellow]")
 
         except Exception as e:
-            self.console.print(f"❌ [red]Filter error: {e}[/red]")
+            self.console.print(f"⚠ [red]Filter error: {e}[/red]")
             self.console.print(
                 "[yellow]Please check your filter expression syntax.[/yellow]"
             )
@@ -282,6 +298,7 @@ class InteractiveHandler:
                 max_depth = int(Prompt.ask("Maximum depth", default="5"))
 
         try:
+
             if search_type == "key":
                 results = self.searcher.search_keys(
                     self.data,
@@ -322,7 +339,328 @@ class InteractiveHandler:
                 self.console.print("[yellow]No results found.[/yellow]")
 
         except Exception as e:
-            self.console.print(f"❌ [red]Search error: {e}[/red]")
+            self.console.print(f"⚠ [red]Search error: {e}[/red]")
+
+    def _interactive_codegen(self):
+        """Interactive code generation functionality."""
+        self.console.print("\n⚡ [bold]Code Generation[/bold]")
+
+        # Show available languages
+        try:
+            languages = list_supported_languages()
+            if not languages:
+                self.console.print("[red]⚠ No code generators available[/red]")
+                return
+
+            self._show_available_languages()
+
+            # Language selection
+            language = Prompt.ask(
+                "\n[bold]Select target language[/bold]",
+                choices=languages + ["info", "back"],
+                default=languages[0] if languages else "back",
+            )
+
+            if language == "back":
+                return
+            elif language == "info":
+                self._show_codegen_info()
+                return
+
+            # Generation configuration
+            config = self._build_interactive_config(language)
+
+            # Root name
+            root_name = Prompt.ask("Root structure name", default="Root")
+
+            # Preview or generate
+            action = Prompt.ask(
+                "Action",
+                choices=["preview", "generate", "save", "configure"],
+                default="preview",
+            )
+
+            if action == "configure":
+                config = self._configure_generation_settings(language, config)
+                action = "preview"  # Default to preview after configuration
+
+            # Generate code
+
+            analysis = analyze_json(self.data)
+
+            result = generate_from_analysis(analysis, language, config, root_name)
+
+            if not result.success:
+                self.console.print(
+                    f"[red]⚠ Code generation failed:[/red] {result.error_message}"
+                )
+                return
+
+            # Handle action
+            if action == "preview":
+                self._display_generated_code(result.code, language)
+
+                # Ask what to do next
+                next_action = Prompt.ask(
+                    "What would you like to do?",
+                    choices=["save", "copy", "regenerate", "back"],
+                    default="save",
+                )
+
+                if next_action == "save":
+                    self._save_generated_code(result.code, language, root_name)
+                elif next_action == "regenerate":
+                    return self._interactive_codegen()  # Restart codegen flow
+
+            elif action in ["generate", "save"]:
+                self._save_generated_code(result.code, language, root_name)
+
+            # Show warnings and metadata
+            self._display_generation_results(result)
+
+        except GeneratorError as e:
+            self.console.print(f"[red]⚠ Code generation error:[/red] {e}")
+        except Exception as e:
+            self.console.print(f"[red]⚠ Unexpected error:[/red] {e}")
+
+    def _show_available_languages(self):
+        """Show available code generation languages."""
+        try:
+            language_info = list_all_language_info()
+
+            if not language_info:
+                self.console.print("[yellow]⚠ No generators available[/yellow]")
+                return
+
+            table = Table(
+                title="🔧 Available Code Generators",
+                box=box.ROUNDED,
+                title_style="bold cyan",
+            )
+
+            table.add_column("Language", style="bold green")
+            table.add_column("Extension", style="cyan")
+            table.add_column("Aliases", style="blue")
+
+            for lang_name, info in sorted(language_info.items()):
+                aliases = (
+                    ", ".join(info["aliases"]) if info["aliases"] else "[dim]none[/dim]"
+                )
+                table.add_row(f"🔧 {lang_name}", info["file_extension"], aliases)
+
+            self.console.print()
+            self.console.print(table)
+
+        except Exception as e:
+            self.console.print(f"[red]Error loading language info: {e}[/red]")
+
+    def _show_codegen_info(self):
+        """Show general code generation information."""
+        info_panel = Panel(
+            """[bold blue]📖 Code Generation Overview[/bold blue]
+
+[bold]What it does:[/bold]
+• Analyzes your JSON data structure
+• Generates strongly-typed data structures
+• Supports multiple programming languages
+• Handles nested objects and arrays
+• Preserves field names and types
+
+[bold]Features:[/bold]
+• Optional field detection
+• Type conflict resolution
+• Custom naming conventions
+• JSON serialization tags
+• Documentation generation
+
+[bold]Languages:[/bold]
+• Go - Structs with JSON tags
+• More languages coming soon!
+
+[bold]Usage:[/bold]
+1. Select target language
+2. Configure generation options
+3. Preview generated code
+4. Save to file or copy to clipboard""",
+            border_style="blue",
+        )
+        self.console.print()
+        self.console.print(info_panel)
+
+    def _build_interactive_config(self, language: str) -> GeneratorConfig:
+        """Build configuration through interactive prompts."""
+        config_dict = {}
+
+        # Basic settings
+        config_dict["package_name"] = Prompt.ask(
+            "Package/namespace name", default="main"
+        )
+
+        add_comments = Confirm.ask("Generate comments/documentation?", default=True)
+        config_dict["add_comments"] = add_comments
+
+        # Language-specific settings
+        if language.lower() == "go":
+            config_dict["generate_json_tags"] = Confirm.ask(
+                "Generate JSON struct tags?", default=True
+            )
+
+            if config_dict["generate_json_tags"]:
+                config_dict["json_tag_omitempty"] = Confirm.ask(
+                    "Add 'omitempty' to JSON tags?", default=True
+                )
+
+            config_dict["use_pointers_for_optional"] = Confirm.ask(
+                "Use pointers for optional fields?", default=True
+            )
+
+        return load_config(custom_config=config_dict)
+
+    def _configure_generation_settings(
+        self, language: str, current_config: GeneratorConfig
+    ) -> GeneratorConfig:
+        """Allow detailed configuration of generation settings."""
+        self.console.print(f"\n⚙️ [bold]{language.title()} Configuration[/bold]")
+
+        config_dict = {}
+
+        # Show current settings
+        self.console.print("\n[bold]Current Settings:[/bold]")
+        self.console.print(
+            f"Package name: [green]{current_config.package_name}[/green]"
+        )
+        self.console.print(
+            f"Add comments: [green]{current_config.add_comments}[/green]"
+        )
+        self.console.print(
+            f"Generate JSON tags: [green]{current_config.generate_json_tags}[/green]"
+        )
+
+        # Allow modifications
+        if Confirm.ask("\nModify package name?", default=False):
+            config_dict["package_name"] = Prompt.ask(
+                "Package name", default=current_config.package_name
+            )
+
+        if Confirm.ask("Modify comment generation?", default=False):
+            config_dict["add_comments"] = Confirm.ask(
+                "Generate comments?", default=current_config.add_comments
+            )
+
+        # Language-specific advanced settings
+        if language.lower() == "go":
+            if Confirm.ask("Configure Go-specific settings?", default=False):
+                config_dict["generate_json_tags"] = Confirm.ask(
+                    "Generate JSON tags?", default=current_config.generate_json_tags
+                )
+
+                if config_dict.get(
+                    "generate_json_tags", current_config.generate_json_tags
+                ):
+                    config_dict["json_tag_omitempty"] = Confirm.ask(
+                        "Add omitempty?", default=current_config.json_tag_omitempty
+                    )
+
+                    tag_case = Prompt.ask(
+                        "JSON tag case style",
+                        choices=["original", "snake", "camel"],
+                        default=current_config.json_tag_case,
+                    )
+                    config_dict["json_tag_case"] = tag_case
+
+                # Naming conventions
+                struct_case = Prompt.ask(
+                    "Struct name case style",
+                    choices=["pascal", "camel", "snake"],
+                    default=current_config.struct_case,
+                )
+                config_dict["struct_case"] = struct_case
+
+                field_case = Prompt.ask(
+                    "Field name case style",
+                    choices=["pascal", "camel", "snake"],
+                    default=current_config.field_case,
+                )
+                config_dict["field_case"] = field_case
+
+        # Merge with current config
+        if config_dict:
+            return load_config(custom_config=config_dict)
+        else:
+            return current_config
+
+    def _display_generated_code(self, code: str, language: str):
+        """Display generated code with syntax highlighting."""
+        self.console.print(f"\n[green]📄 Generated {language.title()} Code\n[/green]")
+
+        try:
+            # Map language names for syntax highlighting
+            syntax_lang = language.lower()
+            if syntax_lang == "golang":
+                syntax_lang = "go"
+
+            syntax = Syntax(
+                code, syntax_lang, theme="monokai", line_numbers=False, padding=1
+            )
+            self.console.print(syntax)
+            self.console.print()
+        except Exception:
+            # Fallback to plain text
+            self.console.print(f"[dim]{code}[/dim]")
+
+    def _save_generated_code(self, code: str, language: str, root_name: str):
+        """Save generated code to file."""
+        try:
+            # Get language info for file extension
+            lang_info = get_language_info(language)
+            extension = lang_info["file_extension"]
+
+            # Suggest filename
+            default_filename = f"{root_name.lower()}{extension}"
+
+            filename = Prompt.ask("Save to file", default=default_filename)
+
+            # Ensure proper extension
+            if not filename.endswith(extension):
+                filename += extension
+
+            # Save file
+            output_path = Path(filename)
+            output_path.write_text(code, encoding="utf-8")
+
+            self.console.print(
+                f"[green]✅ Code saved to:[/green] [cyan]{output_path}[/cyan]"
+            )
+
+        except Exception as e:
+            self.console.print(f"[red]⚠ Error saving file:[/red] {e}")
+
+    def _display_generation_results(self, result):
+        """Display warnings and metadata from generation."""
+        # Show warnings
+        if result.warnings:
+            self.console.print("\n[yellow]⚠️ Warnings:[/yellow]")
+            for warning in result.warnings:
+                self.console.print(f"  [yellow]•[/yellow] {warning}")
+
+        # Show metadata
+        if result.metadata:
+            metadata_table = Table(
+                title="📊 Generation Summary",
+                box=box.SIMPLE,
+                show_header=True,
+                header_style="bold cyan",
+            )
+
+            metadata_table.add_column("Property", style="bold")
+            metadata_table.add_column("Value", style="green")
+
+            for key, value in result.metadata.items():
+                display_key = key.replace("_", " ").title()
+                metadata_table.add_row(display_key, str(value))
+
+            self.console.print()
+            self.console.print(metadata_table)
 
     def _get_value_types(self):
         """Get value types selection from user."""
@@ -423,12 +761,12 @@ class InteractiveHandler:
             self.console.print(f"✅ [green]Successfully loaded: {self.source}[/green]")
 
         except Exception as e:
-            self.console.print(f"❌ [red]Failed to load data: {e}[/red]")
+            self.console.print(f"⚠ [red]Failed to load data: {e}[/red]")
 
     def _show_data_summary(self):
         """Show a quick summary of the loaded data."""
         if not self.data:
-            self.console.print("❌ [red]No data loaded[/red]")
+            self.console.print("⚠ [red]No data loaded[/red]")
             return
 
         self.console.print("\n📋 [bold]Data Summary[/bold]")
@@ -487,4 +825,4 @@ class InteractiveHandler:
             self.console.print(f"✅ [green]Results saved to: {filename}[/green]")
 
         except Exception as e:
-            self.console.print(f"❌ [red]Error saving results: {e}[/red]")
+            self.console.print(f"⚠ [red]Error saving results: {e}[/red]")

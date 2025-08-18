@@ -118,7 +118,6 @@ class CLIHandler:
 
     def _handle_visualization(self, args):
         """Handle visualization generation."""
-        self.console.print("\n📈 Generating visualizations...")
 
         plot_format = getattr(args, "plot_format", "matplotlib")
         save_path = getattr(args, "save_path", None)

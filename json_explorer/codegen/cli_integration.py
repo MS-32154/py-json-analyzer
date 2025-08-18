@@ -12,7 +12,6 @@ from rich.console import Console
 from rich.table import Table
 from rich.panel import Panel
 from rich.syntax import Syntax
-from rich.progress import Progress, SpinnerColumn, TextColumn
 from rich import box
 
 from . import (
@@ -415,27 +414,11 @@ def _generate_and_output(
 ) -> int:
     """Generate code and handle output with rich formatting."""
     try:
-        # Show analysis progress
-        with Progress(
-            SpinnerColumn(),
-            TextColumn("[progress.description]{task.description}"),
-            console=console,
-        ) as progress:
 
-            # Analyze JSON
-            analyze_task = progress.add_task(
-                "[cyan]Analyzing JSON structure...", total=None
-            )
-            analysis = analyze_json(json_data)
-            progress.remove_task(analyze_task)
+        analysis = analyze_json(json_data)
 
-            # Generate code
-            gen_task = progress.add_task(
-                f"[green]Generating {language} code...", total=None
-            )
-            root_name = getattr(args, "root_name", "Root")
-            result = generate_from_analysis(analysis, language, config, root_name)
-            progress.remove_task(gen_task)
+        root_name = getattr(args, "root_name", "Root")
+        result = generate_from_analysis(analysis, language, config, root_name)
 
         if not result.success:
             console.print(
@@ -483,10 +466,8 @@ def _generate_and_output(
 
 def _display_generated_code(code: str, language: str):
     """Display generated code with syntax highlighting."""
-    border = "═" * 50
-    console.print(
-        f"\n[green]{border} 📄 Generated {language.title()} Code {border}[/green]"
-    )
+
+    console.print(f"\n[green]📄 Generated {language.title()} Code\n[/green]")
 
     try:
         # Map language names for syntax highlighting
@@ -494,13 +475,11 @@ def _display_generated_code(code: str, language: str):
         if syntax_lang == "golang":
             syntax_lang = "go"
 
-        syntax = Syntax(code, syntax_lang, theme="monokai", line_numbers=True)
+        syntax = Syntax(code, syntax_lang, theme="monokai", padding=1)
         console.print(syntax)
     except Exception:
         # Fallback to plain text if syntax highlighting fails
         console.print(code)
-
-    console.print(f"[green]{border}{'═' * (22 + len(language))}{border}[/green]\n")
 
 
 def _display_metadata(metadata: dict):
