@@ -9,6 +9,11 @@ import sys
 import json
 from pathlib import Path
 from rich.console import Console
+from rich.table import Table
+from rich.panel import Panel
+from rich.syntax import Syntax
+from rich.progress import Progress, SpinnerColumn, TextColumn
+from rich import box
 
 from . import (
     generate_from_analysis,
@@ -28,6 +33,10 @@ class CLIError(Exception):
     """Exception raised for CLI-related errors."""
 
     pass
+
+
+# Initialize rich console
+console = Console()
 
 
 def add_codegen_args(parser: argparse.ArgumentParser):
@@ -171,10 +180,10 @@ def handle_codegen_command(args: argparse.Namespace) -> int:
         return _generate_and_output(json_data, language, config, args)
 
     except CLIError as e:
-        print(f"Error: {e}", file=sys.stderr)
+        console.print(f"[red]✗ Error:[/red] {e}")
         return 1
     except Exception as e:
-        print(f"Unexpected error: {e}", file=sys.stderr)
+        console.print(f"[red]✗ Unexpected error:[/red] {e}")
         return 1
 
 
@@ -292,14 +301,13 @@ def _handle_codegen_subcommand(args: argparse.Namespace) -> int:
 
         # Require language for generation
         if not args.language:
-            print("Error: --language is required for code generation", file=sys.stderr)
+            console.print("[red]✗[/red] --language is required for code generation")
             return 1
 
         # Require input
         if not (args.file or args.url or args.stdin):
-            print(
-                "Error: Input source required (file, --url, or --stdin)",
-                file=sys.stderr,
+            console.print(
+                "[red]✗[/red] Input source required (file, --url, or --stdin)"
             )
             return 1
 
@@ -319,7 +327,7 @@ def _handle_codegen_subcommand(args: argparse.Namespace) -> int:
         return _generate_and_output(json_data, args.language, config, args)
 
     except Exception as e:
-        print(f"Error: {e}", file=sys.stderr)
+        console.print(f"[red]✗ Error:[/red] {e}")
         return 1
 
 
@@ -329,24 +337,46 @@ def _list_languages() -> int:
         language_info = list_all_language_info()
 
         if not language_info:
-            print("No code generators available")
+            console.print("[yellow]⚠️ No code generators available[/yellow]")
             return 0
 
-        print("Supported languages:")
-        print()
+        # Create a rich table
+        table = Table(
+            title="📋 Supported Languages", box=box.ROUNDED, title_style="bold cyan"
+        )
+
+        table.add_column("Language", style="bold green", no_wrap=True)
+        table.add_column("Extension", style="cyan")
+        table.add_column("Generator Class", style="dim")
+        table.add_column("Aliases", style="blue")
 
         for lang_name, info in sorted(language_info.items()):
-            print(f"  {lang_name}")
-            print(f"    Extension: {info['file_extension']}")
-            print(f"    Class: {info['class']}")
-            if info["aliases"]:
-                print(f"    Aliases: {', '.join(info['aliases'])}")
-            print()
+            aliases = (
+                ", ".join(info["aliases"]) if info["aliases"] else "[dim]none[/dim]"
+            )
+
+            table.add_row(
+                f"🔧 {lang_name}", info["file_extension"], info["class"], aliases
+            )
+
+        console.print()
+        console.print(table)
+        console.print()
+
+        # Add usage hint
+        console.print(
+            Panel(
+                "[bold]Usage:[/bold] json_explorer [dim]input.json[/dim] --generate [cyan]LANGUAGE[/cyan]\n"
+                "[bold]Info:[/bold] json_explorer codegen --language-info [cyan]LANGUAGE[/cyan]",
+                title="💡 Quick Start",
+                border_style="blue",
+            )
+        )
 
         return 0
 
     except Exception as e:
-        print(f"Error listing languages: {e}", file=sys.stderr)
+        console.print(f"[red]✗ Error listing languages:[/red] {e}")
         return 1
 
 
@@ -354,35 +384,82 @@ def _show_language_info(language: str) -> int:
     """Show detailed information about a specific language."""
     try:
         if not _validate_language(language, silent=True):
-            print(f"Error: Language '{language}' is not supported", file=sys.stderr)
-            print("Use --list-languages to see available options", file=sys.stderr)
+            console.print(f"[red]✗ Language '{language}' is not supported[/red]")
+            console.print("[dim]Use --list-languages to see available options[/dim]")
             return 1
 
         info = get_language_info(language)
 
-        print(f"Language: {info['name']}")
-        print(f"File extension: {info['file_extension']}")
-        print(f"Generator class: {info['class']}")
-        print(f"Module: {info['module']}")
+        # Create main info panel
+        info_text = f"""[bold]Language:[/bold] {info['name']}
+[bold]File Extension:[/bold] {info['file_extension']}
+[bold]Generator Class:[/bold] {info['class']}
+[bold]Module:[/bold] {info['module']}"""
 
         if info["aliases"]:
-            print(f"Aliases: {', '.join(info['aliases'])}")
+            info_text += f"\n[bold]Aliases:[/bold] {', '.join(info['aliases'])}"
 
-        # Try to get a sample generator to show default config
+        console.print()
+        console.print(
+            Panel(
+                info_text,
+                title=f"🔧 {info['name'].title()} Generator",
+                border_style="green",
+            )
+        )
+
+        # Try to get configuration details
         try:
             generator = get_generator(language)
-            print(f"\nDefault configuration:")
-            print(f"  Package name: {generator.config.package_name}")
-            print(f"  Indent size: {generator.config.indent_size}")
-            print(f"  Generate JSON tags: {generator.config.generate_json_tags}")
-            print(f"  Add comments: {generator.config.add_comments}")
+
+            # Create configuration table
+            config_table = Table(
+                title="⚙️  Default Configuration",
+                box=box.SIMPLE,
+                show_header=True,
+                header_style="bold cyan",
+            )
+
+            config_table.add_column("Setting", style="bold")
+            config_table.add_column("Value", style="green")
+
+            config_table.add_row("Package Name", str(generator.config.package_name))
+            config_table.add_row("Indent Size", str(generator.config.indent_size))
+            config_table.add_row(
+                "Generate JSON Tags", str(generator.config.generate_json_tags)
+            )
+            config_table.add_row("Add Comments", str(generator.config.add_comments))
+            config_table.add_row(
+                "JSON Tag Omitempty", str(generator.config.json_tag_omitempty)
+            )
+
+            console.print()
+            console.print(config_table)
+
         except Exception:
-            pass
+            console.print(
+                "\n[yellow]⚠️  Could not retrieve configuration details[/yellow]"
+            )
+
+        # Add examples panel
+        examples_text = f"""Generate basic structure:
+[cyan]json_explorer codegen --language {language} data.json[/cyan]
+
+Generate to file:
+[cyan]json_explorer codegen -l {language} -o output{info['file_extension']} data.json[/cyan]
+
+Custom package name:
+[cyan]json_explorer codegen -l {language} --package mypackage data.json[/cyan]"""
+
+        console.print()
+        console.print(
+            Panel(examples_text, title="💡 Usage Examples", border_style="blue")
+        )
 
         return 0
 
     except Exception as e:
-        print(f"Error getting language info: {e}", file=sys.stderr)
+        console.print(f"[red]✗ Error getting language info:[/red] {e}")
         return 1
 
 
@@ -391,8 +468,8 @@ def _validate_language(language: str, silent: bool = False) -> bool:
     supported = list_supported_languages()
     if language.lower() not in [lang.lower() for lang in supported]:
         if not silent:
-            print(f"Error: Unsupported language '{language}'", file=sys.stderr)
-            print(f"Supported languages: {', '.join(supported)}", file=sys.stderr)
+            console.print(f"[red]✗ Unsupported language '{language}'[/red]")
+            console.print(f"[dim]Supported languages: {', '.join(supported)}[/dim]")
         return False
     return True
 
@@ -408,10 +485,10 @@ def _get_input_data(args: argparse.Namespace):
             # Try to read from stdin
             return json.load(sys.stdin)
     except json.JSONDecodeError as e:
-        print(f"Error: Invalid JSON input: {e}", file=sys.stderr)
+        console.print(f"[red]✗ Invalid JSON input:[/red] {e}")
         return None
     except Exception as e:
-        print(f"Error: Failed to load input: {e}", file=sys.stderr)
+        console.print(f"[red]✗ Failed to load input:[/red] {e}")
         return None
 
 
@@ -531,28 +608,37 @@ def _build_subcommand_config(args: argparse.Namespace) -> GeneratorConfig:
 def _generate_and_output(
     json_data, language: str, config: GeneratorConfig, args: argparse.Namespace
 ) -> int:
-    """Generate code and handle output."""
+    """Generate code and handle output with rich formatting."""
     try:
-        # Analyze JSON
-        analysis = analyze_json(json_data)
+        # Show analysis progress
+        with Progress(
+            SpinnerColumn(),
+            TextColumn("[progress.description]{task.description}"),
+            console=console,
+        ) as progress:
 
-        # Generate code
-        root_name = getattr(args, "root_name", "Root")
-        result = generate_from_analysis(analysis, language, config, root_name)
+            # Analyze JSON
+            analyze_task = progress.add_task(
+                "[cyan]Analyzing JSON structure...", total=None
+            )
+            analysis = analyze_json(json_data)
+            progress.remove_task(analyze_task)
+
+            # Generate code
+            gen_task = progress.add_task(
+                f"[green]Generating {language} code...", total=None
+            )
+            root_name = getattr(args, "root_name", "Root")
+            result = generate_from_analysis(analysis, language, config, root_name)
+            progress.remove_task(gen_task)
 
         if not result.success:
-            print(
-                f"Error: Code generation failed: {result.error_message}",
-                file=sys.stderr,
+            console.print(
+                f"[red]✗ Code generation failed:[/red] {result.error_message}"
             )
             if hasattr(result, "exception") and result.exception:
-                print(f"Details: {result.exception}", file=sys.stderr)
+                console.print(f"[dim]Details: {result.exception}[/dim]")
             return 1
-
-        # Show warnings
-        if result.warnings:
-            for warning in result.warnings:
-                print(f"Warning: {warning}", file=sys.stderr)
 
         # Output code
         output_file = getattr(args, "output", None)
@@ -560,26 +646,59 @@ def _generate_and_output(
             try:
                 output_path = Path(output_file)
                 output_path.write_text(result.code, encoding="utf-8")
-                print(f"Generated {language} code saved to {output_path}")
+                console.print(
+                    f"[green]✓[/green] Generated {language} code saved to [cyan]{output_path}[/cyan]"
+                )
             except IOError as e:
-                print(f"Error: Failed to write to {output_path}: {e}", file=sys.stderr)
+                console.print(f"[red]✗ Failed to write to {output_path}:[/red] {e}")
                 return 1
         else:
-            print(result.code)
+            top_border = "═" * 40
+            console.print(
+                f"[green]{top_border} 📄 Generated {language.title()} Code {top_border}[/green]\n"
+            )
+            # Display code with syntax highlighting
+            try:
+                syntax = Syntax(result.code, language, theme="monokai")
+                console.print(syntax)
+
+            except Exception:
+                # Fallback to plain text if syntax highlighting fails
+                console.print(result.code)
+            console.print(f"\n[green]{top_border}{top_border}{top_border}[/green]")
 
         # Show metadata if verbose
         if hasattr(args, "verbose") and args.verbose and result.metadata:
-            print(f"\nGeneration metadata:", file=sys.stderr)
+            metadata_table = Table(
+                title="📊 Generation Metadata",
+                box=box.SIMPLE,
+                show_header=True,
+                header_style="bold cyan",
+            )
+
+            metadata_table.add_column("Property", style="bold")
+            metadata_table.add_column("Value", style="green")
+
             for key, value in result.metadata.items():
-                print(f"  {key}: {value}", file=sys.stderr)
+                metadata_table.add_row(key.replace("_", " ").title(), str(value))
+
+            console.print()
+            console.print(metadata_table)
+
+        # Show warnings with rich formatting
+        if result.warnings:
+            console.print("\n[yellow]⚠️  Warnings:[/yellow]")
+            for warning in result.warnings:
+                console.print(f"  [yellow]•[/yellow] {warning}")
+            console.print()
 
         return 0
 
     except GeneratorError as e:
-        print(f"Error: {e}", file=sys.stderr)
+        console.print(f"[red]✗[/red] {e}")
         return 1
     except Exception as e:
-        print(f"Error: Unexpected failure: {e}", file=sys.stderr)
+        console.print(f"[red]✗ Unexpected failure:[/red] {e}")
         return 1
 
 
