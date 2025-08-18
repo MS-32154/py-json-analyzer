@@ -25,8 +25,8 @@ from . import (
     load_config,
     GeneratorError,
 )
-from ..analyzer import analyze_json
-from ..utils import load_json
+from json_explorer.analyzer import analyze_json
+from json_explorer.utils import load_json
 
 
 class CLIError(Exception):
