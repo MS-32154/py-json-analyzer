@@ -20,6 +20,8 @@ from .config import (
     get_modern_config,
 )
 
+from .interactive import GoInteractiveHandler
+
 __all__ = [
     # Generator
     "GoGenerator",
@@ -35,4 +37,6 @@ __all__ = [
     "get_web_api_config",
     "get_strict_config",
     "get_modern_config",
+    # Interactive
+    "GoInteractiveHandler",
 ]

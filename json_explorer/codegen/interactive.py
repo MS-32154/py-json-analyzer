@@ -1,10 +1,12 @@
 """
-Interactive code generation handler.
+Interactive code generation handler - Language agnostic base.
 
+Provides the main interactive interface for code generation with
+delegation to language-specific handlers for customization.
 """
 
 from pathlib import Path
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, Protocol
 
 from rich.console import Console
 from rich.prompt import Prompt, Confirm
@@ -25,8 +27,36 @@ from . import (
 from json_explorer.analyzer import analyze_json
 
 
+class LanguageInteractiveHandler(Protocol):
+    """Protocol for language-specific interactive handlers."""
+
+    def get_language_info(self) -> Dict[str, str]:
+        """Get language-specific information for display."""
+        ...
+
+    def show_configuration_examples(self, console: Console) -> None:
+        """Show language-specific configuration examples."""
+        ...
+
+    def get_template_choices(self) -> Dict[str, str]:
+        """Get available configuration templates."""
+        ...
+
+    def create_template_config(self, template_name: str) -> Optional[GeneratorConfig]:
+        """Create configuration from template."""
+        ...
+
+    def configure_language_specific(self, console: Console) -> Dict[str, Any]:
+        """Handle language-specific configuration options."""
+        ...
+
+    def get_default_config(self) -> Dict[str, Any]:
+        """Get default configuration for quick setup."""
+        ...
+
+
 class CodegenInteractiveHandler:
-    """Dedicated handler for interactive code generation."""
+    """Interactive handler for code generation."""
 
     def __init__(self, data: Any, console: Console = None):
         """
@@ -39,6 +69,7 @@ class CodegenInteractiveHandler:
         self.data = data
         self.console = console or Console()
         self._analysis_cache = None  # Cache analysis result
+        self._language_handlers = {}  # Cache for language handlers
 
     def run_interactive(self) -> bool:
         """
@@ -48,7 +79,7 @@ class CodegenInteractiveHandler:
             True if successful, False if user cancelled or error occurred
         """
         if not self.data:
-            self.console.print("[red]❌ No data available for code generation[/red]")
+            self.console.print("[red]⚠ No data available for code generation[/red]")
             return False
 
         try:
@@ -70,7 +101,7 @@ class CodegenInteractiveHandler:
             self.console.print("\n[yellow]👋 Code generation cancelled[/yellow]")
             return False
         except Exception as e:
-            self.console.print(f"[red]❌ Unexpected error: {e}[/red]")
+            self.console.print(f"[red]⚠ Unexpected error: {e}[/red]")
             return False
 
     def _show_main_menu(self) -> str:
@@ -82,7 +113,7 @@ class CodegenInteractiveHandler:
 [cyan]2.[/cyan] 📋 Available Languages
 [cyan]3.[/cyan] 📖 General Information
 [cyan]4.[/cyan] 🎨 Configuration Templates
-[cyan]b.[/cyan] 🔙 Back to Main Menu""",
+[cyan]b.[/cyan] 📙 Back to Main Menu""",
             border_style="blue",
             title="⚡ Code Generator",
         )
@@ -131,16 +162,16 @@ class CodegenInteractiveHandler:
             self._handle_generation_output(result, language, root_name)
 
         except GeneratorError as e:
-            self.console.print(f"[red]❌ Generation error:[/red] {e}")
+            self.console.print(f"[red]⚠ Generation error:[/red] {e}")
         except Exception as e:
-            self.console.print(f"[red]❌ Unexpected error:[/red] {e}")
+            self.console.print(f"[red]⚠ Unexpected error:[/red] {e}")
 
     def _select_language(self) -> Optional[str]:
         """Interactive language selection."""
         languages = list_supported_languages()
 
         if not languages:
-            self.console.print("[red]❌ No code generators available[/red]")
+            self.console.print("[red]⚠ No code generators available[/red]")
             return None
 
         self.console.print(f"\n[bold]📋 Available Languages:[/bold]")
@@ -165,72 +196,6 @@ class CodegenInteractiveHandler:
             return self._select_language()  # Recursive call after showing info
         else:
             return languages[int(choice) - 1]
-
-    def _show_detailed_language_info(self):
-        """Show detailed information about all languages."""
-        try:
-            language_info = list_all_language_info()
-
-            if not language_info:
-                self.console.print("[yellow]⚠️ No generators available[/yellow]")
-                return
-
-            table = Table(
-                title="🔧 Detailed Language Information",
-                box=box.ROUNDED,
-                show_header=True,
-                header_style="bold cyan",
-            )
-
-            table.add_column("Language", style="bold green", no_wrap=True)
-            table.add_column("Extension", style="cyan", no_wrap=True)
-            table.add_column("Generator Class", style="dim", no_wrap=True)
-            table.add_column("Aliases", style="blue")
-            table.add_column("Module", style="dim")
-
-            for lang_name, info in sorted(language_info.items()):
-                aliases = (
-                    ", ".join(info["aliases"]) if info["aliases"] else "[dim]none[/dim]"
-                )
-
-                table.add_row(
-                    f"🔧 {lang_name}",
-                    info["file_extension"],
-                    info["class"],
-                    aliases,
-                    info["module"],
-                )
-
-            self.console.print()
-            self.console.print(table)
-
-            # Show usage examples
-            self._show_language_usage_examples()
-
-        except Exception as e:
-            self.console.print(f"[red]Error loading language info: {e}[/red]")
-
-    def _show_language_usage_examples(self):
-        """Show usage examples for languages."""
-        examples_panel = Panel(
-            """[bold]💡 Usage Examples:[/bold]
-
-[bold]Go Language:[/bold]
-• Generates structs with JSON tags
-• Supports optional fields with pointers
-• Configurable naming conventions
-• Time handling for timestamps
-
-[bold]Coming Soon:[/bold]
-• Python - Dataclasses and Pydantic models
-• TypeScript - Interfaces and types
-• Rust - Structs with Serde
-• Java - POJOs with annotations""",
-            title="🎯 Language Features",
-            border_style="green",
-        )
-        self.console.print()
-        self.console.print(examples_panel)
 
     def _configure_generation(self, language: str) -> Optional[GeneratorConfig]:
         """Interactive configuration for code generation."""
@@ -260,15 +225,11 @@ class CodegenInteractiveHandler:
             "add_comments": Confirm.ask("Generate comments?", default=True),
         }
 
-        # Language-specific quick options
-        if language.lower() == "go":
-            config_dict.update(
-                {
-                    "generate_json_tags": True,
-                    "json_tag_omitempty": True,
-                    "use_pointers_for_optional": True,
-                }
-            )
+        # Get language-specific defaults
+        lang_handler = self._get_language_handler(language)
+        if lang_handler:
+            lang_defaults = lang_handler.get_default_config()
+            config_dict.update(lang_defaults)
 
         return load_config(custom_config=config_dict)
 
@@ -298,47 +259,12 @@ class CodegenInteractiveHandler:
             )
 
         # Language-specific configuration
-        if language.lower() == "go":
-            config_dict.update(self._configure_go_specific())
+        lang_handler = self._get_language_handler(language)
+        if lang_handler:
+            lang_config = lang_handler.configure_language_specific(self.console)
+            config_dict.update(lang_config)
 
         return load_config(custom_config=config_dict)
-
-    def _configure_go_specific(self) -> Dict[str, Any]:
-        """Go-specific configuration options."""
-        go_config = {}
-
-        self.console.print("\n[bold]Go-Specific Options:[/bold]")
-
-        # JSON tags
-        go_config["generate_json_tags"] = Confirm.ask(
-            "Generate JSON struct tags?", default=True
-        )
-
-        if go_config["generate_json_tags"]:
-            go_config["json_tag_omitempty"] = Confirm.ask(
-                "Add 'omitempty' to JSON tags?", default=True
-            )
-            go_config["json_tag_case"] = Prompt.ask(
-                "JSON tag case style",
-                choices=["original", "snake", "camel"],
-                default="original",
-            )
-
-        # Optional fields
-        go_config["use_pointers_for_optional"] = Confirm.ask(
-            "Use pointers for optional fields?", default=True
-        )
-
-        # Type preferences
-        if Confirm.ask("Configure type preferences?", default=False):
-            go_config["int_type"] = Prompt.ask(
-                "Integer type", choices=["int", "int32", "int64"], default="int64"
-            )
-            go_config["float_type"] = Prompt.ask(
-                "Float type", choices=["float32", "float64"], default="float64"
-            )
-
-        return go_config
 
     def _template_configuration(self, language: str) -> Optional[GeneratorConfig]:
         """Use configuration templates."""
@@ -346,70 +272,34 @@ class CodegenInteractiveHandler:
             f"\n🎨 [bold]Configuration Templates for {language.title()}[/bold]"
         )
 
-        if language.lower() == "go":
-            template = Prompt.ask(
-                "Select Go template",
-                choices=["web-api", "strict", "modern", "custom"],
-                default="web-api",
-            )
-
-            if template == "web-api":
-                from .languages.go.config import get_web_api_config
-
-                go_config = get_web_api_config()
-                base_config = GeneratorConfig(
-                    package_name="models",
-                    add_comments=True,
-                    generate_json_tags=True,
-                    json_tag_omitempty=True,
-                    language_config=go_config.__dict__,
-                )
-                self._show_template_info(
-                    "Web API",
-                    "Optimized for REST API models with pointers for optional fields",
-                )
-                return base_config
-
-            elif template == "strict":
-                from .languages.go.config import get_strict_config
-
-                go_config = get_strict_config()
-                base_config = GeneratorConfig(
-                    package_name="types",
-                    add_comments=True,
-                    generate_json_tags=True,
-                    json_tag_omitempty=False,
-                    language_config=go_config.__dict__,
-                )
-                self._show_template_info(
-                    "Strict", "No pointers, strict types for high-performance code"
-                )
-                return base_config
-
-            elif template == "modern":
-                from .languages.go.config import get_modern_config
-
-                go_config = get_modern_config()
-                base_config = GeneratorConfig(
-                    package_name="main",
-                    add_comments=True,
-                    generate_json_tags=True,
-                    json_tag_omitempty=True,
-                    language_config=go_config.__dict__,
-                )
-                self._show_template_info("Modern", "Uses modern Go features (Go 1.18+)")
-                return base_config
-
-            elif template == "custom":
-                return self._custom_configuration(language)
-
-        else:
+        lang_handler = self._get_language_handler(language)
+        if not lang_handler:
             self.console.print(
                 f"[yellow]No templates available for {language} yet[/yellow]"
             )
             return self._custom_configuration(language)
 
-        return None
+        templates = lang_handler.get_template_choices()
+        if not templates:
+            self.console.print(f"[yellow]No templates defined for {language}[/yellow]")
+            return self._custom_configuration(language)
+
+        # Add custom option
+        choices = list(templates.keys()) + ["custom"]
+        template = Prompt.ask(
+            f"Select {language} template",
+            choices=choices,
+            default=list(templates.keys())[0],
+        )
+
+        if template == "custom":
+            return self._custom_configuration(language)
+
+        config = lang_handler.create_template_config(template)
+        if config:
+            self._show_template_info(template, templates[template])
+
+        return config
 
     def _show_template_info(self, template_name: str, description: str):
         """Show information about selected template."""
@@ -431,7 +321,7 @@ class CodegenInteractiveHandler:
             config_path = Path(config_file)
             if not config_path.exists():
                 self.console.print(
-                    f"[red]❌ Configuration file not found: {config_path}[/red]"
+                    f"[red]⚠ Configuration file not found: {config_path}[/red]"
                 )
                 return None
 
@@ -442,7 +332,7 @@ class CodegenInteractiveHandler:
             return config
 
         except Exception as e:
-            self.console.print(f"[red]❌ Error loading configuration: {e}[/red]")
+            self.console.print(f"[red]⚠ Error loading configuration: {e}[/red]")
             return None
 
     def _generate_code(self, language: str, config: GeneratorConfig, root_name: str):
@@ -460,7 +350,7 @@ class CodegenInteractiveHandler:
 
             if not result.success:
                 self.console.print(
-                    f"[red]❌ Generation failed:[/red] {result.error_message}"
+                    f"[red]⚠ Generation failed:[/red] {result.error_message}"
                 )
                 return None
 
@@ -468,10 +358,10 @@ class CodegenInteractiveHandler:
             return result
 
         except GeneratorError as e:
-            self.console.print(f"[red]❌ Generator error:[/red] {e}")
+            self.console.print(f"[red]⚠ Generator error:[/red] {e}")
             return None
         except Exception as e:
-            self.console.print(f"[red]❌ Unexpected error during generation:[/red] {e}")
+            self.console.print(f"[red]⚠ Unexpected error during generation:[/red] {e}")
             return None
 
     def _handle_generation_output(self, result, language: str, root_name: str):
@@ -559,7 +449,7 @@ class CodegenInteractiveHandler:
             )
 
         except Exception as e:
-            self.console.print(f"[red]❌ Error saving file:[/red] {e}")
+            self.console.print(f"[red]⚠ Error saving file:[/red] {e}")
 
     def _display_warnings(self, warnings: list):
         """Display generation warnings."""
@@ -612,6 +502,76 @@ class CodegenInteractiveHandler:
         for lang in languages:
             self.console.print(f"  [green]•[/green] {lang}")
 
+    def _show_detailed_language_info(self):
+        """Show detailed information about all languages."""
+        try:
+            language_info = list_all_language_info()
+
+            if not language_info:
+                self.console.print("[yellow]⚠️ No generators available[/yellow]")
+                return
+
+            table = Table(
+                title="🔧 Detailed Language Information",
+                box=box.ROUNDED,
+                show_header=True,
+                header_style="bold cyan",
+            )
+
+            table.add_column("Language", style="bold green", no_wrap=True)
+            table.add_column("Extension", style="cyan", no_wrap=True)
+            table.add_column("Generator Class", style="dim", no_wrap=True)
+            table.add_column("Aliases", style="blue")
+            table.add_column("Module", style="dim")
+
+            for lang_name, info in sorted(language_info.items()):
+                aliases = (
+                    ", ".join(info["aliases"]) if info["aliases"] else "[dim]none[/dim]"
+                )
+
+                table.add_row(
+                    f"🔧 {lang_name}",
+                    info["file_extension"],
+                    info["class"],
+                    aliases,
+                    info["module"],
+                )
+
+            self.console.print()
+            self.console.print(table)
+
+            # Show usage examples
+            self._show_language_usage_examples()
+
+        except Exception as e:
+            self.console.print(f"[red]Error loading language info: {e}[/red]")
+
+    def _show_language_usage_examples(self):
+        """Show usage examples for languages."""
+        examples_panel = Panel(
+            """[bold]💡 Language Features Overview:[/bold]
+
+[bold]Currently Available:[/bold]
+• Go - Structs with JSON tags, configurable types and pointers
+
+[bold]Coming Soon:[/bold]
+• Python - Dataclasses and Pydantic models
+• TypeScript - Interfaces and types
+• Rust - Structs with Serde
+• Java - POJOs with annotations
+
+[bold]Features:[/bold]
+• Smart type detection and conflict resolution
+• Configurable naming conventions
+• Optional field handling
+• Template-based configuration
+• Extensible architecture""",
+            title="🎯 Language Support",
+            border_style="green",
+        )
+        self.console.print()
+        self.console.print(examples_panel)
+
     def _show_specific_language_info(self):
         """Show information about a specific language."""
         languages = list_supported_languages()
@@ -650,37 +610,10 @@ class CodegenInteractiveHandler:
         self.console.print()
         self.console.print(info_panel)
 
-        # Show configuration example for this language
-        if language.lower() == "go":
-            self._show_go_configuration_example()
-
-    def _show_go_configuration_example(self):
-        """Show Go configuration examples."""
-        config_panel = Panel(
-            """[bold]Go Configuration Examples:[/bold]
-
-[green]Web API Template:[/green]
-• Package: "models" 
-• Pointers for optional fields
-• JSON tags with omitempty
-• int64 and float64 types
-
-[green]Strict Template:[/green]  
-• Package: "types"
-• No pointers (value types only)
-• JSON tags without omitempty
-• High performance focus
-
-[green]Modern Template:[/green]
-• Uses Go 1.18+ features
-• "any" instead of interface{}
-• Modern type preferences""",
-            title="⚙️ Go Templates",
-            border_style="blue",
-        )
-
-        self.console.print()
-        self.console.print(config_panel)
+        # Show language-specific information
+        lang_handler = self._get_language_handler(language)
+        if lang_handler:
+            lang_handler.show_configuration_examples(self.console)
 
     def _show_general_info(self):
         """Show general code generation information."""
@@ -703,8 +636,8 @@ class CodegenInteractiveHandler:
 • Custom configuration profiles
 • Detailed validation and warnings
 
-[bold]Supported Languages:[/bold]
-• Go - Structs with JSON tags ✅
+[bold]Current Status:[/bold]
+• Go - Full support with multiple templates ✅
 • Python - Coming soon 🚧
 • TypeScript - Coming soon 🚧  
 • Rust - Coming soon 🚧
@@ -723,38 +656,55 @@ class CodegenInteractiveHandler:
 
     def _show_templates_menu(self):
         """Show configuration templates information."""
-        templates_panel = Panel(
-            """[bold blue]🎨 Configuration Templates[/bold blue]
+        languages = list_supported_languages()
 
-[bold]Available Templates:[/bold]
+        if not languages:
+            self.console.print("[red]No languages available[/red]")
+            return
 
-[green]📡 Web API Template (Go):[/green]
-• Optimized for REST API models
-• Uses pointers for optional fields  
-• JSON tags with omitempty
-• Package name: "models"
-• Types: int64, float64
+        self.console.print("\n[bold blue]🎨 Configuration Templates[/bold blue]")
 
-[green]🔒 Strict Template (Go):[/green]  
-• High-performance, no pointers
-• Value types only
-• JSON tags without omitempty
-• Package name: "types"
-• Minimal memory allocation
+        for language in languages:
+            lang_handler = self._get_language_handler(language)
+            if lang_handler:
+                templates = lang_handler.get_template_choices()
+                if templates:
+                    self.console.print(f"\n[bold]{language.title()} Templates:[/bold]")
+                    for template_name, description in templates.items():
+                        self.console.print(
+                            f"  [green]•[/green] {template_name}: {description}"
+                        )
+            else:
+                self.console.print(
+                    f"\n[yellow]{language.title()}: No templates available[/yellow]"
+                )
 
-[green]🚀 Modern Template (Go):[/green]
-• Uses Go 1.18+ features
-• "any" instead of interface{}
-• Modern type preferences  
-• Package name: "main"
-• Latest Go conventions
+    def _get_language_handler(
+        self, language: str
+    ) -> Optional[LanguageInteractiveHandler]:
+        """Get language-specific interactive handler."""
+        if language in self._language_handlers:
+            return self._language_handlers[language]
 
-[bold]Coming Soon:[/bold]
-• Python templates (Pydantic, Dataclass)
-• TypeScript templates (Interface, Type)
-• Rust templates (Serde, Manual)""",
-            border_style="blue",
-        )
+        try:
+            # Try to import language-specific handler
+            module_name = (
+                f"json_explorer.codegen.languages.{language.lower()}.interactive"
+            )
+            module = __import__(module_name, fromlist=[""])
 
-        self.console.print()
-        self.console.print(templates_panel)
+            # Look for handler class
+            handler_class_name = f"{language.title()}InteractiveHandler"
+            if hasattr(module, handler_class_name):
+                handler_class = getattr(module, handler_class_name)
+                handler = handler_class()
+                self._language_handlers[language] = handler
+                return handler
+
+        except ImportError:
+            pass  # No language-specific handler available
+        except Exception as e:
+            # Log error but don't fail
+            pass
+
+        return None
