@@ -203,7 +203,7 @@ def _list_languages() -> int:
         table.add_column("Language", style="bold green", no_wrap=True)
         table.add_column("Extension", style="cyan")
         table.add_column("Generator Class", style="dim")
-        table.add_column("Aliases", style="blue")
+        table.add_column("Aliases", style="gold1 ")
 
         for lang_name, info in sorted(language_info.items()):
             aliases = (
