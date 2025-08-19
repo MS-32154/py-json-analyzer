@@ -399,7 +399,14 @@ def convert_analyzer_output(
             element_name = (
                 root_name.rstrip("s") if root_name.endswith("s") else f"{root_name}Item"
             )
-            return create_schema_from_object(child_node, element_name)
+            schema = create_schema_from_object(child_node, element_name)
+            if schema.description:
+                schema.description = (
+                    "❗ Generated from array of objects\n" + schema.description
+                )
+            else:
+                schema.description = "❗ Generated from array of objects"
+            return schema
 
         elif "child_type" in analyzer_result:
             # Array of primitives - create a wrapper schema
