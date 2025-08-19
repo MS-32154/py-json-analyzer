@@ -91,7 +91,7 @@ Examples:
   %(prog)s data.json --tree compact --stats
   %(prog)s data.json --search "name" --search-type key
   %(prog)s data.json --search "isinstance(value, int) and value > 10" --search-type filter
-  %(prog)s --url https://api.example.com/data --plot --tree-results
+  %(prog)s --url https://api.example.com/data --plot
   
 Code Generation:
   %(prog)s data.json --generate go --output user.go --root-name User

@@ -239,14 +239,7 @@ def convert_analyzer_output(
 ) -> Schema:
     """
     Convert analyzer.py output to internal Schema representation.
-
-    Args:
-        analyzer_result: Output from analyze_json() function
-        root_name: Name for the root schema object
-        add_attention_descriptions: Whether to generate attention descriptions
-
-    Returns:
-        Schema: Normalized schema representation with attention descriptions
+    Now properly handles all cases the analyzer supports.
     """
 
     def map_analyzer_type(analyzer_type: str) -> FieldType:
@@ -264,69 +257,18 @@ def convert_analyzer_output(
         }
         return type_mapping.get(analyzer_type, FieldType.UNKNOWN)
 
-    def convert_node(node: Dict[str, Any], name: str) -> Schema:
-        """Recursively convert analyzer node to Schema."""
-        schema = Schema(name=name, original_name=name)
-
-        if node["type"] != "object":
-            raise ValueError(f"Expected object type, got {node['type']}")
+    def create_schema_from_object(node: Dict[str, Any], schema_name: str) -> Schema:
+        """Create schema from analyzer object node."""
+        schema = Schema(name=schema_name, original_name=schema_name)
 
         children = node.get("children", {})
         conflicts = node.get("conflicts", {})
 
         for field_name, field_data in children.items():
-            field_type = map_analyzer_type(field_data["type"])
-            optional = field_data.get("optional", False)
-
-            field_obj = Field(
-                name=field_name,
-                original_name=field_name,
-                type=field_type,
-                optional=optional,
+            field = create_field_from_node(
+                field_data, field_name, schema_name, conflicts
             )
-
-            # Handle conflicts
-            if field_name in conflicts:
-                field_obj.type = FieldType.CONFLICT
-                field_obj.conflicting_types = [
-                    map_analyzer_type(t) for t in conflicts[field_name]
-                ]
-
-            # Handle nested objects
-            elif field_type == FieldType.OBJECT:
-                nested_name = f"{name}{field_name.title()}"
-                field_obj.nested_schema = convert_node(field_data, nested_name)
-
-            # Handle arrays
-            elif field_type == FieldType.ARRAY:
-                if "child_type" in field_data:
-                    # Simple array (primitives)
-                    child_type_str = field_data["child_type"]
-                    if "mixed" in child_type_str.lower():
-                        field_obj.array_element_type = FieldType.CONFLICT
-                    else:
-                        field_obj.array_element_type = map_analyzer_type(child_type_str)
-                elif "child" in field_data:
-                    # Complex array (objects/nested arrays)
-                    child_data = field_data["child"]
-                    if child_data["type"] == "object":
-                        nested_name = f"{name}{field_name.title()}Item"
-                        field_obj.array_element_schema = convert_node(
-                            child_data, nested_name
-                        )
-                        field_obj.array_element_type = FieldType.OBJECT
-                    else:
-                        field_obj.array_element_type = map_analyzer_type(
-                            child_data["type"]
-                        )
-
-            # Generate attention description for field
-            if add_attention_descriptions:
-                attention_desc = field_obj.generate_attention_description(True)
-                if attention_desc:
-                    field_obj.description = attention_desc
-
-            schema.add_field(field_obj)
+            schema.add_field(field)
 
         # Generate attention description for schema
         if add_attention_descriptions:
@@ -336,25 +278,179 @@ def convert_analyzer_output(
 
         return schema
 
-    # Convert root level
-    if analyzer_result["type"] == "object":
-        return convert_node(analyzer_result, root_name)
-    else:
-        # Handle case where root is not an object
-        schema = Schema(name=root_name, original_name=root_name)
-        root_field = Field(
-            name="value",
-            original_name="value",
-            type=map_analyzer_type(analyzer_result["type"]),
+    def create_field_from_node(
+        field_node: Dict[str, Any],
+        field_name: str,
+        parent_schema_name: str,
+        conflicts: Dict[str, Any],
+    ) -> Field:
+        """Create field from analyzer field node."""
+        field_type_str = field_node["type"]
+        field_type = map_analyzer_type(field_type_str)
+        optional = field_node.get("optional", False)
+
+        field = Field(
+            name=field_name,
+            original_name=field_name,
+            type=field_type,
+            optional=optional,
         )
 
-        # Generate attention description for primitive root
-        if add_attention_descriptions:
-            attention_desc = root_field.generate_attention_description(True)
-            if attention_desc:
-                root_field.description = attention_desc
+        # Handle type conflicts
+        if field_name in conflicts:
+            field.type = FieldType.CONFLICT
+            field.conflicting_types = [
+                map_analyzer_type(t) for t in conflicts[field_name]
+            ]
 
-        schema.add_field(root_field)
+        # Handle different field types
+        elif field_type == FieldType.OBJECT:
+            # Nested object - always handle recursively
+            nested_schema_name = f"{parent_schema_name}{field_name.title()}"
+            field.nested_schema = create_schema_from_object(
+                field_node, nested_schema_name
+            )
+
+        elif field_type == FieldType.ARRAY:
+            # Handle arrays - check what the analyzer found
+            if "child_type" in field_node:
+                # Simple array (primitives or mixed primitives)
+                child_type_str = field_node["child_type"]
+                if "mixed" in child_type_str.lower():
+                    field.array_element_type = FieldType.CONFLICT
+                else:
+                    field.array_element_type = map_analyzer_type(child_type_str)
+
+            elif "child" in field_node:
+                # Complex array (objects or nested arrays)
+                child_node = field_node["child"]
+                child_type = child_node["type"]
+
+                if child_type == "object":
+                    # Array of objects
+                    element_schema_name = (
+                        f"{parent_schema_name}{field_name.title()}Item"
+                    )
+                    field.array_element_schema = create_schema_from_object(
+                        child_node, element_schema_name
+                    )
+                    field.array_element_type = FieldType.OBJECT
+
+                elif child_type == "list":
+                    # Array of arrays (nested lists) - handle recursively
+                    field.array_element_type = FieldType.ARRAY
+                    # Recursively create field for nested array
+                    nested_field = create_field_from_node(
+                        child_node, f"{field_name}_item", parent_schema_name, {}
+                    )
+                    # Store nested array structure
+                    if hasattr(nested_field, "array_element_type"):
+                        # Copy the nested array's element info
+                        if nested_field.array_element_schema:
+                            field.array_element_schema = (
+                                nested_field.array_element_schema
+                            )
+                        else:
+                            field.array_element_type = nested_field.array_element_type
+
+                else:
+                    # Array of other complex types or mixed types
+                    field.array_element_type = map_analyzer_type(child_type)
+
+                    # If it's a complex type we don't recognize, try to handle it
+                    if child_type not in ["str", "int", "float", "bool", "timestamp"]:
+                        # Might be a complex structure we should handle recursively
+                        try:
+                            nested_field = create_field_from_node(
+                                child_node, f"{field_name}_item", parent_schema_name, {}
+                            )
+                            # If the nested field has structure, preserve it
+                            if nested_field.nested_schema:
+                                field.array_element_schema = nested_field.nested_schema
+                                field.array_element_type = FieldType.OBJECT
+                        except:
+                            # Fallback to basic type mapping
+                            pass
+
+            else:
+                # Unknown array type
+                field.array_element_type = FieldType.UNKNOWN
+
+        # Generate attention description for field
+        if add_attention_descriptions:
+            attention_desc = field.generate_attention_description(True)
+            if attention_desc:
+                field.description = attention_desc
+
+        return field
+
+    # Main conversion logic - handle different root types
+    root_type = analyzer_result["type"]
+
+    if root_type == "object":
+        # Root is an object - standard case
+        return create_schema_from_object(analyzer_result, root_name)
+
+    elif root_type == "list":
+        # Root is an array - extract the element type/structure
+        if "child" in analyzer_result and analyzer_result["child"]["type"] == "object":
+            # Array of objects - generate schema for the object, not the array
+            child_node = analyzer_result["child"]
+            element_name = (
+                root_name.rstrip("s") if root_name.endswith("s") else f"{root_name}Item"
+            )
+            return create_schema_from_object(child_node, element_name)
+
+        elif "child_type" in analyzer_result:
+            # Array of primitives - create a wrapper schema
+            schema = Schema(name=root_name, original_name=root_name)
+
+            child_type_str = analyzer_result["child_type"]
+            if "mixed" in child_type_str.lower():
+                array_element_type = FieldType.CONFLICT
+            else:
+                array_element_type = map_analyzer_type(child_type_str)
+
+            field = Field(
+                name="items",
+                original_name="items",
+                type=FieldType.ARRAY,
+                array_element_type=array_element_type,
+            )
+
+            if add_attention_descriptions:
+                field.description = f"📋 Array of {child_type_str} values"
+
+            schema.add_field(field)
+            return schema
+
+        else:
+            # Unknown array structure
+            schema = Schema(name=root_name, original_name=root_name)
+            field = Field(
+                name="items",
+                original_name="items",
+                type=FieldType.ARRAY,
+                array_element_type=FieldType.UNKNOWN,
+            )
+
+            if add_attention_descriptions:
+                field.description = "❓ Array of unknown type"
+
+            schema.add_field(field)
+            return schema
+
+    else:
+        # Root is a primitive (string, int, bool, etc.)
+        schema = Schema(name=root_name, original_name=root_name)
+        field = Field(
+            name="value", original_name="value", type=map_analyzer_type(root_type)
+        )
+
+        if add_attention_descriptions:
+            field.description = f"📦 Single {root_type} value"
+
+        schema.add_field(field)
         return schema
 
 
