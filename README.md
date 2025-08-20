@@ -360,6 +360,38 @@ json_explorer data.json --generate go --config config.json
 
 ---
 
+## API Reference
+
+For the complete API reference got to [JSON Explorer API Documentation](https://ms-32154.github.io/py-json-analyzer/) or see the source code.
+
+---
+
 ## License
 
-MIT License. See `LICENSE` for details.
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+## Contributing
+
+Contributions are welcome! Please feel free to submit a Pull Request.
+
+1. Fork the repository
+2. Create your feature branch (`git checkout -b feature/AmazingFeature`)
+3. Commit your changes (`git commit -m 'Add some AmazingFeature'`)
+4. Push to the branch (`git push origin feature/AmazingFeature`)
+5. Open a Pull Request
+
+## Support
+
+If you encounter any issues or have questions, please:
+
+1. Check the [examples](#examples) section
+2. Search existing [GitHub Issues](https://github.com/MS-32154/py-json-analyzer/issues)
+3. Create a new issue with:
+   - Python version
+   - Operating system
+   - Minimal code example reproducing the issue
+   - Full error traceback (if applicable)
+
+---
+
+**JSON Explorer** – © 2025 MS-32154. All rights reserved.
