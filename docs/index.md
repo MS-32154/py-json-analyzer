@@ -34,7 +34,7 @@ Analyzes JSON structure and returns detailed metadata.
 
 **Parameters:**
 
-- `data` (dict|list|any): JSON data to analyze
+- `data (dict|list|any)`: JSON data to analyze
 
 **Returns:**
 
@@ -276,7 +276,7 @@ Generate code from analyzer output.
 
 - `analyzer_result`: Output from `analyze_json()`
 - `language` (str): Target language
-- `config` (GeneratorConfig|dict|str): Configuration
+- `config (GeneratorConfig|dict|str)`: Configuration
 - `root_name` (str): Name for root schema
 
 **Returns:**
