@@ -553,9 +553,9 @@ class CodegenInteractiveHandler:
 
 [bold]Currently Available:[/bold]
 • Go - Structs with JSON tags, configurable types and pointers
+• Python - Dataclasses, Pydantic, and Typeddict models
 
 [bold]Coming Soon:[/bold]
-• Python - Dataclasses and Pydantic models
 • TypeScript - Interfaces and types
 • Rust - Structs with Serde
 • Java - POJOs with annotations

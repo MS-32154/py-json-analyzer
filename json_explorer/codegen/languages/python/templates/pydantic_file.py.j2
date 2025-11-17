@@ -1,0 +1,38 @@
+"""Generated Pydantic models from JSON schema."""
+{%- if imports %}
+
+{%- for import_stmt in imports %}
+{{ import_stmt }}
+{%- endfor %}
+{%- endif %}
+
+{%- for class in classes %}
+
+
+class {{ class.class_name }}(BaseModel):
+{%- if class.description %}
+    """{{ class.description }}"""
+{%- endif %}
+{%- if class.config_dict %}
+
+    model_config = ConfigDict(
+{%- if class.extra_forbid %}
+        extra="forbid",
+{%- else %}
+        extra="ignore",
+{%- endif %}
+        populate_by_name=True,
+    )
+{%- endif %}
+
+{%- for field in class.fields %}
+{%- if field.comment %}
+    # {{ field.comment }}
+{%- endif %}
+    {{ field.name }}: {{ field.type }}
+{%- if field.field_config %} = Field({{ field.field_config }}){% endif %}
+{%- endfor %}
+{%- if not class.fields %}
+    pass
+{%- endif %}
+{%- endfor %}

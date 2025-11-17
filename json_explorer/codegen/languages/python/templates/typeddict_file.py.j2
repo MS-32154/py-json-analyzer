@@ -1,0 +1,26 @@
+"""Generated TypedDict classes from JSON schema."""
+{%- if imports %}
+
+{%- for import_stmt in imports %}
+{{ import_stmt }}
+{%- endfor %}
+{%- endif %}
+
+{%- for class in classes %}
+
+
+class {{ class.class_name }}(TypedDict
+{%- if not class.total %}, total=False{% endif %}):
+{%- if class.description %}
+    """{{ class.description }}"""
+{%- endif %}
+{%- for field in class.fields %}
+{%- if field.comment %}
+    # {{ field.comment }}
+{%- endif %}
+    {{ field.name }}: {{ field.type }}
+{%- endfor %}
+{%- if not class.fields %}
+    pass
+{%- endif %}
+{%- endfor %}

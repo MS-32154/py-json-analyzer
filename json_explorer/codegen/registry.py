@@ -23,12 +23,16 @@ class GeneratorRegistry:
         """Initialize empty registry."""
         self._generators: Dict[str, Type[CodeGenerator]] = {}
         self._aliases: Dict[str, str] = {}
+        self._primary_names: Dict[str, str] = (
+            {}
+        )  # Maps canonical name back to primary key
 
     def register(
         self,
         language: str,
         generator_class: Type[CodeGenerator],
         aliases: Optional[List[str]] = None,
+        replace: bool = False,
     ):
         """
         Register a generator for a language.
@@ -37,22 +41,48 @@ class GeneratorRegistry:
             language: Primary language name (e.g., 'go', 'python')
             generator_class: Generator class implementing CodeGenerator
             aliases: Alternative names for this language
+            replace: If True, replace existing registration. If False, skip if exists.
 
         Raises:
-            RegistryError: If generator class is invalid
+            RegistryError: If generator class is invalid or conflicts exist
         """
         if not issubclass(generator_class, CodeGenerator):
             raise RegistryError(f"Generator class must inherit from CodeGenerator")
 
         language_key = language.lower()
+
+        # Check if already registered
+        if language_key in self._generators and not replace:
+            # Already registered, skip silently
+            return
+
+        # Store the generator
         self._generators[language_key] = generator_class
+        self._primary_names[language_key] = language_key
 
         # Register aliases
         if aliases:
             for alias in aliases:
                 alias_key = alias.lower()
-                if alias_key in self._generators or alias_key in self._aliases:
-                    raise RegistryError(f"Alias '{alias}' already registered")
+
+                # Skip if alias is the same as primary
+                if alias_key == language_key:
+                    continue
+
+                # Check for conflicts (unless replacing)
+                if not replace:
+                    if alias_key in self._generators:
+                        raise RegistryError(
+                            f"Alias '{alias}' conflicts with existing primary language"
+                        )
+                    if (
+                        alias_key in self._aliases
+                        and self._aliases[alias_key] != language_key
+                    ):
+                        raise RegistryError(
+                            f"Alias '{alias}' already points to '{self._aliases[alias_key]}'"
+                        )
+
                 self._aliases[alias_key] = language_key
 
     def unregister(self, language: str):
@@ -66,6 +96,8 @@ class GeneratorRegistry:
 
         if language_key in self._generators:
             del self._generators[language_key]
+            if language_key in self._primary_names:
+                del self._primary_names[language_key]
 
         # Remove aliases pointing to this language
         aliases_to_remove = [
@@ -98,10 +130,10 @@ class GeneratorRegistry:
             target_language = self._aliases[language_key]
             return self._generators[target_language]
 
-        available = self.list_all_names()
+        available = self.list_languages()
         raise RegistryError(
             f"No generator registered for language: {language}. "
-            f"Available: {list(available.keys())}"
+            f"Available: {', '.join(available)}"
         )
 
     def create_generator(
@@ -129,13 +161,10 @@ class GeneratorRegistry:
             if isinstance(config, GeneratorConfig):
                 final_config = config
             elif isinstance(config, (str, Path)):
-                # Config is a file path
                 final_config = load_config(config_file=config)
             elif isinstance(config, dict):
-                # Config is a dictionary
                 final_config = load_config(custom_config=config)
             elif config is None:
-                # Use defaults
                 final_config = load_config()
             else:
                 raise RegistryError(f"Invalid config type: {type(config)}")
@@ -149,6 +178,21 @@ class GeneratorRegistry:
         """Get list of registered primary language names."""
         return sorted(self._generators.keys())
 
+    def get_aliases_for_language(self, language: str) -> List[str]:
+        """
+        Get all aliases for a specific language.
+
+        Args:
+            language: Primary language name
+
+        Returns:
+            List of aliases for this language
+        """
+        language_key = language.lower()
+        return sorted(
+            [alias for alias, target in self._aliases.items() if target == language_key]
+        )
+
     def list_all_names(self) -> Dict[str, List[str]]:
         """
         Get all registered names including aliases.
@@ -159,10 +203,8 @@ class GeneratorRegistry:
         result = {}
         for language in self._generators:
             names = [language]
-            aliases = [
-                alias for alias, target in self._aliases.items() if target == language
-            ]
-            names.extend(sorted(aliases))
+            aliases = self.get_aliases_for_language(language)
+            names.extend(aliases)
             result[language] = names
         return result
 
@@ -194,14 +236,16 @@ class GeneratorRegistry:
         """
         generator_class = self.get_generator_class(language)
 
+        # Resolve to primary language if an alias was provided
+        language_key = language.lower()
+        if language_key in self._aliases:
+            language_key = self._aliases[language_key]
+
         # Create temporary instance to get info
         temp_config = load_config()
         temp_generator = generator_class(temp_config)
 
-        language_key = language.lower()
-        aliases = [
-            alias for alias, target in self._aliases.items() if target == language_key
-        ]
+        aliases = self.get_aliases_for_language(language_key)
 
         return {
             "name": temp_generator.language_name,
@@ -212,13 +256,44 @@ class GeneratorRegistry:
         }
 
 
-# Global registry instance
-_global_registry = GeneratorRegistry()
+# Global registry instance - created once
+_global_registry: Optional[GeneratorRegistry] = None
 
 
 def get_registry() -> GeneratorRegistry:
-    """Get the global generator registry."""
+    """Get the global generator registry, initializing if needed."""
+    global _global_registry
+    if _global_registry is None:
+        _global_registry = GeneratorRegistry()
+        _auto_register_generators()
     return _global_registry
+
+
+def _auto_register_generators():
+    """
+    Auto-register known generators with their aliases.
+
+    This is the single source of truth for generator registration.
+    Each language module should export its configuration here.
+    """
+    # Register Go generator
+    try:
+        from .languages.go import GoGenerator
+
+        _global_registry.register("go", GoGenerator, aliases=["golang"])
+    except ImportError:
+        pass
+
+    # Future languages will be added here:
+    try:
+        from .languages.python import PythonGenerator
+
+        _global_registry.register("python", PythonGenerator, aliases=["py"])
+    except ImportError:
+        pass
+
+
+# Public API functions using the global registry
 
 
 def register_generator(
@@ -234,7 +309,7 @@ def register_generator(
         generator_class: Generator class
         aliases: Optional aliases
     """
-    _global_registry.register(language, generator_class, aliases)
+    get_registry().register(language, generator_class, aliases)
 
 
 def get_generator(
@@ -251,22 +326,22 @@ def get_generator(
     Returns:
         Generator instance
     """
-    return _global_registry.create_generator(language, config)
+    return get_registry().create_generator(language, config)
 
 
 def list_supported_languages() -> List[str]:
     """List all supported languages from global registry."""
-    return _global_registry.list_languages()
+    return get_registry().list_languages()
 
 
 def is_language_supported(language: str) -> bool:
     """Check if language is supported by global registry."""
-    return _global_registry.is_supported(language)
+    return get_registry().is_supported(language)
 
 
 def get_language_info(language: str) -> Dict[str, Any]:
     """Get information about a supported language."""
-    return _global_registry.get_language_info(language)
+    return get_registry().get_language_info(language)
 
 
 def list_all_language_info() -> Dict[str, Dict[str, Any]]:
@@ -276,80 +351,5 @@ def list_all_language_info() -> Dict[str, Dict[str, Any]]:
         try:
             result[language] = get_language_info(language)
         except Exception:
-            # Skip languages that can't provide info
             continue
     return result
-
-
-# Auto-discovery functions
-def discover_generators():
-    """
-    Auto-discover and register available generators.
-
-    Looks for generator modules in the languages/ directory.
-    """
-    import importlib
-    from pathlib import Path
-
-    # Get the languages directory
-    languages_dir = Path(__file__).parent / "languages"
-
-    if not languages_dir.exists():
-        return
-
-    # Scan for language directories
-    for lang_dir in languages_dir.iterdir():
-        if not lang_dir.is_dir() or lang_dir.name.startswith("_"):
-            continue
-
-        try:
-            # Try to import the language module
-            module_name = f".languages.{lang_dir.name}"
-            module = importlib.import_module(module_name, package=__package__)
-
-            # Look for generator classes in the module's __all__ or by inspection
-            generator_classes = []
-
-            if hasattr(module, "__all__"):
-                # Check items in __all__
-                for name in module.__all__:
-                    if name.endswith("Generator"):
-                        attr = getattr(module, name, None)
-                        if (
-                            isinstance(attr, type)
-                            and issubclass(attr, CodeGenerator)
-                            and attr != CodeGenerator
-                        ):
-                            generator_classes.append(attr)
-            else:
-                # Scan module attributes
-                for attr_name in dir(module):
-                    if not attr_name.endswith("Generator"):
-                        continue
-                    attr = getattr(module, attr_name)
-                    if (
-                        isinstance(attr, type)
-                        and issubclass(attr, CodeGenerator)
-                        and attr != CodeGenerator
-                    ):
-                        generator_classes.append(attr)
-
-            # Register found generators
-            for generator_class in generator_classes:
-                if not _global_registry.is_supported(lang_dir.name):
-                    _global_registry.register(lang_dir.name, generator_class)
-
-        except ImportError as e:
-            # Skip languages that can't be imported
-            continue
-        except Exception as e:
-            # Skip languages with other issues
-            continue
-
-
-# Initialize with auto-discovery
-try:
-    discover_generators()
-except Exception:
-    # Don't fail if auto-discovery fails
-    pass

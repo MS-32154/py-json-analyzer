@@ -137,6 +137,44 @@ def add_codegen_args(parser: argparse.ArgumentParser):
         help="Case style for JSON tag names in Go",
     )
 
+    # Python-specific options
+    python_group = parser.add_argument_group("Python-specific options")
+    python_group.add_argument(
+        "--python-style",
+        choices=["dataclass", "pydantic", "typeddict"],
+        help="Python code style (default: dataclass)",
+    )
+
+    python_group.add_argument(
+        "--no-slots",
+        action="store_true",
+        help="Don't use __slots__ in dataclasses",
+    )
+
+    python_group.add_argument(
+        "--frozen",
+        action="store_true",
+        help="Make dataclasses frozen (immutable)",
+    )
+
+    python_group.add_argument(
+        "--kw-only",
+        action="store_true",
+        help="Make dataclass fields keyword-only",
+    )
+
+    python_group.add_argument(
+        "--no-pydantic-field",
+        action="store_true",
+        help="Don't use Field() in Pydantic models",
+    )
+
+    python_group.add_argument(
+        "--pydantic-forbid-extra",
+        action="store_true",
+        help="Forbid extra fields in Pydantic models",
+    )
+
 
 def handle_codegen_command(args: argparse.Namespace, json_data=None) -> int:
     """
@@ -203,7 +241,7 @@ def _list_languages() -> int:
         table.add_column("Language", style="bold green", no_wrap=True)
         table.add_column("Extension", style="cyan")
         table.add_column("Generator Class", style="dim")
-        table.add_column("Aliases", style="gold1 ")
+        table.add_column("Aliases", style="gold1")
 
         for lang_name, info in sorted(language_info.items()):
             aliases = (
@@ -222,7 +260,8 @@ def _list_languages() -> int:
         console.print(
             Panel(
                 "[bold]Usage:[/bold] json_explorer [dim]input.json[/dim] --generate [cyan]LANGUAGE[/cyan]\n"
-                "[bold]Info:[/bold] json_explorer --language-info [cyan]LANGUAGE[/cyan]",
+                "[bold]Info:[/bold] json_explorer --language-info [cyan]LANGUAGE[/cyan]\n"
+                "[bold]Python:[/bold] json_explorer [dim]input.json[/dim] --generate [cyan]python[/cyan] --python-style [yellow]dataclass[/yellow]",
                 title="💡 Quick Start",
                 border_style="blue",
             )
@@ -263,59 +302,54 @@ def _show_language_info(language: str) -> int:
             )
         )
 
-        # Try to get configuration details
-        try:
-            generator = get_generator(language)
-
-            # Create configuration table
-            config_table = Table(
-                title="⚙️ Default Configuration",
-                box=box.SIMPLE,
-                show_header=True,
-                header_style="bold cyan",
-            )
-
-            config_table.add_column("Setting", style="bold")
-            config_table.add_column("Value", style="green")
-
-            config_table.add_row("Package Name", str(generator.config.package_name))
-            config_table.add_row("Indent Size", str(generator.config.indent_size))
-            config_table.add_row(
-                "Generate JSON Tags", str(generator.config.generate_json_tags)
-            )
-            config_table.add_row("Add Comments", str(generator.config.add_comments))
-            config_table.add_row(
-                "JSON Tag Omitempty", str(generator.config.json_tag_omitempty)
-            )
-
-            console.print()
-            console.print(config_table)
-
-        except Exception:
-            console.print(
-                "\n[yellow]⚠️  Could not retrieve configuration details[/yellow]"
-            )
-
-        # Add examples panel
-        examples_text = f"""Generate basic structure:
-[cyan]json_explorer data.json --generate {language}[/cyan]
-
-Generate to file:
-[cyan]json_explorer data.json --generate {language} --output output{info['file_extension']}[/cyan]
-
-Custom package name:
-[cyan]json_explorer data.json --generate {language} --package-name mypackage[/cyan]"""
-
-        console.print()
-        console.print(
-            Panel(examples_text, title="💡 Usage Examples", border_style="blue")
-        )
+        # Show language-specific examples
+        if language == "python":
+            _show_python_examples()
+        elif language == "go":
+            _show_go_examples()
 
         return 0
 
     except Exception as e:
         console.print(f"[red]❌ Error getting language info:[/red] {e}")
         return 1
+
+
+def _show_python_examples():
+    """Show Python-specific CLI examples."""
+    examples_text = """Generate dataclass:
+[cyan]json_explorer data.json --generate python --python-style dataclass[/cyan]
+
+Generate Pydantic model:
+[cyan]json_explorer data.json --generate python --python-style pydantic[/cyan]
+
+Generate TypedDict:
+[cyan]json_explorer data.json --generate python --python-style typeddict[/cyan]
+
+Frozen dataclass with slots:
+[cyan]json_explorer data.json --generate python --frozen --python-style dataclass[/cyan]"""
+
+    console.print()
+    console.print(
+        Panel(examples_text, title="💡 Python Usage Examples", border_style="blue")
+    )
+
+
+def _show_go_examples():
+    """Show Go-specific CLI examples."""
+    examples_text = """Generate basic structure:
+[cyan]json_explorer data.json --generate go[/cyan]
+
+Generate to file:
+[cyan]json_explorer data.json --generate go --output output.go[/cyan]
+
+Custom package name:
+[cyan]json_explorer data.json --generate go --package-name mypackage[/cyan]"""
+
+    console.print()
+    console.print(
+        Panel(examples_text, title="💡 Go Usage Examples", border_style="blue")
+    )
 
 
 def _validate_language(language: str, silent: bool = False) -> bool:
@@ -389,6 +423,25 @@ def _build_config(args: argparse.Namespace, language: str) -> GeneratorConfig:
 
         if hasattr(args, "json_tag_case") and args.json_tag_case:
             config_dict["json_tag_case"] = args.json_tag_case
+
+    elif language.lower() in ["python", "py"]:
+        if hasattr(args, "python_style") and args.python_style:
+            config_dict["style"] = args.python_style
+
+        if hasattr(args, "no_slots") and args.no_slots:
+            config_dict["dataclass_slots"] = False
+
+        if hasattr(args, "frozen") and args.frozen:
+            config_dict["dataclass_frozen"] = True
+
+        if hasattr(args, "kw_only") and args.kw_only:
+            config_dict["dataclass_kw_only"] = True
+
+        if hasattr(args, "no_pydantic_field") and args.no_pydantic_field:
+            config_dict["pydantic_use_field"] = False
+
+        if hasattr(args, "pydantic_forbid_extra") and args.pydantic_forbid_extra:
+            config_dict["pydantic_extra_forbid"] = True
 
     return load_config(custom_config=config_dict)
 
@@ -474,6 +527,8 @@ def _display_generated_code(code: str, language: str):
         syntax_lang = language.lower()
         if syntax_lang == "golang":
             syntax_lang = "go"
+        elif syntax_lang == "py":
+            syntax_lang = "python"
 
         syntax = Syntax(code, syntax_lang, theme="monokai", padding=1)
         console.print(syntax)

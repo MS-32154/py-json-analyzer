@@ -1,0 +1,34 @@
+"""Generated dataclasses from JSON schema."""
+{%- if imports %}
+
+{%- for import_stmt in imports %}
+{{ import_stmt }}
+{%- endfor %}
+{%- endif %}
+
+{%- for class in classes %}
+
+
+@dataclass
+{%- set has_options = class.frozen or class.slots or class.kw_only %}
+{%- if has_options %}(
+{%- set comma_needed = [] %}
+{%- if class.frozen %}frozen=True{% set _ = comma_needed.append(1) %}{% endif %}
+{%- if class.slots %}{% if comma_needed %}, {% endif %}slots=True{% set _ = comma_needed.append(1) %}{% endif %}
+{%- if class.kw_only %}{% if comma_needed %}, {% endif %}kw_only=True{% endif %})
+{%- endif %}
+class {{ class.class_name }}:
+{%- if class.description %}
+    """{{ class.description }}"""
+{%- endif %}
+{%- for field in class.fields %}
+{%- if field.comment %}
+    # {{ field.comment }}
+{%- endif %}
+    {{ field.name }}: {{ field.type }}
+{%- if field.use_default %} = {{ field.default_value }}{% endif %}
+{%- endfor %}
+{%- if not class.fields %}
+    pass
+{%- endif %}
+{%- endfor %}

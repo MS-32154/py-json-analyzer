@@ -4,6 +4,7 @@ JSON Explorer Code Generation Module
 Generates code in various languages from JSON schema analysis.
 """
 
+# Import registry functions (this will trigger auto-registration)
 from .registry import (
     GeneratorRegistry,
     get_generator,
@@ -11,7 +12,11 @@ from .registry import (
     register_generator,
     get_language_info,
     list_all_language_info,
+    is_language_supported,
+    get_registry,
 )
+
+# Import core interfaces
 from .core import (
     CodeGenerator,
     GeneratorError,
@@ -30,31 +35,6 @@ from .core import (
     TemplateError,
     create_template_engine,
 )
-
-# Initialize global registry
-registry = GeneratorRegistry()
-
-
-# Auto-register available generators
-def _register_available_generators():
-    """Register all available language generators."""
-    try:
-        from .languages.go import GoGenerator
-
-        registry.register("go", GoGenerator, aliases=["golang"])
-    except ImportError:
-        pass
-
-    # Add more languages here as they become available
-    # try:
-    #     from .languages.python import PythonGenerator
-    #     registry.register("python", PythonGenerator, aliases=["py"])
-    # except ImportError:
-    #     pass
-
-
-# Initialize registry
-_register_available_generators()
 
 # Version info
 __version__ = "0.1.0"
@@ -147,9 +127,10 @@ __all__ = [
     "get_generator",
     "list_supported_languages",
     "register_generator",
-    "registry",
     "get_language_info",
     "list_all_language_info",
+    "is_language_supported",
+    "get_registry",
     # Core interfaces
     "CodeGenerator",
     "GeneratorError",
