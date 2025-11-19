@@ -102,7 +102,8 @@ class GoGenerator(CodeGenerator):
 
     def _generate_struct_data(self, schema: Schema) -> dict[str, Any]:
         """Generate struct data for template."""
-        struct_name = self.name_tracker.sanitize(schema.name, "pascal")
+        case_style = self.config.struct_case
+        struct_name = self.name_tracker.sanitize(schema.name, case_style)
 
         fields = []
         for field in schema.fields:
@@ -121,7 +122,8 @@ class GoGenerator(CodeGenerator):
     def _generate_field_data(self, field: Field) -> dict[str, Any]:
         """Generate field data for template."""
         # Sanitize field name to PascalCase for Go
-        field_name = self.name_tracker.sanitize(field.name, "pascal")
+        case_style = self.config.field_case
+        field_name = self.name_tracker.sanitize(field.name, case_style)
 
         # Determine Go type
         go_type = self._get_field_type(field)

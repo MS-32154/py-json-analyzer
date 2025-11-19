@@ -120,7 +120,8 @@ class PythonGenerator(CodeGenerator):
 
     def _generate_class_data(self, schema: Schema) -> dict[str, Any]:
         """Generate class data for template."""
-        class_name = self.name_tracker.sanitize(schema.name, "pascal")
+        case_style = self.config.struct_case
+        class_name = self.name_tracker.sanitize(schema.name, case_style)
 
         fields = []
         for field in schema.fields:
@@ -156,7 +157,8 @@ class PythonGenerator(CodeGenerator):
     def _generate_field_data(self, field: Field) -> dict[str, Any]:
         """Generate field data for template."""
         # Sanitize field name to snake_case for Python
-        field_name = self.name_tracker.sanitize(field.name, "snake")
+        case_style = self.config.field_case
+        field_name = self.name_tracker.sanitize(field.name, case_style)
 
         # Determine Python type
         python_type = self._get_field_type(field)
