@@ -9,11 +9,8 @@ import logging
 from pathlib import Path
 from typing import Any
 
-try:
-    import jinja2
-    from jinja2 import Environment
-except ImportError:
-    jinja2 = None
+import jinja2
+from jinja2 import Environment
 
 logger = logging.getLogger(__name__)
 
@@ -46,13 +43,8 @@ def create_template_env(
         Configured Jinja2 environment
 
     Raises:
-        TemplateError: If Jinja2 is not installed or template_dir invalid
+        TemplateError: If template_dir invalid
     """
-    if jinja2 is None:
-        raise TemplateError(
-            "Jinja2 is required for template functionality. "
-            "Install with: pip install jinja2"
-        )
 
     # Setup loader
     if template_dir and template_dir.exists():
