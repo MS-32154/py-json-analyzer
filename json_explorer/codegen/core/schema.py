@@ -1,13 +1,21 @@
 """
-Core schema representation for code generation.
+Schema representation for code generation.
 
-Converts analyzer.py output into a normalized internal format
-that generators can work with consistently.
+Converts analyzer output into normalized Schema/Field objects that
+generators can work with consistently across languages.
 """
 
+import logging
 from dataclasses import dataclass, field
-from typing import Dict, List, Optional, Union, Any
 from enum import Enum
+from typing import Any
+
+logger = logging.getLogger(__name__)
+
+
+# ============================================================================
+# Field Types
+# ============================================================================
 
 
 class FieldType(Enum):
@@ -21,81 +29,123 @@ class FieldType(Enum):
     OBJECT = "object"
     ARRAY = "array"
     UNKNOWN = "unknown"
-    CONFLICT = "conflict"  # When multiple types detected
+    CONFLICT = "conflict"  # Multiple types detected
 
 
-@dataclass
+# Analyzer type to FieldType mapping
+ANALYZER_TYPE_MAP: dict[str, FieldType] = {
+    "str": FieldType.STRING,
+    "int": FieldType.INTEGER,
+    "float": FieldType.FLOAT,
+    "bool": FieldType.BOOLEAN,
+    "timestamp": FieldType.TIMESTAMP,
+    "object": FieldType.OBJECT,
+    "list": FieldType.ARRAY,
+    "conflict": FieldType.CONFLICT,
+    "unknown": FieldType.UNKNOWN,
+}
+
+
+def map_analyzer_type(analyzer_type: str) -> FieldType:
+    """Map analyzer type string to FieldType enum."""
+    return ANALYZER_TYPE_MAP.get(analyzer_type, FieldType.UNKNOWN)
+
+
+# ============================================================================
+# Schema Data Structures
+# ============================================================================
+
+
+@dataclass(slots=True)
 class Field:
-    """Represents a single field in a data structure."""
+    """
+    Represents a single field in a data structure.
+
+    Attributes:
+        name: Sanitized field name
+        original_name: Original JSON key (preserved for tags/annotations)
+        type: Field type
+        optional: Whether field can be absent
+        description: Auto-generated or custom description
+        nested_schema: For OBJECT types
+        array_element_type: For ARRAY of primitives
+        array_element_schema: For ARRAY of objects
+        conflicting_types: Types involved in conflicts
+    """
 
     name: str
-    original_name: str  # Keep original JSON key for tags/annotations
+    original_name: str
     type: FieldType
     optional: bool = False
-    description: Optional[str] = None
+    description: str | None = None
 
-    # For nested objects
-    nested_schema: Optional["Schema"] = None
+    # Nested structures
+    nested_schema: "Schema | None" = None
 
-    # For arrays
-    array_element_type: Optional[FieldType] = None
-    array_element_schema: Optional["Schema"] = None
+    # Array information
+    array_element_type: FieldType | None = None
+    array_element_schema: "Schema | None" = None
 
-    # Type conflicts (when field has inconsistent types)
-    conflicting_types: List[FieldType] = field(default_factory=list)
+    # Type conflicts
+    conflicting_types: list[FieldType] = field(default_factory=list)
+
+    def is_complex(self) -> bool:
+        """Check if field contains complex nested structures."""
+        if self.type == FieldType.OBJECT:
+            return self.nested_schema is not None
+        if self.type == FieldType.ARRAY:
+            return self.array_element_schema is not None
+        return False
 
     def generate_attention_description(
-        self, add_attention_descriptions: bool = True
-    ) -> Optional[str]:
+        self,
+        add_attention: bool = True,
+    ) -> str | None:
         """
-        Generate attention-making description for special cases.
+        Generate warning description for special cases.
 
-        Args:
-            add_attention_descriptions: Whether to generate attention descriptions
-
-        Returns:
-            Description string for special cases, None for normal fields
+        Returns None for normal fields, description string for problematic ones.
         """
-        if not add_attention_descriptions:
-            return None
-
-        # Don't override existing descriptions
-        if self.description:
+        if not add_attention or self.description:
             return self.description
 
-        # Type conflicts - highest priority
-        if self.type == FieldType.CONFLICT:
-            if self.conflicting_types:
-                type_names = [t.value for t in self.conflicting_types]
-                return f"⚠️ Mixed types: {', '.join(type_names)}"
-            return "⚠️ Mixed types detected"
+        # Pattern match on field type
+        match self.type:
+            case FieldType.CONFLICT:
+                types = (
+                    [t.value for t in self.conflicting_types]
+                    if self.conflicting_types
+                    else ["unknown"]
+                )
+                return f"⚠️ Mixed types: {', '.join(types)}"
 
-        # Unknown types
-        if self.type == FieldType.UNKNOWN:
-            return "❓ Type unknown"
+            case FieldType.UNKNOWN:
+                return "❓ Type unknown"
 
-        # Complex arrays
-        if self.type == FieldType.ARRAY:
-            if self.array_element_type == FieldType.CONFLICT:
+            case FieldType.ARRAY if self.array_element_type == FieldType.CONFLICT:
                 return "📋 Array with mixed types"
-            elif self.array_element_type == FieldType.UNKNOWN:
+
+            case FieldType.ARRAY if self.array_element_type == FieldType.UNKNOWN:
                 return "📋 Array with unknown element type"
-            elif self.array_element_schema and self._is_complex_array():
+
+            case FieldType.ARRAY if (
+                self.array_element_schema and self._is_complex_array()
+            ):
                 return "📋 Array of complex objects"
 
-        # Optional nested objects
-        if self.type == FieldType.OBJECT and self.optional and self.nested_schema:
-            if self._is_complex_nested():
+            case FieldType.OBJECT if (
+                self.optional and self.nested_schema and self._is_complex_nested()
+            ):
                 return "🔗 Optional complex structure"
 
-        # Normal fields get no auto-generated description
-        return None
+            case _:
+                return None
 
     def _is_complex_array(self) -> bool:
         """Check if array contains complex nested structures."""
-        if not self.array_element_schema:
-            return False
-        return len(self.array_element_schema.fields) > 5
+        return bool(
+            self.array_element_schema and len(self.array_element_schema.fields) > 5
+        )
 
     def _is_complex_nested(self) -> bool:
         """Check if nested object is complex."""
@@ -109,375 +159,384 @@ class Field:
             return False
 
         for field in self.nested_schema.fields:
-            if field.type == FieldType.OBJECT and field.nested_schema:
-                return True
-            if field.type == FieldType.ARRAY and field.array_element_schema:
-                return True
+            if field.type in (FieldType.OBJECT, FieldType.ARRAY):
+                if field.nested_schema or field.array_element_schema:
+                    return True
         return False
 
 
-@dataclass
+@dataclass(slots=True)
 class Schema:
-    """Represents the structure of a data object."""
+    """
+    Represents the structure of a data object.
+
+    Attributes:
+        name: Schema name (sanitized)
+        original_name: Original name from JSON
+        fields: List of fields in this schema
+        description: Optional description
+    """
 
     name: str
     original_name: str
-    fields: List[Field] = field(default_factory=list)
-    description: Optional[str] = None
+    fields: list[Field] = field(default_factory=list)
+    description: str | None = None
 
     def add_field(self, field: Field) -> None:
         """Add a field to this schema."""
         self.fields.append(field)
+        logger.debug(f"Added field '{field.name}' to schema '{self.name}'")
 
-    def get_field(self, name: str) -> Optional[Field]:
+    def get_field(self, name: str) -> Field | None:
         """Get field by name."""
+        return next((f for f in self.fields if f.name == name), None)
+
+    def get_max_depth(self, current_depth: int = 1) -> int:
+        """Calculate maximum nesting depth."""
+        max_depth = current_depth
+
         for field in self.fields:
-            if field.name == name:
-                return field
-        return None
+            if field.nested_schema:
+                depth = field.nested_schema.get_max_depth(current_depth + 1)
+                max_depth = max(max_depth, depth)
+            elif field.array_element_schema:
+                depth = field.array_element_schema.get_max_depth(current_depth + 1)
+                max_depth = max(max_depth, depth)
+
+        return max_depth
 
     def generate_attention_description(
-        self, add_attention_descriptions: bool = True
-    ) -> Optional[str]:
-        """
-        Generate attention-making description for special schema cases.
-
-        Args:
-            add_attention_descriptions: Whether to generate attention descriptions
-
-        Returns:
-            Description string for special cases, None for normal schemas
-        """
-        if not add_attention_descriptions:
-            return None
-
-        # Don't override existing descriptions
-        if self.description:
+        self,
+        add_attention: bool = True,
+    ) -> str | None:
+        """Generate warning description for special schema cases."""
+        if not add_attention or self.description:
             return self.description
 
         # Empty schemas
         if not self.fields:
             return "⚠️ No fields detected"
 
-        # Count special field types
-        conflict_count = sum(1 for f in self.fields if f.type == FieldType.CONFLICT)
-        unknown_count = sum(1 for f in self.fields if f.type == FieldType.UNKNOWN)
+        # Count issues
+        conflicts = sum(1 for f in self.fields if f.type == FieldType.CONFLICT)
+        unknowns = sum(1 for f in self.fields if f.type == FieldType.UNKNOWN)
 
-        # Many conflicts
-        if conflict_count >= 3:
-            return f"⚠️ Multiple type conflicts ({conflict_count} fields)"
+        # Multiple issues
+        if conflicts >= 3:
+            return f"⚠️ Multiple type conflicts ({conflicts} fields)"
+        if unknowns >= 3:
+            return f"❓ Multiple unknown types ({unknowns} fields)"
+        if conflicts > 0 and unknowns > 0:
+            return f"⚠️ Mixed issues: {conflicts} conflicts, {unknowns} unknowns"
 
-        # Many unknowns
-        if unknown_count >= 3:
-            return f"❓ Multiple unknown types ({unknown_count} fields)"
-
-        # Large schemas
+        # Large or deeply nested
         if len(self.fields) >= 15:
             return f"📊 Large structure ({len(self.fields)} fields)"
+        if self.get_max_depth() >= 3:
+            return "🗂️ Deeply nested structure"
 
-        # Deep nesting
-        if self._has_deep_nesting():
-            return "🏗️ Deeply nested structure"
-
-        # Mixed issues
-        if conflict_count > 0 and unknown_count > 0:
-            return (
-                f"⚠️ Mixed issues: {conflict_count} conflicts, {unknown_count} unknowns"
-            )
-
-        # Normal schemas get no auto-generated description
         return None
 
-    def _has_deep_nesting(self) -> bool:
-        """Check if schema has deep nesting (3+ levels)."""
-        return self._get_max_depth() >= 3
-
-    def _get_max_depth(self, current_depth: int = 1) -> int:
-        """Get maximum nesting depth of this schema."""
-        max_depth = current_depth
-
-        for field in self.fields:
-            if field.type == FieldType.OBJECT and field.nested_schema:
-                depth = field.nested_schema._get_max_depth(current_depth + 1)
-                max_depth = max(max_depth, depth)
-            elif field.type == FieldType.ARRAY and field.array_element_schema:
-                depth = field.array_element_schema._get_max_depth(current_depth + 1)
-                max_depth = max(max_depth, depth)
-
-        return max_depth
-
-    def get_attention_summary(self) -> Dict[str, int]:
-        """Get summary of attention-worthy issues in this schema."""
-        summary = {
-            "conflicts": 0,
-            "unknowns": 0,
-            "empty_schemas": 0,
-            "complex_arrays": 0,
-            "max_depth": 1,
+    def get_statistics(self) -> dict[str, int]:
+        """Get schema statistics."""
+        return {
             "total_fields": len(self.fields),
+            "conflicts": sum(1 for f in self.fields if f.type == FieldType.CONFLICT),
+            "unknowns": sum(1 for f in self.fields if f.type == FieldType.UNKNOWN),
+            "optional_fields": sum(1 for f in self.fields if f.optional),
+            "complex_arrays": sum(
+                1
+                for f in self.fields
+                if f.type == FieldType.ARRAY and f.array_element_schema
+            ),
+            "max_depth": self.get_max_depth(),
         }
 
-        # Count field-level issues
-        for field in self.fields:
-            if field.type == FieldType.CONFLICT:
-                summary["conflicts"] += 1
-            elif field.type == FieldType.UNKNOWN:
-                summary["unknowns"] += 1
-            elif field.type == FieldType.ARRAY and field._is_complex_array():
-                summary["complex_arrays"] += 1
 
-        # Schema-level metrics
-        summary["max_depth"] = self._get_max_depth()
-
-        return summary
+# ============================================================================
+# Analyzer Output Conversion
+# ============================================================================
 
 
 def convert_analyzer_output(
-    analyzer_result: Dict[str, Any],
+    analyzer_result: dict[str, Any],
     root_name: str = "Root",
-    add_attention_descriptions: bool = True,
+    add_attention: bool = True,
 ) -> Schema:
     """
-    Convert analyzer.py output to internal Schema representation.
-    Now properly handles all cases the analyzer supports.
-    """
+    Convert analyzer output to internal Schema representation.
 
-    def map_analyzer_type(analyzer_type: str) -> FieldType:
-        """Map analyzer types to our FieldType enum."""
-        type_mapping = {
-            "str": FieldType.STRING,
-            "int": FieldType.INTEGER,
-            "float": FieldType.FLOAT,
-            "bool": FieldType.BOOLEAN,
-            "timestamp": FieldType.TIMESTAMP,
-            "object": FieldType.OBJECT,
-            "list": FieldType.ARRAY,
-            "conflict": FieldType.CONFLICT,
-            "unknown": FieldType.UNKNOWN,
-        }
-        return type_mapping.get(analyzer_type, FieldType.UNKNOWN)
-
-    def create_schema_from_object(node: Dict[str, Any], schema_name: str) -> Schema:
-        """Create schema from analyzer object node."""
-        schema = Schema(name=schema_name, original_name=schema_name)
-
-        children = node.get("children", {})
-        conflicts = node.get("conflicts", {})
-
-        for field_name, field_data in children.items():
-            field = create_field_from_node(
-                field_data, field_name, schema_name, conflicts
-            )
-            schema.add_field(field)
-
-        # Generate attention description for schema
-        if add_attention_descriptions:
-            attention_desc = schema.generate_attention_description(True)
-            if attention_desc:
-                schema.description = attention_desc
-
-        return schema
-
-    def create_field_from_node(
-        field_node: Dict[str, Any],
-        field_name: str,
-        parent_schema_name: str,
-        conflicts: Dict[str, Any],
-    ) -> Field:
-        """Create field from analyzer field node."""
-        field_type_str = field_node["type"]
-        field_type = map_analyzer_type(field_type_str)
-        optional = field_node.get("optional", False)
-
-        field = Field(
-            name=field_name,
-            original_name=field_name,
-            type=field_type,
-            optional=optional,
-        )
-
-        # Handle type conflicts
-        if field_name in conflicts:
-            field.type = FieldType.CONFLICT
-            field.conflicting_types = [
-                map_analyzer_type(t) for t in conflicts[field_name]
-            ]
-
-        # Handle different field types
-        elif field_type == FieldType.OBJECT:
-            # Nested object - always handle recursively
-            nested_schema_name = f"{parent_schema_name}{field_name.title()}"
-            field.nested_schema = create_schema_from_object(
-                field_node, nested_schema_name
-            )
-
-        elif field_type == FieldType.ARRAY:
-            # Handle arrays - check what the analyzer found
-            if "child_type" in field_node:
-                # Simple array (primitives or mixed primitives)
-                child_type_str = field_node["child_type"]
-                if "mixed" in child_type_str.lower():
-                    field.array_element_type = FieldType.CONFLICT
-                else:
-                    field.array_element_type = map_analyzer_type(child_type_str)
-
-            elif "child" in field_node:
-                # Complex array (objects or nested arrays)
-                child_node = field_node["child"]
-                child_type = child_node["type"]
-
-                if child_type == "object":
-                    # Array of objects
-                    element_schema_name = (
-                        f"{parent_schema_name}{field_name.title()}Item"
-                    )
-                    field.array_element_schema = create_schema_from_object(
-                        child_node, element_schema_name
-                    )
-                    field.array_element_type = FieldType.OBJECT
-
-                elif child_type == "list":
-                    # Array of arrays (nested lists) - handle recursively
-                    field.array_element_type = FieldType.ARRAY
-                    # Recursively create field for nested array
-                    nested_field = create_field_from_node(
-                        child_node, f"{field_name}_item", parent_schema_name, {}
-                    )
-                    # Store nested array structure
-                    if hasattr(nested_field, "array_element_type"):
-                        # Copy the nested array's element info
-                        if nested_field.array_element_schema:
-                            field.array_element_schema = (
-                                nested_field.array_element_schema
-                            )
-                        else:
-                            field.array_element_type = nested_field.array_element_type
-
-                else:
-                    # Array of other complex types or mixed types
-                    field.array_element_type = map_analyzer_type(child_type)
-
-                    # If it's a complex type we don't recognize, try to handle it
-                    if child_type not in ["str", "int", "float", "bool", "timestamp"]:
-                        # Might be a complex structure we should handle recursively
-                        try:
-                            nested_field = create_field_from_node(
-                                child_node, f"{field_name}_item", parent_schema_name, {}
-                            )
-                            # If the nested field has structure, preserve it
-                            if nested_field.nested_schema:
-                                field.array_element_schema = nested_field.nested_schema
-                                field.array_element_type = FieldType.OBJECT
-                        except:
-                            # Fallback to basic type mapping
-                            pass
-
-            else:
-                # Unknown array type
-                field.array_element_type = FieldType.UNKNOWN
-
-        # Generate attention description for field
-        if add_attention_descriptions:
-            attention_desc = field.generate_attention_description(True)
-            if attention_desc:
-                field.description = attention_desc
-
-        return field
-
-    # Main conversion logic - handle different root types
-    root_type = analyzer_result["type"]
-
-    if root_type == "object":
-        # Root is an object - standard case
-        return create_schema_from_object(analyzer_result, root_name)
-
-    elif root_type == "list":
-        # Root is an array - extract the element type/structure
-        if "child" in analyzer_result and analyzer_result["child"]["type"] == "object":
-            # Array of objects - generate schema for the object, not the array
-            child_node = analyzer_result["child"]
-            element_name = (
-                root_name.rstrip("s") if root_name.endswith("s") else f"{root_name}Item"
-            )
-            schema = create_schema_from_object(child_node, element_name)
-            if schema.description:
-                schema.description = (
-                    "❗ Generated from array of objects\n" + schema.description
-                )
-            else:
-                schema.description = "❗ Generated from array of objects"
-            return schema
-
-        elif "child_type" in analyzer_result:
-            # Array of primitives - create a wrapper schema
-            schema = Schema(name=root_name, original_name=root_name)
-
-            child_type_str = analyzer_result["child_type"]
-            if "mixed" in child_type_str.lower():
-                array_element_type = FieldType.CONFLICT
-            else:
-                array_element_type = map_analyzer_type(child_type_str)
-
-            field = Field(
-                name="items",
-                original_name="items",
-                type=FieldType.ARRAY,
-                array_element_type=array_element_type,
-            )
-
-            if add_attention_descriptions:
-                field.description = f"📋 Array of {child_type_str} values"
-
-            schema.add_field(field)
-            return schema
-
-        else:
-            # Unknown array structure
-            schema = Schema(name=root_name, original_name=root_name)
-            field = Field(
-                name="items",
-                original_name="items",
-                type=FieldType.ARRAY,
-                array_element_type=FieldType.UNKNOWN,
-            )
-
-            if add_attention_descriptions:
-                field.description = "❓ Array of unknown type"
-
-            schema.add_field(field)
-            return schema
-
-    else:
-        # Root is a primitive (string, int, bool, etc.)
-        schema = Schema(name=root_name, original_name=root_name)
-        field = Field(
-            name="value", original_name="value", type=map_analyzer_type(root_type)
-        )
-
-        if add_attention_descriptions:
-            field.description = f"📦 Single {root_type} value"
-
-        schema.add_field(field)
-        return schema
-
-
-def extract_all_schemas(root_schema: Schema) -> Dict[str, Schema]:
-    """
-    Extract all nested schemas into a flat dictionary.
+    Args:
+        analyzer_result: Output from analyze_json()
+        root_name: Name for root schema
+        add_attention: Generate attention descriptions for issues
 
     Returns:
-        Dict mapping schema name to Schema object
+        Root Schema object with nested structures
     """
-    schemas = {}
+    logger.info(f"Converting analyzer output to schema: {root_name}")
 
-    def collect_schemas(schema: Schema):
+    root_type = analyzer_result["type"]
+
+    match root_type:
+        case "object":
+            # Standard case: root is an object
+            schema = _create_schema_from_object(
+                analyzer_result,
+                root_name,
+                add_attention,
+            )
+            logger.debug(f"Created object schema: {root_name}")
+            return schema
+
+        case "list":
+            # Root is an array
+            return _handle_root_array(analyzer_result, root_name, add_attention)
+
+        case _:
+            # Root is a primitive value
+            return _handle_root_primitive(
+                analyzer_result, root_name, root_type, add_attention
+            )
+
+
+def _create_schema_from_object(
+    node: dict[str, Any],
+    schema_name: str,
+    add_attention: bool,
+) -> Schema:
+    """Create schema from analyzer object node."""
+    schema = Schema(name=schema_name, original_name=schema_name)
+
+    children = node.get("children", {})
+    conflicts = node.get("conflicts", {})
+
+    for field_name, field_data in children.items():
+        field_obj = _create_field_from_node(
+            field_data,
+            field_name,
+            schema_name,
+            conflicts,
+            add_attention,
+        )
+        schema.add_field(field_obj)
+
+    # Generate attention description
+    if add_attention:
+        desc = schema.generate_attention_description(True)
+        if desc:
+            schema.description = desc
+
+    return schema
+
+
+def _create_field_from_node(
+    field_node: dict[str, Any],
+    field_name: str,
+    parent_schema_name: str,
+    conflicts: dict[str, Any],
+    add_attention: bool,
+) -> Field:
+    """Create field from analyzer field node."""
+    field_type_str = field_node["type"]
+    field_type = map_analyzer_type(field_type_str)
+    optional = field_node.get("optional", False)
+
+    field_obj = Field(
+        name=field_name,
+        original_name=field_name,
+        type=field_type,
+        optional=optional,
+    )
+
+    # Handle type conflicts
+    if field_name in conflicts:
+        field_obj.type = FieldType.CONFLICT
+        field_obj.conflicting_types = [
+            map_analyzer_type(t) for t in conflicts[field_name]
+        ]
+        logger.warning(f"Type conflict in {parent_schema_name}.{field_name}")
+
+    # Handle specific field types
+    elif field_type == FieldType.OBJECT:
+        nested_name = f"{parent_schema_name}{field_name.title()}"
+        field_obj.nested_schema = _create_schema_from_object(
+            field_node,
+            nested_name,
+            add_attention,
+        )
+
+    elif field_type == FieldType.ARRAY:
+        _handle_array_field(
+            field_obj, field_node, parent_schema_name, field_name, add_attention
+        )
+
+    # Generate attention description
+    if add_attention:
+        desc = field_obj.generate_attention_description(True)
+        if desc:
+            field_obj.description = desc
+
+    return field_obj
+
+
+def _handle_array_field(
+    field_obj: Field,
+    field_node: dict[str, Any],
+    parent_schema_name: str,
+    field_name: str,
+    add_attention: bool,
+) -> None:
+    """Handle array field type detection."""
+    if "child_type" in field_node:
+        # Simple array (primitives or mixed)
+        child_type_str = field_node["child_type"]
+        if "mixed" in child_type_str.lower():
+            field_obj.array_element_type = FieldType.CONFLICT
+        else:
+            field_obj.array_element_type = map_analyzer_type(child_type_str)
+
+    elif "child" in field_node:
+        # Complex array (objects or nested arrays)
+        child_node = field_node["child"]
+        child_type = child_node["type"]
+
+        match child_type:
+            case "object":
+                # Array of objects
+                element_name = f"{parent_schema_name}{field_name.title()}Item"
+                field_obj.array_element_schema = _create_schema_from_object(
+                    child_node,
+                    element_name,
+                    add_attention,
+                )
+                field_obj.array_element_type = FieldType.OBJECT
+
+            case "list":
+                # Nested arrays
+                field_obj.array_element_type = FieldType.ARRAY
+                # Recursively handle nested arrays
+                nested_field = _create_field_from_node(
+                    child_node,
+                    f"{field_name}_item",
+                    parent_schema_name,
+                    {},
+                    add_attention,
+                )
+                if nested_field.array_element_schema:
+                    field_obj.array_element_schema = nested_field.array_element_schema
+                else:
+                    field_obj.array_element_type = nested_field.array_element_type
+
+            case _:
+                # Other types
+                field_obj.array_element_type = map_analyzer_type(child_type)
+
+    else:
+        # Unknown array type
+        field_obj.array_element_type = FieldType.UNKNOWN
+
+
+def _handle_root_array(
+    analyzer_result: dict[str, Any],
+    root_name: str,
+    add_attention: bool,
+) -> Schema:
+    """Handle case where root is an array."""
+    if "child" in analyzer_result and analyzer_result["child"]["type"] == "object":
+        # Array of objects - use element schema as root
+        child_node = analyzer_result["child"]
+        element_name = (
+            root_name.rstrip("s") if root_name.endswith("s") else f"{root_name}Item"
+        )
+        schema = _create_schema_from_object(child_node, element_name, add_attention)
+
+        if add_attention:
+            prefix = "◉ Generated from array of objects"
+            schema.description = (
+                f"{prefix}\n{schema.description}" if schema.description else prefix
+            )
+
+        logger.info(
+            f"Root is array of objects, extracted element schema: {element_name}"
+        )
+        return schema
+
+    # Array of primitives or unknown - create wrapper
+    schema = Schema(name=root_name, original_name=root_name)
+
+    if "child_type" in analyzer_result:
+        child_type_str = analyzer_result["child_type"]
+        element_type = (
+            FieldType.CONFLICT
+            if "mixed" in child_type_str.lower()
+            else map_analyzer_type(child_type_str)
+        )
+    else:
+        element_type = FieldType.UNKNOWN
+
+    field_obj = Field(
+        name="items",
+        original_name="items",
+        type=FieldType.ARRAY,
+        array_element_type=element_type,
+    )
+
+    if add_attention:
+        field_obj.description = f"📋 Array of {element_type.value} values"
+
+    schema.add_field(field_obj)
+    logger.info(f"Root is array of primitives: {element_type.value}")
+    return schema
+
+
+def _handle_root_primitive(
+    analyzer_result: dict[str, Any],
+    root_name: str,
+    root_type: str,
+    add_attention: bool,
+) -> Schema:
+    """Handle case where root is a primitive value."""
+    schema = Schema(name=root_name, original_name=root_name)
+    field_obj = Field(
+        name="value",
+        original_name="value",
+        type=map_analyzer_type(root_type),
+    )
+
+    if add_attention:
+        field_obj.description = f"📦 Single {root_type} value"
+
+    schema.add_field(field_obj)
+    logger.info(f"Root is primitive: {root_type}")
+    return schema
+
+
+# ============================================================================
+# Schema Extraction
+# ============================================================================
+
+
+def extract_all_schemas(root_schema: Schema) -> dict[str, Schema]:
+    """
+    Extract all nested schemas into flat dictionary.
+
+    Args:
+        root_schema: Root schema with potential nested schemas
+
+    Returns:
+        Dictionary mapping schema names to Schema objects
+    """
+    schemas: dict[str, Schema] = {}
+
+    def collect(schema: Schema) -> None:
         schemas[schema.name] = schema
-
         for field in schema.fields:
             if field.nested_schema:
-                collect_schemas(field.nested_schema)
+                collect(field.nested_schema)
             if field.array_element_schema:
-                collect_schemas(field.array_element_schema)
+                collect(field.array_element_schema)
 
-    collect_schemas(root_schema)
+    collect(root_schema)
+    logger.info(f"Extracted {len(schemas)} schemas from root: {root_schema.name}")
     return schemas

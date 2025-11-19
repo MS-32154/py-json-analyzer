@@ -1,63 +1,94 @@
 """
-JSON Explorer Code Generation Module
+JSON Explorer Code Generation Module.
 
 Generates code in various languages from JSON schema analysis.
+
+Example:
+    >>> from json_explorer.codegen import quick_generate
+    >>> code = quick_generate({"name": "John", "age": 30}, language="python")
+    >>> print(code)
 """
 
-# Import registry functions (this will trigger auto-registration)
-from .registry import (
-    GeneratorRegistry,
-    get_generator,
-    list_supported_languages,
-    register_generator,
-    get_language_info,
-    list_all_language_info,
-    is_language_supported,
-    get_registry,
-)
+import logging
+
+# Configure module-level logger
+logger = logging.getLogger(__name__)
 
 # Import core interfaces
 from .core import (
     CodeGenerator,
-    GeneratorError,
-    GenerationResult,
-    generate_code,
-    Schema,
     Field,
     FieldType,
-    convert_analyzer_output,
-    extract_all_schemas,
+    GenerationResult,
     GeneratorConfig,
-    load_config,
-    NameSanitizer,
-    NamingCase,
-    TemplateEngine,
+    GeneratorError,
+    NameTracker,
+    Schema,
     TemplateError,
-    create_template_engine,
+    TemplateManager,
+    convert_analyzer_output,
+    create_template_env,
+    extract_all_schemas,
+    generate_code,
+    load_config,
+    sanitize_name,
 )
 
-# Version info
-__version__ = "0.1.0"
+# Import registry functions
+from .registry import (
+    create_generator,
+    get_aliases,
+    get_generator,
+    get_generator_class,
+    get_language_info,
+    is_language_supported,
+    is_supported,
+    list_all_language_info,
+    list_languages,
+    list_supported_languages,
+    register,
+)
+
+# Version
+__version__ = "0.2.0"
+
+
+# ============================================================================
+# High-Level API Functions
+# ============================================================================
 
 
 def generate_from_analysis(
-    analyzer_result, language="go", config=None, root_name="Root"
+    analyzer_result: dict,
+    language: str = "go",
+    config: GeneratorConfig | dict | str | None = None,
+    root_name: str = "Root",
 ) -> GenerationResult:
     """
     Generate code from analyzer output.
 
     Args:
         analyzer_result: Output from json_explorer.analyzer.analyze_json()
-        language: Target language name
-        config: GeneratorConfig instance, dict, or path to config file
+        language: Target language name (e.g., 'go', 'python')
+        config: Configuration (GeneratorConfig, dict, or file path)
         root_name: Name for root schema
 
     Returns:
         GenerationResult with generated code and metadata
+
+    Example:
+        >>> from json_explorer.analyzer import analyze_json
+        >>> analysis = analyze_json({"name": "John", "age": 30})
+        >>> result = generate_from_analysis(analysis, "python")
+        >>> print(result.code)
     """
+    logger.info(f"Generating {language} code from analyzer result")
+
     # Convert analyzer result to schema
     root_schema = convert_analyzer_output(analyzer_result, root_name)
     all_schemas = extract_all_schemas(root_schema)
+
+    logger.debug(f"Converted to {len(all_schemas)} schemas")
 
     # Get generator instance
     generator = get_generator(language, config)
@@ -66,13 +97,20 @@ def generate_from_analysis(
     return generate_code(generator, all_schemas, root_name)
 
 
-def quick_generate(json_data, language="go", **options) -> str:
+def quick_generate(
+    json_data: dict | list | str,
+    language: str = "go",
+    **options,
+) -> str:
     """
     Quick code generation from JSON data.
 
+    This is the simplest way to generate code from JSON.
+    It handles analysis automatically.
+
     Args:
-        json_data: JSON data (dict/list/str)
-        language: Target language
+        json_data: JSON data (dict, list, or JSON string)
+        language: Target language (e.g., 'go', 'python')
         **options: Generator configuration options
 
     Returns:
@@ -80,9 +118,19 @@ def quick_generate(json_data, language="go", **options) -> str:
 
     Raises:
         GeneratorError: If generation fails
+
+    Example:
+        >>> code = quick_generate(
+        ...     {"user_id": 1, "name": "Alice"},
+        ...     language="python",
+        ...     style="dataclass",
+        ... )
+        >>> print(code)
     """
     from json_explorer.analyzer import analyze_json
     import json as json_module
+
+    logger.info(f"Quick generate: {language}")
 
     # Convert string to dict if needed
     if isinstance(json_data, str):
@@ -101,12 +149,13 @@ def quick_generate(json_data, language="go", **options) -> str:
     result = generate_from_analysis(analysis, language, options)
 
     if result.success:
+        logger.info("Quick generation completed successfully")
         return result.code
     else:
         raise GeneratorError(f"Code generation failed: {result.error_message}")
 
 
-def create_config(language="go", **kwargs) -> GeneratorConfig:
+def create_config(language: str = "go", **kwargs) -> GeneratorConfig:
     """
     Create a GeneratorConfig for the specified language.
 
@@ -116,21 +165,41 @@ def create_config(language="go", **kwargs) -> GeneratorConfig:
 
     Returns:
         GeneratorConfig instance
+
+    Example:
+        >>> config = create_config(
+        ...     "python",
+        ...     package_name="models",
+        ...     style="pydantic",
+        ... )
     """
     return load_config(custom_config=kwargs)
 
 
-# Export main interfaces
+# ============================================================================
+# Public API
+# ============================================================================
+
+
 __all__ = [
+    # Version
+    "__version__",
+    # High-level API
+    "generate_from_analysis",
+    "quick_generate",
+    "create_config",
     # Registry
-    "GeneratorRegistry",
+    "register",
     "get_generator",
+    "create_generator",
+    "get_generator_class",
+    "list_languages",
     "list_supported_languages",
-    "register_generator",
+    "is_supported",
+    "is_language_supported",
+    "get_aliases",
     "get_language_info",
     "list_all_language_info",
-    "is_language_supported",
-    "get_registry",
     # Core interfaces
     "CodeGenerator",
     "GeneratorError",
@@ -145,15 +214,11 @@ __all__ = [
     # Configuration
     "GeneratorConfig",
     "load_config",
-    "create_config",
     # Naming utilities
-    "NameSanitizer",
-    "NamingCase",
+    "NameTracker",
+    "sanitize_name",
     # Template system
-    "TemplateEngine",
+    "TemplateManager",
     "TemplateError",
-    "create_template_engine",
-    # High-level API
-    "generate_from_analysis",
-    "quick_generate",
+    "create_template_env",
 ]

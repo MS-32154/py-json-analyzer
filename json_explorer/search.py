@@ -45,7 +45,7 @@ class SearchResult:
 
 
 class JsonSearcher:
-    """Enhanced JSON search utility with multiple search modes and rich output."""
+    """JSON search utility with multiple search modes and rich output."""
 
     def __init__(self, console: Optional[Console] = None):
         self.console = console or Console()

@@ -2,7 +2,7 @@ from collections import Counter, defaultdict
 
 
 class DataStatsAnalyzer:
-    """Enhanced data structure analyzer with comprehensive statistics and insights."""
+    """Data structure analyzer with comprehensive statistics and insights."""
 
     def __init__(self):
         self.reset()

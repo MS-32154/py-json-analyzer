@@ -1,175 +1,337 @@
 """
-Naming utilities for safe code generation.
+Naming utilities for code generation.
 
-Handles name sanitization, case conversions, keyword conflicts,
-and other naming concerns across different programming languages.
+Handles name sanitization, case conversions, and conflict resolution
+for generating valid identifiers across different programming languages.
 """
 
+import logging
 import re
-from typing import Set, Dict
-from enum import Enum
+from functools import cache
+from typing import Literal
+
+logger = logging.getLogger(__name__)
+
+# Type aliases for better readability
+CaseStyle = Literal["snake", "camel", "pascal", "kebab", "screaming_snake"]
 
 
-class NamingCase(Enum):
-    """Different naming case styles."""
-
-    SNAKE_CASE = "snake"  # user_name
-    CAMEL_CASE = "camel"  # userName
-    PASCAL_CASE = "pascal"  # UserName
-    KEBAB_CASE = "kebab"  # user-name
-    SCREAMING_SNAKE = "screaming_snake"  # USER_NAME
+# ============================================================================
+# Pure Functions: Case Conversion (Cached)
+# ============================================================================
 
 
-class NameSanitizer:
-    """Handles name sanitization and case conversion."""
+@cache
+def to_snake_case(name: str) -> str:
+    """
+    Convert name to snake_case.
 
-    def __init__(self, reserved_words: Set[str] = None, builtin_types: Set[str] = None):
+    Examples:
+        >>> to_snake_case("UserName")
+        'user_name'
+        >>> to_snake_case("user-name")
+        'user_name'
+    """
+    # Replace hyphens with underscores
+    name = name.replace("-", "_")
+
+    # Insert underscore before uppercase letters
+    name = re.sub(r"([a-z0-9])([A-Z])", r"\1_\2", name)
+
+    # Convert to lowercase and clean up multiple underscores
+    name = name.lower()
+    name = re.sub(r"_+", "_", name)
+
+    return name.strip("_")
+
+
+@cache
+def to_camel_case(name: str) -> str:
+    """
+    Convert name to camelCase.
+
+    Examples:
+        >>> to_camel_case("user_name")
+        'userName'
+        >>> to_camel_case("user-name")
+        'userName'
+    """
+    # First convert to snake case for consistency
+    snake = to_snake_case(name)
+    parts = snake.split("_")
+
+    if not parts:
+        return name
+
+    # First part lowercase, rest title case
+    return parts[0].lower() + "".join(p.capitalize() for p in parts[1:])
+
+
+@cache
+def to_pascal_case(name: str) -> str:
+    """
+    Convert name to PascalCase.
+
+    Examples:
+        >>> to_pascal_case("user_name")
+        'UserName'
+        >>> to_pascal_case("user-name")
+        'UserName'
+    """
+    # First convert to snake case for consistency
+    snake = to_snake_case(name)
+    parts = snake.split("_")
+
+    # All parts title case
+    return "".join(p.capitalize() for p in parts if p)
+
+
+@cache
+def to_kebab_case(name: str) -> str:
+    """
+    Convert name to kebab-case.
+
+    Examples:
+        >>> to_kebab_case("UserName")
+        'user-name'
+        >>> to_kebab_case("user_name")
+        'user-name'
+    """
+    return to_snake_case(name).replace("_", "-")
+
+
+@cache
+def to_screaming_snake_case(name: str) -> str:
+    """
+    Convert name to SCREAMING_SNAKE_CASE.
+
+    Examples:
+        >>> to_screaming_snake_case("userName")
+        'USER_NAME'
+    """
+    return to_snake_case(name).upper()
+
+
+# ============================================================================
+# Case Converter Registry
+# ============================================================================
+
+CASE_CONVERTERS: dict[CaseStyle, callable] = {
+    "snake": to_snake_case,
+    "camel": to_camel_case,
+    "pascal": to_pascal_case,
+    "kebab": to_kebab_case,
+    "screaming_snake": to_screaming_snake_case,
+}
+
+
+def convert_case(name: str, target_case: CaseStyle) -> str:
+    """
+    Convert name to target case style.
+
+    Args:
+        name: Original name to convert
+        target_case: Desired case style
+
+    Returns:
+        Converted name
+
+    Raises:
+        ValueError: If target_case is not supported
+    """
+    if target_case not in CASE_CONVERTERS:
+        raise ValueError(
+            f"Unknown case style: {target_case}. "
+            f"Must be one of: {', '.join(CASE_CONVERTERS.keys())}"
+        )
+
+    return CASE_CONVERTERS[target_case](name)
+
+
+# ============================================================================
+# Name Sanitization
+# ============================================================================
+
+
+def clean_identifier(name: str) -> str:
+    """
+    Clean name to be a valid identifier.
+
+    - Removes non-alphanumeric characters (except _ and -)
+    - Ensures doesn't start with digit
+    - Returns "field" if result is empty
+
+    Args:
+        name: Original name
+
+    Returns:
+        Cleaned name that can be an identifier
+    """
+    # Remove non-alphanumeric chars except underscore and hyphen
+    cleaned = re.sub(r"[^a-zA-Z0-9_-]", "_", name)
+
+    # Remove leading/trailing underscores and hyphens
+    cleaned = cleaned.strip("_-")
+
+    # Ensure doesn't start with number
+    if cleaned and cleaned[0].isdigit():
+        cleaned = f"_{cleaned}"
+
+    # Ensure not empty
+    return cleaned or "field"
+
+
+def resolve_conflict(
+    name: str,
+    reserved_words: set[str],
+    used_names: set[str],
+    suffix: str = "_",
+) -> str:
+    """
+    Resolve naming conflicts with reserved words and existing names.
+
+    Args:
+        name: Proposed name
+        reserved_words: Language reserved words to avoid
+        used_names: Already used names to avoid
+        suffix: Suffix to add for conflicts (default: "_")
+
+    Returns:
+        Name with conflicts resolved
+    """
+    original = name
+
+    # Check reserved words and builtin types (case-insensitive)
+    if name.lower() in {w.lower() for w in reserved_words}:
+        name = f"{name}{suffix}"
+        logger.debug(f"Reserved word conflict: {original} → {name}")
+
+    # Check for duplicates
+    counter = 1
+    while name in used_names:
+        name = (
+            f"{original}{suffix}{counter}" if suffix == "_" else f"{original}{counter}"
+        )
+        counter += 1
+        if counter == 2:  # Log only on first conflict
+            logger.debug(f"Duplicate name conflict: {original} → {name}")
+
+    return name
+
+
+def sanitize_name(
+    name: str,
+    target_case: CaseStyle,
+    reserved_words: set[str] | None = None,
+    used_names: set[str] | None = None,
+    suffix: str = "_",
+) -> str:
+    """
+    Sanitize and convert a name for safe use in code generation.
+
+    This is the main entry point for name processing. It:
+    1. Cleans the name to be a valid identifier
+    2. Converts to target case style
+    3. Resolves conflicts with reserved words and used names
+
+    Args:
+        name: Original name to sanitize
+        target_case: Desired case style
+        reserved_words: Set of reserved words to avoid
+        used_names: Set of already used names to avoid
+        suffix: Suffix for conflict resolution
+
+    Returns:
+        Sanitized and converted name
+
+    Example:
+        >>> sanitize_name("user-name", "pascal", {"class"}, {"User"})
+        'UserName'
+    """
+    reserved_words = reserved_words or set()
+    used_names = used_names or set()
+
+    # Step 1: Clean
+    cleaned = clean_identifier(name)
+
+    # Step 2: Convert case
+    converted = convert_case(cleaned, target_case)
+
+    # Step 3: Resolve conflicts
+    final_name = resolve_conflict(converted, reserved_words, used_names, suffix)
+
+    if final_name != name:
+        logger.debug(f"Name sanitization: {name} → {final_name}")
+
+    return final_name
+
+
+# ============================================================================
+# Stateful Name Tracker (for tracking names across generation)
+# ============================================================================
+
+
+class NameTracker:
+    """
+    Tracks used names during code generation.
+
+    This is a simple stateful wrapper around the sanitize_name function
+    that maintains a set of used names across multiple calls.
+    """
+
+    __slots__ = ("_used_names", "_reserved_words")
+
+    def __init__(self, reserved_words: set[str] | None = None):
         """
-        Initialize name sanitizer.
+        Initialize name tracker.
 
         Args:
             reserved_words: Set of language reserved words
-            builtin_types: Set of builtin type names that might conflict
         """
-        self.reserved_words = reserved_words or set()
-        self.builtin_types = builtin_types or set()
-        self._name_cache: Dict[str, str] = {}
-        self._used_names: Set[str] = set()
+        self._used_names: set[str] = set()
+        self._reserved_words = reserved_words or set()
+        logger.debug(
+            f"NameTracker initialized with {len(self._reserved_words)} reserved words"
+        )
 
-    def sanitize_name(
+    def sanitize(
         self,
         name: str,
-        target_case: NamingCase = NamingCase.SNAKE_CASE,
-        suffix_on_conflict: str = "_",
+        target_case: CaseStyle,
+        suffix: str = "_",
     ) -> str:
         """
-        Sanitize a name for safe use in target language.
+        Sanitize name and track it.
 
         Args:
-            name: Original name to sanitize
+            name: Original name
             target_case: Desired case style
-            suffix_on_conflict: Suffix to add for conflicts
+            suffix: Conflict resolution suffix
 
         Returns:
-            Sanitized name safe for use
+            Sanitized name (automatically tracked)
         """
-        # Use cache if available
-        cache_key = f"{name}_{target_case.value}_{suffix_on_conflict}"
-        if cache_key in self._name_cache:
-            return self._name_cache[cache_key]
+        result = sanitize_name(
+            name,
+            target_case,
+            self._reserved_words,
+            self._used_names,
+            suffix,
+        )
+        self._used_names.add(result)
+        return result
 
-        # Step 1: Basic cleanup
-        cleaned = self._clean_basic(name)
-
-        # Step 2: Convert to target case
-        converted = self._convert_case(cleaned, target_case)
-
-        # Step 3: Handle conflicts
-        final_name = self._resolve_conflicts(converted, suffix_on_conflict)
-
-        # Cache and track
-        self._name_cache[cache_key] = final_name
-        self._used_names.add(final_name)
-
-        return final_name
-
-    def _clean_basic(self, name: str) -> str:
-        """Basic name cleanup - remove invalid characters."""
-        # Remove non-alphanumeric chars except underscore and hyphen
-        cleaned = re.sub(r"[^a-zA-Z0-9_-]", "_", name)
-
-        # Remove leading/trailing underscores and hyphens
-        cleaned = cleaned.strip("_-")
-
-        # Ensure doesn't start with number
-        if cleaned and cleaned[0].isdigit():
-            cleaned = f"_{cleaned}"
-
-        # Ensure not empty
-        if not cleaned:
-            cleaned = "field"
-
-        return cleaned
-
-    def _convert_case(self, name: str, target_case: NamingCase) -> str:
-        """Convert name to target case style."""
-        if target_case == NamingCase.SNAKE_CASE:
-            return self._to_snake_case(name)
-        elif target_case == NamingCase.CAMEL_CASE:
-            return self._to_camel_case(name)
-        elif target_case == NamingCase.PASCAL_CASE:
-            return self._to_pascal_case(name)
-        elif target_case == NamingCase.KEBAB_CASE:
-            return self._to_kebab_case(name)
-        elif target_case == NamingCase.SCREAMING_SNAKE:
-            return self._to_snake_case(name).upper()
-        else:
-            return name
-
-    def _to_snake_case(self, name: str) -> str:
-        """Convert to snake_case."""
-        # Replace hyphens with underscores
-        name = name.replace("-", "_")
-
-        # Insert underscore before uppercase letters
-        name = re.sub(r"([a-z0-9])([A-Z])", r"\1_\2", name)
-
-        # Convert to lowercase and clean up multiple underscores
-        name = name.lower()
-        name = re.sub(r"_+", "_", name)
-
-        return name.strip("_")
-
-    def _to_camel_case(self, name: str) -> str:
-        """Convert to camelCase."""
-        # First convert to snake case, then to camel
-        snake = self._to_snake_case(name)
-        parts = snake.split("_")
-
-        if not parts:
-            return name
-
-        # First part lowercase, rest title case
-        return parts[0].lower() + "".join(part.capitalize() for part in parts[1:])
-
-    def _to_pascal_case(self, name: str) -> str:
-        """Convert to PascalCase."""
-        # First convert to snake case, then to pascal
-        snake = self._to_snake_case(name)
-        parts = snake.split("_")
-
-        # All parts title case
-        return "".join(part.capitalize() for part in parts if part)
-
-    def _to_kebab_case(self, name: str) -> str:
-        """Convert to kebab-case."""
-        # Convert to snake case, then replace underscores with hyphens
-        snake = self._to_snake_case(name)
-        return snake.replace("_", "-")
-
-    def _resolve_conflicts(self, name: str, suffix: str) -> str:
-        """Resolve naming conflicts with reserved words and existing names."""
-        original_name = name
-
-        # Check reserved words and builtin types
-        if name.lower() in self.reserved_words or name.lower() in self.builtin_types:
-            name = f"{name}{suffix}"
-
-        # Check for duplicates
-        counter = 1
-        while name in self._used_names:
-            if suffix == "_":
-                name = f"{original_name}{suffix}{counter}"
-            else:
-                name = f"{original_name}{counter}"
-            counter += 1
-
-        return name
-
-    def reset_used_names(self):
-        """Reset the tracking of used names."""
+    def reset(self) -> None:
+        """Clear all tracked names."""
+        logger.debug(f"Clearing {len(self._used_names)} tracked names")
         self._used_names.clear()
 
-    def add_used_name(self, name: str):
-        """Manually add a name to the used names set."""
+    def add(self, name: str) -> None:
+        """Manually add a name to the tracker."""
         self._used_names.add(name)
+        logger.debug(f"Manually added name: {name}")
+
+    @property
+    def used_names(self) -> frozenset[str]:
+        """Get immutable view of used names."""
+        return frozenset(self._used_names)

@@ -4,37 +4,55 @@ Python code generator implementation.
 Generates Python dataclasses, Pydantic models, or TypedDict using templates.
 """
 
-from typing import Dict, List, Any
+import logging
 from pathlib import Path
+from typing import Any
+
+from ...core.config import GeneratorConfig
 from ...core.generator import CodeGenerator
 from ...core.schema import Schema, Field, FieldType
-from ...core.naming import NamingCase
-from ...core.config import GeneratorConfig
-from .naming import create_python_sanitizer
 from .config import PythonConfig, PythonStyle
+from .naming import create_python_name_tracker
+
+logger = logging.getLogger(__name__)
+
+
+# ============================================================================
+# Python Code Generator
+# ============================================================================
 
 
 class PythonGenerator(CodeGenerator):
     """Code generator for Python dataclasses, Pydantic models, and TypedDict."""
 
+    __slots__ = ("python_config", "name_tracker", "types_used", "has_optional_fields")
+
     def __init__(self, config: GeneratorConfig):
         """Initialize Python generator with configuration."""
-        super().__init__(config)
-
-        # Initialize naming
-        self.sanitizer = create_python_sanitizer()
-
-        # Initialize Python-specific configuration
+        # Initialize Python-specific config
         self.python_config = PythonConfig(**config.language_config)
 
-        # State tracking
-        self.generated_classes = set()
-        self.types_used = set()
+        # Initialize naming
+        self.name_tracker = create_python_name_tracker()
+
+        # Track types and optional fields for imports
+        self.types_used: set[str] = set()
         self.has_optional_fields = False
+
+        # Call parent init (sets up templates)
+        super().__init__(config)
+
+        logger.info(
+            f"PythonGenerator initialized (style: {self.python_config.style.value})"
+        )
+
+    # ========================================================================
+    # Required Properties
+    # ========================================================================
 
     @property
     def language_name(self) -> str:
-        """Return the language name."""
+        """Return language name."""
         return "python"
 
     @property
@@ -43,31 +61,41 @@ class PythonGenerator(CodeGenerator):
         return ".py"
 
     def get_template_directory(self) -> Path:
-        """Return the Python templates directory."""
+        """Return Python templates directory."""
         return Path(__file__).parent / "templates"
 
-    def generate(self, schemas: Dict[str, Schema], root_schema_name: str) -> str:
+    # ========================================================================
+    # Code Generation
+    # ========================================================================
+
+    def generate(
+        self,
+        schemas: dict[str, Schema],
+        root_schema_name: str,
+    ) -> str:
         """Generate complete Python code for all schemas."""
+        logger.info(f"Generating Python code for {len(schemas)} schemas")
+
         # Reset state
-        self.generated_classes.clear()
         self.types_used.clear()
         self.has_optional_fields = False
-        self.sanitizer.reset_used_names()
+        self.name_tracker.reset()
 
         # Generate classes in dependency order
         generation_order = self._get_generation_order(schemas, root_schema_name)
         classes = []
 
         for schema_name in generation_order:
-            if schema_name in schemas and schema_name not in self.generated_classes:
+            if schema_name in schemas:
                 class_data = self._generate_class_data(schemas[schema_name])
                 classes.append(class_data)
-                self.generated_classes.add(schema_name)
+
+        logger.debug(f"Generated {len(classes)} classes")
 
         # Get required imports
         imports = self._get_imports()
 
-        # Render complete file
+        # Render complete file with appropriate template
         template_name = self._get_template_name()
         context = {
             "imports": imports,
@@ -80,22 +108,27 @@ class PythonGenerator(CodeGenerator):
 
     def _get_template_name(self) -> str:
         """Get the appropriate template based on style."""
-        style_templates = {
-            PythonStyle.DATACLASS: "dataclass_file.py.j2",
-            PythonStyle.PYDANTIC: "pydantic_file.py.j2",
-            PythonStyle.TYPEDDICT: "typeddict_file.py.j2",
-        }
-        return style_templates.get(self.python_config.style, "dataclass_file.py.j2")
+        match self.python_config.style:
+            case PythonStyle.DATACLASS:
+                return "dataclass_file.py.j2"
+            case PythonStyle.PYDANTIC:
+                return "pydantic_file.py.j2"
+            case PythonStyle.TYPEDDICT:
+                return "typeddict_file.py.j2"
+            case _:
+                return "dataclass_file.py.j2"
 
-    def _generate_class_data(self, schema: Schema) -> Dict[str, Any]:
+    def _generate_class_data(self, schema: Schema) -> dict[str, Any]:
         """Generate class data for template."""
-        class_name = self.sanitizer.sanitize_name(schema.name, NamingCase.PASCAL_CASE)
+        class_name = self.name_tracker.sanitize(schema.name, "pascal")
 
         fields = []
         for field in schema.fields:
-            field_data = self._generate_field_data(field, schema.name)
+            field_data = self._generate_field_data(field)
             if field_data:
                 fields.append(field_data)
+
+        logger.debug(f"Generated class: {class_name} with {len(fields)} fields")
 
         class_data = {
             "class_name": class_name,
@@ -105,27 +138,28 @@ class PythonGenerator(CodeGenerator):
         }
 
         # Add style-specific metadata
-        if self.python_config.style == PythonStyle.DATACLASS:
-            class_data["frozen"] = self.python_config.dataclass_frozen
-            class_data["slots"] = self.python_config.dataclass_slots
-            class_data["kw_only"] = self.python_config.dataclass_kw_only
+        match self.python_config.style:
+            case PythonStyle.DATACLASS:
+                class_data["frozen"] = self.python_config.dataclass_frozen
+                class_data["slots"] = self.python_config.dataclass_slots
+                class_data["kw_only"] = self.python_config.dataclass_kw_only
 
-        elif self.python_config.style == PythonStyle.PYDANTIC:
-            class_data["config_dict"] = self.python_config.pydantic_config_dict
-            class_data["extra_forbid"] = self.python_config.pydantic_extra_forbid
+            case PythonStyle.PYDANTIC:
+                class_data["config_dict"] = self.python_config.pydantic_config_dict
+                class_data["extra_forbid"] = self.python_config.pydantic_extra_forbid
 
-        elif self.python_config.style == PythonStyle.TYPEDDICT:
-            class_data["total"] = self.python_config.typeddict_total
+            case PythonStyle.TYPEDDICT:
+                class_data["total"] = self.python_config.typeddict_total
 
         return class_data
 
-    def _generate_field_data(self, field: Field, schema_context: str) -> Dict[str, Any]:
+    def _generate_field_data(self, field: Field) -> dict[str, Any]:
         """Generate field data for template."""
-        # Generate field name
-        field_name = self.sanitizer.sanitize_name(field.name, NamingCase.SNAKE_CASE)
+        # Sanitize field name to snake_case for Python
+        field_name = self.name_tracker.sanitize(field.name, "snake")
 
         # Determine Python type
-        python_type = self._get_field_type(field, schema_context)
+        python_type = self._get_field_type(field)
         self.types_used.add(python_type)
 
         # Track optional fields
@@ -144,129 +178,132 @@ class PythonGenerator(CodeGenerator):
             field_data["comment"] = field.description
 
         # Add style-specific field metadata
-        if self.python_config.style == PythonStyle.DATACLASS:
-            field_data["use_default"] = field.optional
-            if field.optional:
-                field_data["default_value"] = "None"
-
-        elif self.python_config.style == PythonStyle.PYDANTIC:
-            # Pydantic Field configuration
-            if self.python_config.pydantic_use_field:
-                field_config = []
-
-                if (
-                    self.python_config.pydantic_use_alias
-                    and field.original_name != field_name
-                ):
-                    field_config.append(f'alias="{field.original_name}"')
-
-                if field.description and self.config.add_comments:
-                    # Escape quotes in description
-                    desc = field.description.replace('"', '\\"')
-                    field_config.append(f'description="{desc}"')
-
+        match self.python_config.style:
+            case PythonStyle.DATACLASS:
+                field_data["use_default"] = field.optional
                 if field.optional:
-                    field_config.append("default=None")
+                    field_data["default_value"] = "None"
 
-                if field_config:
-                    field_data["field_config"] = ", ".join(field_config)
+            case PythonStyle.PYDANTIC:
+                # Pydantic Field configuration
+                if self.python_config.pydantic_use_field:
+                    field_config = []
+
+                    # Alias for original JSON key
+                    if (
+                        self.python_config.pydantic_use_alias
+                        and field.original_name != field_name
+                    ):
+                        field_config.append(f'alias="{field.original_name}"')
+
+                    # Description
+                    if field.description and self.config.add_comments:
+                        desc = field.description.replace('"', '\\"')
+                        field_config.append(f'description="{desc}"')
+
+                    # Default for optional
+                    if field.optional:
+                        field_config.append("default=None")
+
+                    if field_config:
+                        field_data["field_config"] = ", ".join(field_config)
 
         return field_data
 
-    def _get_field_type(self, field: Field, schema_context: str) -> str:
+    def _get_field_type(self, field: Field) -> str:
         """Get Python type for a field."""
-        if field.type == FieldType.ARRAY:
-            return self._get_array_type(field, schema_context)
-        elif field.type == FieldType.OBJECT:
-            return self._get_object_type(field, schema_context)
-        else:
-            return self.python_config.get_python_type(
-                field.type, is_optional=field.optional
-            )
+        match field.type:
+            case FieldType.ARRAY:
+                return self._get_array_type(field)
+            case FieldType.OBJECT:
+                return self._get_object_type(field)
+            case _:
+                return self.python_config.get_python_type(
+                    field.type,
+                    is_optional=field.optional,
+                )
 
-    def _get_array_type(self, field: Field, schema_context: str) -> str:
+    def _get_array_type(self, field: Field) -> str:
         """Get Python type for array fields."""
-        if field.array_element_type and field.array_element_type != FieldType.UNKNOWN:
-            element_type = self.python_config.type_map.get(
-                field.array_element_type, self.python_config.unknown_type
-            )
-        elif field.array_element_schema:
-            element_name = self.sanitizer.sanitize_name(
-                field.array_element_schema.name, NamingCase.PASCAL_CASE
+        if field.array_element_schema:
+            # Array of objects
+            element_name = self.name_tracker.sanitize(
+                field.array_element_schema.name,
+                "pascal",
             )
             element_type = element_name
+        elif field.array_element_type and field.array_element_type != FieldType.UNKNOWN:
+            # Array of primitives
+            element_type = self.python_config.type_map.get(
+                field.array_element_type,
+                self.python_config.unknown_type,
+            )
         else:
+            # Unknown array element type
             element_type = self.python_config.unknown_type
 
         base_type = f"list[{element_type}]"
 
         # Add optional wrapper if needed
         if field.optional and self.python_config.use_optional:
-            if self.python_config.style == PythonStyle.TYPEDDICT:
-                return f"NotRequired[{base_type}]"
-            else:
-                return f"{base_type} | None"
+            match self.python_config.style:
+                case PythonStyle.TYPEDDICT:
+                    return f"NotRequired[{base_type}]"
+                case _:
+                    return f"{base_type} | None"
 
         return base_type
 
-    def _get_object_type(self, field: Field, schema_context: str) -> str:
+    def _get_object_type(self, field: Field) -> str:
         """Get Python type for object fields."""
         if field.nested_schema:
-            class_name = self.sanitizer.sanitize_name(
-                field.nested_schema.name, NamingCase.PASCAL_CASE
+            class_name = self.name_tracker.sanitize(
+                field.nested_schema.name,
+                "pascal",
             )
 
             # Add optional wrapper if needed
             if field.optional and self.python_config.use_optional:
-                if self.python_config.style == PythonStyle.TYPEDDICT:
-                    return f"NotRequired[{class_name}]"
-                else:
-                    return f"{class_name} | None"
-            return class_name
-        else:
-            return self.python_config.get_python_type(
-                FieldType.UNKNOWN, is_optional=field.optional
-            )
+                match self.python_config.style:
+                    case PythonStyle.TYPEDDICT:
+                        return f"NotRequired[{class_name}]"
+                    case _:
+                        return f"{class_name} | None"
 
-    def _get_imports(self) -> List[str]:
+            return class_name
+
+        return self.python_config.get_python_type(
+            FieldType.UNKNOWN,
+            is_optional=field.optional,
+        )
+
+    def _get_imports(self) -> list[str]:
         """Get required imports based on types used."""
         imports = self.python_config.get_required_imports(
-            self.types_used, self.has_optional_fields
+            self.types_used,
+            self.has_optional_fields,
         )
-
-        # Sort imports: standard library, then third-party
-        sorted_imports = sorted(
-            list(imports),
-            key=lambda x: (
-                (
-                    0
-                    if x.startswith("from typing") or x.startswith("from datetime")
-                    else 1
-                ),
-                x,
-            ),
-        )
-
-        return sorted_imports
-
-    def get_import_statements(self, schemas: Dict[str, Schema]) -> List[str]:
-        """Get required import statements."""
-        return self._get_imports()
+        logger.debug(f"Generated {len(imports)} imports")
+        return imports
 
     def _get_generation_order(
-        self, schemas: Dict[str, Schema], root_name: str
-    ) -> List[str]:
-        """Determine order for generating classes to handle dependencies."""
-        visited = set()
-        visiting = set()
-        ordered = []
+        self,
+        schemas: dict[str, Schema],
+        root_name: str,
+    ) -> list[str]:
+        """Determine order for generating classes (dependencies first)."""
+        visited: set[str] = set()
+        visiting: set[str] = set()
+        ordered: list[str] = []
 
-        def visit_schema(schema_name: str):
+        def visit(schema_name: str) -> None:
             if schema_name in visited or schema_name not in schemas:
                 return
 
             if schema_name in visiting:
-                return  # Circular dependency - skip
+                # Circular dependency detected
+                logger.warning(f"Circular dependency detected: {schema_name}")
+                return
 
             visiting.add(schema_name)
             schema = schemas[schema_name]
@@ -274,12 +311,13 @@ class PythonGenerator(CodeGenerator):
             # Visit dependencies first
             for field in schema.fields:
                 if field.nested_schema and field.nested_schema.name in schemas:
-                    visit_schema(field.nested_schema.name)
+                    visit(field.nested_schema.name)
+
                 if (
                     field.array_element_schema
                     and field.array_element_schema.name in schemas
                 ):
-                    visit_schema(field.array_element_schema.name)
+                    visit(field.array_element_schema.name)
 
             visiting.remove(schema_name)
             visited.add(schema_name)
@@ -287,11 +325,16 @@ class PythonGenerator(CodeGenerator):
 
         # Visit all schemas
         for schema_name in schemas:
-            visit_schema(schema_name)
+            visit(schema_name)
 
+        logger.debug(f"Generation order determined: {len(ordered)} schemas")
         return ordered
 
-    def validate_schemas(self, schemas: Dict[str, Schema]) -> List[str]:
+    # ========================================================================
+    # Validation
+    # ========================================================================
+
+    def validate_schemas(self, schemas: dict[str, Schema]) -> list[str]:
         """Validate schemas for Python generation."""
         warnings = super().validate_schemas(schemas)
 
@@ -299,36 +342,39 @@ class PythonGenerator(CodeGenerator):
         for schema in schemas.values():
             if not schema.fields:
                 warnings.append(
-                    f"Schema {schema.name} has no fields - will generate empty class"
+                    f"Schema '{schema.name}' has no fields - will generate empty class"
                 )
-
-            # Check for potential naming conflicts
-            for field in schema.fields:
-                sanitized = self.sanitizer.sanitize_name(
-                    field.name, NamingCase.SNAKE_CASE
-                )
-                if sanitized != field.name.lower().replace("-", "_"):
-                    warnings.append(
-                        f"Field {schema.name}.{field.name} renamed to {sanitized}"
-                    )
 
         # Style-specific warnings
-        if self.python_config.style == PythonStyle.TYPEDDICT:
-            warnings.append(
-                "TypedDict classes are type hints only - no runtime validation"
-            )
+        match self.python_config.style:
+            case PythonStyle.TYPEDDICT:
+                warnings.append(
+                    "TypedDict classes are type hints only - no runtime validation"
+                )
 
         return warnings
 
 
-# Factory functions
-def create_python_generator(
-    config: GeneratorConfig = None, style: str = "dataclass"
-) -> PythonGenerator:
-    """Create a Python generator with specified style."""
-    if config is None:
-        from ...core.config import GeneratorConfig
+# ============================================================================
+# Factory Functions
+# ============================================================================
 
+
+def create_python_generator(
+    config: GeneratorConfig | None = None,
+    style: str = "dataclass",
+) -> PythonGenerator:
+    """
+    Create a Python generator with specified style.
+
+    Args:
+        config: Optional configuration
+        style: Python style (dataclass, pydantic, typeddict)
+
+    Returns:
+        Configured PythonGenerator instance
+    """
+    if config is None:
         config = GeneratorConfig(
             package_name="models",
             add_comments=True,
@@ -340,7 +386,6 @@ def create_python_generator(
 
 def create_dataclass_generator() -> PythonGenerator:
     """Create generator for Python dataclasses."""
-    from ...core.config import GeneratorConfig
     from .config import get_dataclass_config
 
     config = GeneratorConfig(
@@ -354,7 +399,6 @@ def create_dataclass_generator() -> PythonGenerator:
 
 def create_pydantic_generator() -> PythonGenerator:
     """Create generator for Pydantic v2 models."""
-    from ...core.config import GeneratorConfig
     from .config import get_pydantic_config
 
     config = GeneratorConfig(
@@ -368,7 +412,6 @@ def create_pydantic_generator() -> PythonGenerator:
 
 def create_typeddict_generator() -> PythonGenerator:
     """Create generator for TypedDict classes."""
-    from ...core.config import GeneratorConfig
     from .config import get_typeddict_config
 
     config = GeneratorConfig(

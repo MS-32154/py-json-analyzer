@@ -1,174 +1,292 @@
 """
-Template engine wrapper for code generation.
+Template engine for code generation.
 
-Provides a clean, language-agnostic interface for Jinja2 template rendering
-with common utilities for code generation.
+Thin wrapper around Jinja2 with code-generation-specific filters
+and utilities.
 """
 
-from typing import Dict, Any, Optional
+import logging
 from pathlib import Path
-from .naming import NameSanitizer
+from typing import Any
 
 try:
-    from jinja2 import (
-        Environment,
-        FileSystemLoader,
-        DictLoader,
-        select_autoescape,
-    )
+    import jinja2
+    from jinja2 import Environment
 except ImportError:
-    # Fallback for environments without jinja2
-    Environment = None
-    FileSystemLoader = None
-    BaseLoader = None
-    DictLoader = None
-    select_autoescape = None
+    jinja2 = None
+
+logger = logging.getLogger(__name__)
 
 
 class TemplateError(Exception):
-    """Exception raised for template-related errors."""
+    """Raised when template operations fail."""
 
     pass
 
 
-class TemplateEngine:
-    """Language-agnostic wrapper for Jinja2 template engine."""
-
-    def __init__(self, template_dir: Optional[Path] = None):
-        """
-        Initialize template engine.
-
-        Args:
-            template_dir: Directory containing template files
-        """
-        self._name_sanitizer = NameSanitizer()
-
-        if Environment is None:
-            raise TemplateError(
-                "Jinja2 is required for template functionality. "
-                "Install with: pip install jinja2"
-            )
-
-        self.template_dir = template_dir
-        self._env = None
-        self._setup_environment()
-
-    def _setup_environment(self):
-        """Setup Jinja2 environment with code generation utilities."""
-        if self.template_dir and self.template_dir.exists():
-            loader = FileSystemLoader(str(self.template_dir))
-        else:
-            # Use in-memory templates as fallback
-            loader = DictLoader({})
-
-        self._env = Environment(
-            loader=loader,
-            autoescape=select_autoescape(["html", "xml"]),
-            lstrip_blocks=True,
-            # trim_blocks=True,
-        )
-
-        # Add language-agnostic filters for code generation
-        self._env.filters["snake_case"] = self._snake_case_filter
-        self._env.filters["camel_case"] = self._camel_case_filter
-        self._env.filters["pascal_case"] = self._pascal_case_filter
-        self._env.filters["indent"] = self._indent_filter
-        self._env.filters["comment"] = self._comment_filter
-
-    def render_template(self, template_name: str, context: Dict[str, Any]) -> str:
-        """
-        Render a template with the given context.
-
-        Args:
-            template_name: Name of template file (e.g., 'struct.go.j2')
-            context: Variables to pass to template
-
-        Returns:
-            Rendered template content
-        """
-        try:
-            template = self._env.get_template(template_name)
-            return template.render(**context)
-        except Exception as e:
-            raise TemplateError(f"Failed to render template {template_name}: {str(e)}")
-
-    def render_string(self, template_string: str, context: Dict[str, Any]) -> str:
-        """
-        Render a template string with the given context.
-
-        Args:
-            template_string: Template content as string
-            context: Variables to pass to template
-
-        Returns:
-            Rendered content
-        """
-        try:
-            template = self._env.from_string(template_string)
-            return template.render(**context)
-        except Exception as e:
-            raise TemplateError(f"Failed to render template string: {str(e)}")
-
-    def add_template(self, name: str, content: str):
-        """
-        Add an in-memory template.
-
-        Args:
-            name: Template name
-            content: Template content
-        """
-        if not isinstance(self._env.loader, DictLoader):
-            # Convert to DictLoader to support in-memory templates
-            self._env.loader = DictLoader({})
-
-        self._env.loader.mapping[name] = content
-
-    def template_exists(self, template_name: str) -> bool:
-        """Check if a template exists."""
-        try:
-            self._env.get_template(template_name)
-            return True
-        except:
-            return False
-
-    def list_templates(self) -> list[str]:
-        """List all available templates."""
-        try:
-            return self._env.list_templates()
-        except:
-            return []
-
-    # Language-agnostic template filters
-
-    def _snake_case_filter(self, value: str) -> str:
-        return self._name_sanitizer._to_snake_case(value)
-
-    def _camel_case_filter(self, value: str) -> str:
-        return self._name_sanitizer._to_camel_case(value)
-
-    def _pascal_case_filter(self, value: str) -> str:
-        return self._name_sanitizer._to_pascal_case(value)
-
-    def _indent_filter(self, value: str, spaces: int = 4) -> str:
-        """Indent all lines in a string."""
-        indent = " " * spaces
-        lines = str(value).split("\n")
-        return "\n".join(indent + line if line.strip() else line for line in lines)
-
-    def _comment_filter(self, value: str, style: str = "//") -> str:
-        """Add comment markers to each line."""
-        lines = str(value).split("\n")
-        return "\n".join(f"{style} {line}" if line.strip() else line for line in lines)
+# ============================================================================
+# Template Engine
+# ============================================================================
 
 
-def create_template_engine(template_dir: Optional[Path] = None) -> TemplateEngine:
+def create_template_env(
+    template_dir: Path | None = None,
+    trim_blocks: bool = False,
+    lstrip_blocks: bool = True,
+) -> "Environment":
     """
-    Create a template engine instance.
+    Create Jinja2 environment for code generation.
 
     Args:
         template_dir: Directory containing template files
+        trim_blocks: Remove first newline after block
+        lstrip_blocks: Strip leading spaces before blocks
 
     Returns:
-        Configured TemplateEngine instance
+        Configured Jinja2 environment
+
+    Raises:
+        TemplateError: If Jinja2 is not installed or template_dir invalid
     """
-    return TemplateEngine(template_dir)
+    if jinja2 is None:
+        raise TemplateError(
+            "Jinja2 is required for template functionality. "
+            "Install with: pip install jinja2"
+        )
+
+    # Setup loader
+    if template_dir and template_dir.exists():
+        loader = jinja2.FileSystemLoader(str(template_dir))
+        logger.debug(f"Template environment created with directory: {template_dir}")
+    else:
+        loader = jinja2.DictLoader({})
+        logger.warning(
+            "Template environment created without directory (in-memory only)"
+        )
+
+    # Create environment
+    env = jinja2.Environment(
+        loader=loader,
+        trim_blocks=trim_blocks,
+        lstrip_blocks=lstrip_blocks,
+        autoescape=False,  # No HTML escaping for code generation
+        keep_trailing_newline=True,  # Preserve final newlines
+    )
+
+    # Add custom filters
+    env.filters["snake_case"] = _to_snake_case_filter
+    env.filters["camel_case"] = _to_camel_case_filter
+    env.filters["pascal_case"] = _to_pascal_case_filter
+    env.filters["indent"] = _indent_filter
+    env.filters["comment"] = _comment_filter
+
+    logger.info(f"Template environment configured with {len(env.filters)} filters")
+    return env
+
+
+def render_template(
+    env: "Environment",
+    template_name: str,
+    context: dict[str, Any],
+) -> str:
+    """
+    Render a template with context.
+
+    Args:
+        env: Jinja2 environment
+        template_name: Name of template file (e.g., 'struct.go.j2')
+        context: Variables to pass to template
+
+    Returns:
+        Rendered template content
+
+    Raises:
+        TemplateError: If template cannot be rendered
+    """
+    try:
+        template = env.get_template(template_name)
+        result = template.render(**context)
+        logger.debug(f"Rendered template: {template_name} ({len(result)} chars)")
+        return result
+    except jinja2.TemplateNotFound as e:
+        raise TemplateError(f"Template not found: {template_name}") from e
+    except jinja2.TemplateSyntaxError as e:
+        raise TemplateError(f"Syntax error in {template_name}: {e}") from e
+    except Exception as e:
+        raise TemplateError(f"Failed to render {template_name}: {e}") from e
+
+
+def render_string(
+    env: "Environment",
+    template_string: str,
+    context: dict[str, Any],
+) -> str:
+    """
+    Render a template string with context.
+
+    Args:
+        env: Jinja2 environment
+        template_string: Template content as string
+        context: Variables to pass to template
+
+    Returns:
+        Rendered content
+
+    Raises:
+        TemplateError: If template cannot be rendered
+    """
+    try:
+        template = env.from_string(template_string)
+        result = template.render(**context)
+        logger.debug(f"Rendered string template ({len(result)} chars)")
+        return result
+    except Exception as e:
+        raise TemplateError(f"Failed to render string template: {e}") from e
+
+
+def template_exists(env: "Environment", template_name: str) -> bool:
+    """
+    Check if a template exists in the environment.
+
+    Args:
+        env: Jinja2 environment
+        template_name: Name of template to check
+
+    Returns:
+        True if template exists, False otherwise
+    """
+    try:
+        env.get_template(template_name)
+        return True
+    except jinja2.TemplateNotFound:
+        return False
+
+
+def list_templates(env: "Environment") -> list[str]:
+    """
+    List all available templates.
+
+    Args:
+        env: Jinja2 environment
+
+    Returns:
+        List of template names
+    """
+    try:
+        templates = env.list_templates()
+        logger.debug(f"Found {len(templates)} templates")
+        return list(templates)
+    except Exception as e:
+        logger.warning(f"Failed to list templates: {e}")
+        return []
+
+
+# ============================================================================
+# Custom Jinja2 Filters
+# ============================================================================
+
+
+def _to_snake_case_filter(value: str) -> str:
+    """Convert value to snake_case."""
+    import re
+
+    name = value.replace("-", "_")
+    name = re.sub(r"([a-z0-9])([A-Z])", r"\1_\2", name)
+    name = name.lower()
+    name = re.sub(r"_+", "_", name)
+    return name.strip("_")
+
+
+def _to_camel_case_filter(value: str) -> str:
+    """Convert value to camelCase."""
+    snake = _to_snake_case_filter(value)
+    parts = snake.split("_")
+    if not parts:
+        return value
+    return parts[0].lower() + "".join(p.capitalize() for p in parts[1:])
+
+
+def _to_pascal_case_filter(value: str) -> str:
+    """Convert value to PascalCase."""
+    snake = _to_snake_case_filter(value)
+    parts = snake.split("_")
+    return "".join(p.capitalize() for p in parts if p)
+
+
+def _indent_filter(value: str, spaces: int = 4) -> str:
+    """
+    Indent all non-empty lines in a string.
+
+    Args:
+        value: String to indent
+        spaces: Number of spaces per indent level
+
+    Returns:
+        Indented string
+    """
+    indent = " " * spaces
+    lines = str(value).split("\n")
+    return "\n".join(indent + line if line.strip() else line for line in lines)
+
+
+def _comment_filter(value: str, style: str = "//") -> str:
+    """
+    Add comment markers to each line.
+
+    Args:
+        value: String to comment
+        style: Comment style ("//", "#", "/*", etc.)
+
+    Returns:
+        Commented string
+    """
+    lines = str(value).split("\n")
+    return "\n".join(f"{style} {line}" if line.strip() else line for line in lines)
+
+
+# ============================================================================
+# High-Level Template Manager
+# ============================================================================
+
+
+class TemplateManager:
+    """
+    Manages templates for a specific generator.
+
+    This is a simple wrapper that holds the Jinja2 environment
+    and provides convenient methods.
+    """
+
+    __slots__ = ("_env", "_template_dir")
+
+    def __init__(self, template_dir: Path | None = None):
+        """
+        Initialize template manager.
+
+        Args:
+            template_dir: Directory containing templates
+        """
+        self._template_dir = template_dir
+        self._env = create_template_env(template_dir)
+        logger.info(f"TemplateManager initialized for: {template_dir}")
+
+    def render(self, template_name: str, context: dict[str, Any]) -> str:
+        """Render a template by name."""
+        return render_template(self._env, template_name, context)
+
+    def render_string(self, template_string: str, context: dict[str, Any]) -> str:
+        """Render a template string."""
+        return render_string(self._env, template_string, context)
+
+    def exists(self, template_name: str) -> bool:
+        """Check if template exists."""
+        return template_exists(self._env, template_name)
+
+    def list(self) -> list[str]:
+        """List available templates."""
+        return list_templates(self._env)
+
+    @property
+    def template_dir(self) -> Path | None:
+        """Get template directory."""
+        return self._template_dir

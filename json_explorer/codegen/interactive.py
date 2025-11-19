@@ -1,36 +1,43 @@
 """
-Interactive code generation handler - Language agnostic base.
+Interactive code generation handler.
 
-Provides the main interactive interface for code generation with
-delegation to language-specific handlers for customization.
+Provides language-agnostic interactive interface for code generation
+with delegation to language-specific handlers for customization.
 """
 
+import logging
 from pathlib import Path
-from typing import Dict, Any, Optional, Protocol
+from typing import Any, Protocol
 
 from rich.console import Console
-from rich.prompt import Prompt, Confirm
 from rich.panel import Panel
-from rich.table import Table
+from rich.prompt import Confirm, Prompt
 from rich.syntax import Syntax
+from rich.table import Table
 from rich import box
 
 from . import (
+    GeneratorError,
     generate_from_analysis,
-    list_supported_languages,
     get_language_info,
     list_all_language_info,
-    GeneratorConfig,
+    list_supported_languages,
     load_config,
-    GeneratorError,
 )
 from json_explorer.analyzer import analyze_json
+
+logger = logging.getLogger(__name__)
+
+
+# ============================================================================
+# Language Handler Protocol
+# ============================================================================
 
 
 class LanguageInteractiveHandler(Protocol):
     """Protocol for language-specific interactive handlers."""
 
-    def get_language_info(self) -> Dict[str, str]:
+    def get_language_info(self) -> dict[str, str]:
         """Get language-specific information for display."""
         ...
 
@@ -38,27 +45,32 @@ class LanguageInteractiveHandler(Protocol):
         """Show language-specific configuration examples."""
         ...
 
-    def get_template_choices(self) -> Dict[str, str]:
+    def get_template_choices(self) -> dict[str, str]:
         """Get available configuration templates."""
         ...
 
-    def create_template_config(self, template_name: str) -> Optional[GeneratorConfig]:
+    def create_template_config(self, template_name: str) -> Any:
         """Create configuration from template."""
         ...
 
-    def configure_language_specific(self, console: Console) -> Dict[str, Any]:
+    def configure_language_specific(self, console: Console) -> dict[str, Any]:
         """Handle language-specific configuration options."""
         ...
 
-    def get_default_config(self) -> Dict[str, Any]:
+    def get_default_config(self) -> dict[str, Any]:
         """Get default configuration for quick setup."""
         ...
+
+
+# ============================================================================
+# Main Interactive Handler
+# ============================================================================
 
 
 class CodegenInteractiveHandler:
     """Interactive handler for code generation."""
 
-    def __init__(self, data: Any, console: Console = None):
+    def __init__(self, data: Any, console: Console | None = None):
         """
         Initialize the codegen interactive handler.
 
@@ -68,41 +80,51 @@ class CodegenInteractiveHandler:
         """
         self.data = data
         self.console = console or Console()
-        self._analysis_cache = None  # Cache analysis result
-        self._language_handlers = {}  # Cache for language handlers
+        self._analysis_cache: dict | None = None
+        self._language_handlers: dict[str, LanguageInteractiveHandler] = {}
+
+        logger.info("CodegenInteractiveHandler initialized")
 
     def run_interactive(self) -> bool:
         """
         Run the interactive code generation interface.
 
         Returns:
-            True if successful, False if user cancelled or error occurred
+            True if successful, False if cancelled or error
         """
         if not self.data:
-            self.console.print("[red]⚠ No data available for code generation[/red]")
+            self.console.print("[red]⚠️ No data available for code generation[/red]")
             return False
 
         try:
             while True:
                 action = self._show_main_menu()
 
-                if action == "back":
-                    return True
-                elif action == "generate":
-                    self._interactive_generation()
-                elif action == "languages":
-                    self._show_languages_menu()
-                elif action == "info":
-                    self._show_general_info()
-                elif action == "templates":
-                    self._show_templates_menu()
+                match action:
+                    case "back":
+                        logger.info("User exited code generation")
+                        return True
+                    case "generate":
+                        self._interactive_generation()
+                    case "languages":
+                        self._show_languages_menu()
+                    case "info":
+                        self._show_general_info()
+                    case "templates":
+                        self._show_templates_menu()
 
         except KeyboardInterrupt:
             self.console.print("\n[yellow]👋 Code generation cancelled[/yellow]")
+            logger.info("Code generation cancelled by user")
             return False
         except Exception as e:
-            self.console.print(f"[red]⚠ Unexpected error: {e}[/red]")
+            self.console.print(f"[red]⚠️ Unexpected error: {e}[/red]")
+            logger.exception("Unexpected error in interactive handler")
             return False
+
+    # ========================================================================
+    # Main Menu
+    # ========================================================================
 
     def _show_main_menu(self) -> str:
         """Show the main codegen menu and get user choice."""
@@ -113,7 +135,7 @@ class CodegenInteractiveHandler:
 [cyan]2.[/cyan] 📋 Available Languages
 [cyan]3.[/cyan] 📖 General Information
 [cyan]4.[/cyan] 🎨 Configuration Templates
-[cyan]b.[/cyan] 📙 Back to Main Menu""",
+[cyan]b.[/cyan] 🔙 Back to Main Menu""",
             border_style="blue",
             title="⚡ Code Generator",
         )
@@ -137,13 +159,19 @@ class CodegenInteractiveHandler:
 
         return choice_map.get(choice, "back")
 
-    def _interactive_generation(self):
+    # ========================================================================
+    # Code Generation Flow
+    # ========================================================================
+
+    def _interactive_generation(self) -> None:
         """Handle the interactive code generation process."""
         try:
             # Step 1: Language selection
             language = self._select_language()
             if not language:
                 return
+
+            logger.info(f"User selected language: {language}")
 
             # Step 2: Configuration
             config = self._configure_generation(language)
@@ -162,21 +190,22 @@ class CodegenInteractiveHandler:
             self._handle_generation_output(result, language, root_name)
 
         except GeneratorError as e:
-            self.console.print(f"[red]⚠ Generation error:[/red] {e}")
+            self.console.print(f"[red]⚠️ Generation error:[/red] {e}")
+            logger.error(f"Generation error: {e}")
         except Exception as e:
-            self.console.print(f"[red]⚠ Unexpected error:[/red] {e}")
+            self.console.print(f"[red]⚠️ Unexpected error:[/red] {e}")
+            logger.exception("Unexpected error during generation")
 
-    def _select_language(self) -> Optional[str]:
+    def _select_language(self) -> str | None:
         """Interactive language selection."""
         languages = list_supported_languages()
 
         if not languages:
-            self.console.print("[red]⚠ No code generators available[/red]")
+            self.console.print("[red]⚠️ No code generators available[/red]")
             return None
 
-        self.console.print(f"\n[bold]📋 Available Languages:[/bold]")
+        self.console.print("\n[bold]📋 Available Languages:[/bold]")
 
-        # Show compact language list
         for i, lang in enumerate(languages, 1):
             self.console.print(f"  [cyan]{i}.[/cyan] {lang}")
 
@@ -189,15 +218,16 @@ class CodegenInteractiveHandler:
             default="1",
         )
 
-        if choice == "b":
-            return None
-        elif choice == "i":
-            self._show_detailed_language_info()
-            return self._select_language()  # Recursive call after showing info
-        else:
-            return languages[int(choice) - 1]
+        match choice:
+            case "b":
+                return None
+            case "i":
+                self._show_detailed_language_info()
+                return self._select_language()
+            case _:
+                return languages[int(choice) - 1]
 
-    def _configure_generation(self, language: str) -> Optional[GeneratorConfig]:
+    def _configure_generation(self, language: str) -> dict | None:
         """Interactive configuration for code generation."""
         self.console.print(f"\n⚙️ [bold]Configure {language.title()} Generation[/bold]")
 
@@ -207,18 +237,19 @@ class CodegenInteractiveHandler:
             default="quick",
         )
 
-        if config_type == "quick":
-            return self._quick_configuration(language)
-        elif config_type == "custom":
-            return self._custom_configuration(language)
-        elif config_type == "template":
-            return self._template_configuration(language)
-        elif config_type == "file":
-            return self._file_configuration()
+        match config_type:
+            case "quick":
+                return self._quick_configuration(language)
+            case "custom":
+                return self._custom_configuration(language)
+            case "template":
+                return self._template_configuration(language)
+            case "file":
+                return self._file_configuration()
+            case _:
+                return None
 
-        return None
-
-    def _quick_configuration(self, language: str) -> GeneratorConfig:
+    def _quick_configuration(self, language: str) -> dict:
         """Quick configuration with sensible defaults."""
         config_dict = {
             "package_name": Prompt.ask("Package/namespace name", default="main"),
@@ -231,18 +262,21 @@ class CodegenInteractiveHandler:
             lang_defaults = lang_handler.get_default_config()
             config_dict.update(lang_defaults)
 
-        return load_config(custom_config=config_dict)
+        logger.debug(f"Quick config created: {len(config_dict)} options")
+        return config_dict
 
-    def _custom_configuration(self, language: str) -> GeneratorConfig:
+    def _custom_configuration(self, language: str) -> dict:
         """Detailed custom configuration."""
         config_dict = {}
 
         # Basic configuration
         config_dict["package_name"] = Prompt.ask(
-            "Package/namespace name", default="main"
+            "Package/namespace name",
+            default="main",
         )
         config_dict["add_comments"] = Confirm.ask(
-            "Generate comments/documentation?", default=True
+            "Generate comments/documentation?",
+            default=True,
         )
 
         # Naming conventions
@@ -264,9 +298,10 @@ class CodegenInteractiveHandler:
             lang_config = lang_handler.configure_language_specific(self.console)
             config_dict.update(lang_config)
 
-        return load_config(custom_config=config_dict)
+        logger.debug(f"Custom config created: {len(config_dict)} options")
+        return config_dict
 
-    def _template_configuration(self, language: str) -> Optional[GeneratorConfig]:
+    def _template_configuration(self, language: str) -> dict | None:
         """Use configuration templates."""
         self.console.print(
             f"\n🎨 [bold]Configuration Templates for {language.title()}[/bold]"
@@ -284,24 +319,33 @@ class CodegenInteractiveHandler:
             self.console.print(f"[yellow]No templates defined for {language}[/yellow]")
             return self._custom_configuration(language)
 
+        # Show templates
+        for name, desc in templates.items():
+            self.console.print(f"  [green]•[/green] [bold]{name}[/bold]: {desc}")
+
         # Add custom option
-        choices = list(templates.keys()) + ["custom"]
+        choices = list(templates.keys()) + ["custom", "back"]
         template = Prompt.ask(
-            f"Select {language} template",
+            f"\nSelect {language} template",
             choices=choices,
-            default=list(templates.keys())[0],
+            default=list(templates.keys())[0] if templates else "custom",
         )
 
-        if template == "custom":
-            return self._custom_configuration(language)
+        match template:
+            case "back":
+                return None
+            case "custom":
+                return self._custom_configuration(language)
+            case _:
+                config = lang_handler.create_template_config(template)
+                if config:
+                    self._show_template_info(template, templates[template])
+                    # Convert GeneratorConfig to dict if needed
+                    if hasattr(config, "to_dict"):
+                        return config.to_dict()
+                return config
 
-        config = lang_handler.create_template_config(template)
-        if config:
-            self._show_template_info(template, templates[template])
-
-        return config
-
-    def _show_template_info(self, template_name: str, description: str):
+    def _show_template_info(self, template_name: str, description: str) -> None:
         """Show information about selected template."""
         info_panel = Panel(
             f"[bold]Selected Template: {template_name}[/bold]\n\n{description}",
@@ -311,17 +355,18 @@ class CodegenInteractiveHandler:
         self.console.print()
         self.console.print(info_panel)
 
-    def _file_configuration(self) -> Optional[GeneratorConfig]:
+    def _file_configuration(self) -> dict | None:
         """Load configuration from file."""
         config_file = Prompt.ask(
-            "Configuration file path", default="codegen_config.json"
+            "Configuration file path",
+            default="codegen_config.json",
         )
 
         try:
             config_path = Path(config_file)
             if not config_path.exists():
                 self.console.print(
-                    f"[red]⚠ Configuration file not found: {config_path}[/red]"
+                    f"[red]⚠️ Configuration file not found: {config_path}[/red]"
                 )
                 return None
 
@@ -329,13 +374,23 @@ class CodegenInteractiveHandler:
             self.console.print(
                 f"[green]✅ Configuration loaded from: {config_path}[/green]"
             )
+
+            # Convert to dict
+            if hasattr(config, "to_dict"):
+                return config.to_dict()
             return config
 
         except Exception as e:
-            self.console.print(f"[red]⚠ Error loading configuration: {e}[/red]")
+            self.console.print(f"[red]⚠️ Error loading configuration: {e}[/red]")
+            logger.error(f"Failed to load config file: {e}")
             return None
 
-    def _generate_code(self, language: str, config: GeneratorConfig, root_name: str):
+    def _generate_code(
+        self,
+        language: str,
+        config: dict,
+        root_name: str,
+    ) -> Any:
         """Generate code and handle errors."""
         try:
             self.console.print(f"\n⚡ [yellow]Generating {language} code...[/yellow]")
@@ -343,28 +398,44 @@ class CodegenInteractiveHandler:
             # Use cached analysis or create new one
             if self._analysis_cache is None:
                 self._analysis_cache = analyze_json(self.data)
+                logger.debug("JSON analyzed and cached")
 
             result = generate_from_analysis(
-                self._analysis_cache, language, config, root_name
+                self._analysis_cache,
+                language,
+                config,
+                root_name,
             )
 
             if not result.success:
                 self.console.print(
-                    f"[red]⚠ Generation failed:[/red] {result.error_message}"
+                    f"[red]⚠️ Generation failed:[/red] {result.error_message}"
                 )
                 return None
 
             self.console.print("[green]✅ Code generation completed![/green]")
+            logger.info("Code generation completed successfully")
             return result
 
         except GeneratorError as e:
-            self.console.print(f"[red]⚠ Generator error:[/red] {e}")
+            self.console.print(f"[red]⚠️ Generator error:[/red] {e}")
+            logger.error(f"Generator error: {e}")
             return None
         except Exception as e:
-            self.console.print(f"[red]⚠ Unexpected error during generation:[/red] {e}")
+            self.console.print(f"[red]⚠️ Unexpected error during generation:[/red] {e}")
+            logger.exception("Unexpected error during generation")
             return None
 
-    def _handle_generation_output(self, result, language: str, root_name: str):
+    # ========================================================================
+    # Output Handling
+    # ========================================================================
+
+    def _handle_generation_output(
+        self,
+        result: Any,
+        language: str,
+        root_name: str,
+    ) -> None:
         """Handle the output of generated code."""
         # Display warnings first
         if result.warnings:
@@ -381,20 +452,23 @@ class CodegenInteractiveHandler:
             default="preview",
         )
 
-        if action in ["preview", "both"]:
-            self._preview_code(result.code, language)
+        match action:
+            case "preview":
+                self._preview_code(result.code, language)
+                if Confirm.ask("\nSave the generated code to file?", default=True):
+                    self._save_code(result.code, language, root_name)
 
-        if action in ["save", "both"]:
-            self._save_code(result.code, language, root_name)
-        elif action == "preview":
-            # Ask if they want to save after preview
-            if Confirm.ask("\nSave the generated code to file?", default=True):
+            case "save":
                 self._save_code(result.code, language, root_name)
 
-        elif action == "regenerate":
-            self._interactive_generation()  # Start over
+            case "both":
+                self._preview_code(result.code, language)
+                self._save_code(result.code, language, root_name)
 
-    def _preview_code(self, code: str, language: str):
+            case "regenerate":
+                self._interactive_generation()
+
+    def _preview_code(self, code: str, language: str) -> None:
         """Preview generated code with syntax highlighting."""
         self.console.print(
             f"\n[green]📄 Generated {language.title()} Code Preview[/green]"
@@ -405,19 +479,25 @@ class CodegenInteractiveHandler:
             syntax_lang = language.lower()
             if syntax_lang == "golang":
                 syntax_lang = "go"
+            elif syntax_lang == "py":
+                syntax_lang = "python"
 
             syntax = Syntax(
-                code, syntax_lang, theme="monokai", line_numbers=False, padding=1
+                code,
+                syntax_lang,
+                theme="monokai",
+                line_numbers=False,
+                padding=1,
             )
             self.console.print()
             self.console.print(syntax)
             self.console.print()
 
         except Exception:
-            # Fallback to plain text if syntax highlighting fails
+            # Fallback to plain text
             self.console.print("[dim]" + code + "[/dim]")
 
-    def _save_code(self, code: str, language: str, root_name: str):
+    def _save_code(self, code: str, language: str, root_name: str) -> None:
         """Save generated code to file."""
         try:
             # Get language info for file extension
@@ -438,7 +518,8 @@ class CodegenInteractiveHandler:
             # Check if file exists
             if output_path.exists():
                 if not Confirm.ask(
-                    f"File {output_path} exists. Overwrite?", default=False
+                    f"File {output_path} exists. Overwrite?",
+                    default=False,
                 ):
                     filename = Prompt.ask("Enter new filename")
                     output_path = Path(filename)
@@ -447,17 +528,19 @@ class CodegenInteractiveHandler:
             self.console.print(
                 f"[green]✅ Code saved to:[/green] [cyan]{output_path}[/cyan]"
             )
+            logger.info(f"Code saved to: {output_path}")
 
         except Exception as e:
-            self.console.print(f"[red]⚠ Error saving file:[/red] {e}")
+            self.console.print(f"[red]⚠️ Error saving file:[/red] {e}")
+            logger.error(f"Failed to save file: {e}")
 
-    def _display_warnings(self, warnings: list):
+    def _display_warnings(self, warnings: list[str]) -> None:
         """Display generation warnings."""
         self.console.print("\n[yellow]⚠️ Warnings:[/yellow]")
         for warning in warnings:
             self.console.print(f"  [yellow]•[/yellow] {warning}")
 
-    def _display_metadata(self, metadata: Dict[str, Any]):
+    def _display_metadata(self, metadata: dict[str, Any]) -> None:
         """Display generation metadata."""
         metadata_table = Table(
             title="📊 Generation Summary",
@@ -476,7 +559,11 @@ class CodegenInteractiveHandler:
         self.console.print()
         self.console.print(metadata_table)
 
-    def _show_languages_menu(self):
+    # ========================================================================
+    # Information Displays
+    # ========================================================================
+
+    def _show_languages_menu(self) -> None:
         """Show detailed languages information menu."""
         while True:
             choice = Prompt.ask(
@@ -485,16 +572,17 @@ class CodegenInteractiveHandler:
                 default="list",
             )
 
-            if choice == "back":
-                break
-            elif choice == "list":
-                self._show_language_list()
-            elif choice == "details":
-                self._show_detailed_language_info()
-            elif choice == "specific":
-                self._show_specific_language_info()
+            match choice:
+                case "back":
+                    break
+                case "list":
+                    self._show_language_list()
+                case "details":
+                    self._show_detailed_language_info()
+                case "specific":
+                    self._show_specific_language_info()
 
-    def _show_language_list(self):
+    def _show_language_list(self) -> None:
         """Show simple language list."""
         languages = list_supported_languages()
 
@@ -502,7 +590,7 @@ class CodegenInteractiveHandler:
         for lang in languages:
             self.console.print(f"  [green]•[/green] {lang}")
 
-    def _show_detailed_language_info(self):
+    def _show_detailed_language_info(self) -> None:
         """Show detailed information about all languages."""
         try:
             language_info = list_all_language_info()
@@ -522,7 +610,6 @@ class CodegenInteractiveHandler:
             table.add_column("Extension", style="cyan", no_wrap=True)
             table.add_column("Generator Class", style="dim", no_wrap=True)
             table.add_column("Aliases", style="blue")
-            table.add_column("Module", style="dim")
 
             for lang_name, info in sorted(language_info.items()):
                 aliases = (
@@ -534,45 +621,16 @@ class CodegenInteractiveHandler:
                     info["file_extension"],
                     info["class"],
                     aliases,
-                    info["module"],
                 )
 
             self.console.print()
             self.console.print(table)
 
-            # Show usage examples
-            self._show_language_usage_examples()
-
         except Exception as e:
             self.console.print(f"[red]Error loading language info: {e}[/red]")
+            logger.error(f"Failed to load language info: {e}")
 
-    def _show_language_usage_examples(self):
-        """Show usage examples for languages."""
-        examples_panel = Panel(
-            """[bold]💡 Language Features Overview:[/bold]
-
-[bold]Currently Available:[/bold]
-• Go - Structs with JSON tags, configurable types and pointers
-• Python - Dataclasses, Pydantic, and Typeddict models
-
-[bold]Coming Soon:[/bold]
-• TypeScript - Interfaces and types
-• Rust - Structs with Serde
-• Java - POJOs with annotations
-
-[bold]Features:[/bold]
-• Smart type detection and conflict resolution
-• Configurable naming conventions
-• Optional field handling
-• Template-based configuration
-• Extensible architecture""",
-            title="🎯 Language Support",
-            border_style="green",
-        )
-        self.console.print()
-        self.console.print(examples_panel)
-
-    def _show_specific_language_info(self):
+    def _show_specific_language_info(self) -> None:
         """Show information about a specific language."""
         languages = list_supported_languages()
 
@@ -594,8 +652,13 @@ class CodegenInteractiveHandler:
             self._display_specific_language_info(language, info)
         except Exception as e:
             self.console.print(f"[red]Error getting language info: {e}[/red]")
+            logger.error(f"Failed to get language info: {e}")
 
-    def _display_specific_language_info(self, language: str, info: Dict[str, Any]):
+    def _display_specific_language_info(
+        self,
+        language: str,
+        info: dict[str, Any],
+    ) -> None:
         """Display detailed information about a specific language."""
         info_panel = Panel(
             f"""[bold]Language:[/bold] {info['name']}
@@ -615,7 +678,7 @@ class CodegenInteractiveHandler:
         if lang_handler:
             lang_handler.show_configuration_examples(self.console)
 
-    def _show_general_info(self):
+    def _show_general_info(self) -> None:
         """Show general code generation information."""
         info_panel = Panel(
             """[bold blue]📖 Code Generation Overview[/bold blue]
@@ -638,7 +701,7 @@ class CodegenInteractiveHandler:
 
 [bold]Current Status:[/bold]
 • Go - Full support with multiple templates ✅
-• Python - Coming soon 🚧
+• Python - Full support (dataclass, pydantic, typeddict) ✅
 • TypeScript - Coming soon 🚧  
 • Rust - Coming soon 🚧
 
@@ -654,7 +717,7 @@ class CodegenInteractiveHandler:
         self.console.print()
         self.console.print(info_panel)
 
-    def _show_templates_menu(self):
+    def _show_templates_menu(self) -> None:
         """Show configuration templates information."""
         languages = list_supported_languages()
 
@@ -679,10 +742,16 @@ class CodegenInteractiveHandler:
                     f"\n[yellow]{language.title()}: No templates available[/yellow]"
                 )
 
+    # ========================================================================
+    # Language Handler Management
+    # ========================================================================
+
     def _get_language_handler(
-        self, language: str
-    ) -> Optional[LanguageInteractiveHandler]:
+        self,
+        language: str,
+    ) -> LanguageInteractiveHandler | None:
         """Get language-specific interactive handler."""
+        # Check cache
         if language in self._language_handlers:
             return self._language_handlers[language]
 
@@ -699,12 +768,12 @@ class CodegenInteractiveHandler:
                 handler_class = getattr(module, handler_class_name)
                 handler = handler_class()
                 self._language_handlers[language] = handler
+                logger.debug(f"Loaded interactive handler for {language}")
                 return handler
 
         except ImportError:
-            pass  # No language-specific handler available
+            logger.debug(f"No interactive handler available for {language}")
         except Exception as e:
-            # Log error but don't fail
-            pass
+            logger.warning(f"Failed to load handler for {language}: {e}")
 
         return None

@@ -4,23 +4,20 @@ Go code generator module.
 Generates Go structs with JSON tags from JSON schema analysis.
 """
 
+from .config import (
+    GoConfig,
+    get_modern_config,
+    get_strict_config,
+    get_web_api_config,
+)
 from .generator import (
     GoGenerator,
     create_go_generator,
-    create_web_api_generator,
     create_strict_generator,
+    create_web_api_generator,
 )
-from .naming import create_go_sanitizer
-from .config import (
-    GoConfig,
-    get_go_reserved_words,
-    get_go_builtin_types,
-    get_web_api_config,
-    get_strict_config,
-    get_modern_config,
-)
-
 from .interactive import GoInteractiveHandler
+from .naming import create_go_name_tracker
 
 __all__ = [
     # Generator
@@ -28,15 +25,13 @@ __all__ = [
     "create_go_generator",
     "create_web_api_generator",
     "create_strict_generator",
-    # Naming
-    "create_go_sanitizer",
     # Configuration
     "GoConfig",
-    "get_go_reserved_words",
-    "get_go_builtin_types",
     "get_web_api_config",
     "get_strict_config",
     "get_modern_config",
+    # Naming
+    "create_go_name_tracker",
     # Interactive
     "GoInteractiveHandler",
 ]

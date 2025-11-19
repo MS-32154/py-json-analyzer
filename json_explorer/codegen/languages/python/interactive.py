@@ -1,10 +1,12 @@
 """
-Python-specific interactive handler for code generation.
+Python-specific interactive handler.
 
-Provides Python-specific configuration options, templates, and information.
+Provides Python-specific configuration options, templates, and examples
+for the interactive code generation interface.
 """
 
-from typing import Dict, Any, Optional
+import logging
+from typing import Any
 
 from rich.console import Console
 from rich.panel import Panel
@@ -16,14 +18,22 @@ from .config import (
     get_pydantic_config,
     get_typeddict_config,
     get_strict_dataclass_config,
-    PythonStyle,
 )
+
+logger = logging.getLogger(__name__)
+
+
+# ============================================================================
+# Python Interactive Handler
+# ============================================================================
 
 
 class PythonInteractiveHandler:
     """Interactive handler for Python-specific code generation options."""
 
-    def get_language_info(self) -> Dict[str, str]:
+    __slots__ = ()
+
+    def get_language_info(self) -> dict[str, str]:
         """Get Python-specific information for display."""
         return {
             "description": "Generates Python dataclasses, Pydantic models, or TypedDict",
@@ -70,7 +80,7 @@ class PythonInteractiveHandler:
         console.print()
         console.print(config_panel)
 
-    def get_template_choices(self) -> Dict[str, str]:
+    def get_template_choices(self) -> dict[str, str]:
         """Get available Python configuration templates."""
         return {
             "dataclass": "Standard Python dataclasses with type hints",
@@ -79,43 +89,51 @@ class PythonInteractiveHandler:
             "strict-dataclass": "Frozen, slotted dataclasses for immutable data",
         }
 
-    def create_template_config(self, template_name: str) -> Optional[GeneratorConfig]:
+    def create_template_config(
+        self,
+        template_name: str,
+    ) -> GeneratorConfig | None:
         """Create configuration from Python template."""
-        if template_name == "dataclass":
-            python_config = get_dataclass_config()
-            return GeneratorConfig(
-                package_name="models",
-                add_comments=True,
-                language_config=python_config.__dict__,
-            )
+        match template_name:
+            case "dataclass":
+                python_config = get_dataclass_config()
+                return GeneratorConfig(
+                    package_name="models",
+                    add_comments=True,
+                    language_config=python_config.__dict__,
+                )
 
-        elif template_name == "pydantic":
-            python_config = get_pydantic_config()
-            return GeneratorConfig(
-                package_name="models",
-                add_comments=True,
-                language_config=python_config.__dict__,
-            )
+            case "pydantic":
+                python_config = get_pydantic_config()
+                return GeneratorConfig(
+                    package_name="models",
+                    add_comments=True,
+                    language_config=python_config.__dict__,
+                )
 
-        elif template_name == "typeddict":
-            python_config = get_typeddict_config()
-            return GeneratorConfig(
-                package_name="types",
-                add_comments=True,
-                language_config=python_config.__dict__,
-            )
+            case "typeddict":
+                python_config = get_typeddict_config()
+                return GeneratorConfig(
+                    package_name="types",
+                    add_comments=True,
+                    language_config=python_config.__dict__,
+                )
 
-        elif template_name == "strict-dataclass":
-            python_config = get_strict_dataclass_config()
-            return GeneratorConfig(
-                package_name="models",
-                add_comments=True,
-                language_config=python_config.__dict__,
-            )
+            case "strict-dataclass":
+                python_config = get_strict_dataclass_config()
+                return GeneratorConfig(
+                    package_name="models",
+                    add_comments=True,
+                    language_config=python_config.__dict__,
+                )
 
-        return None
+            case _:
+                return None
 
-    def configure_language_specific(self, console: Console) -> Dict[str, Any]:
+    def configure_language_specific(
+        self,
+        console: Console,
+    ) -> dict[str, Any]:
         """Handle Python-specific configuration options."""
         python_config = {}
 
@@ -131,78 +149,89 @@ class PythonInteractiveHandler:
 
         # Optional field handling
         python_config["use_optional"] = Confirm.ask(
-            "Use type unions (T | None) for optional fields?", default=True
+            "Use type unions (T | None) for optional fields?",
+            default=True,
         )
 
         # Style-specific configuration
-        if style == "dataclass":
-            python_config.update(self._configure_dataclass(console))
-        elif style == "pydantic":
-            python_config.update(self._configure_pydantic(console))
-        elif style == "typeddict":
-            python_config.update(self._configure_typeddict(console))
+        match style:
+            case "dataclass":
+                python_config.update(self._configure_dataclass(console))
+            case "pydantic":
+                python_config.update(self._configure_pydantic(console))
+            case "typeddict":
+                python_config.update(self._configure_typeddict(console))
 
+        logger.info(f"Python-specific config collected: style={style}")
         return python_config
 
-    def _configure_dataclass(self, console: Console) -> Dict[str, Any]:
+    def _configure_dataclass(self, console: Console) -> dict[str, Any]:
         """Configure dataclass-specific options."""
         config = {}
 
         console.print("\n[cyan]Dataclass Options:[/cyan]")
 
         config["dataclass_slots"] = Confirm.ask(
-            "Use __slots__ for memory optimization?", default=True
+            "Use __slots__ for memory optimization?",
+            default=True,
         )
 
         config["dataclass_frozen"] = Confirm.ask(
-            "Make dataclasses immutable (frozen)?", default=False
+            "Make dataclasses immutable (frozen)?",
+            default=False,
         )
 
         config["dataclass_kw_only"] = Confirm.ask(
-            "Require keyword-only arguments?", default=False
+            "Require keyword-only arguments?",
+            default=False,
         )
 
         return config
 
-    def _configure_pydantic(self, console: Console) -> Dict[str, Any]:
+    def _configure_pydantic(self, console: Console) -> dict[str, Any]:
         """Configure Pydantic-specific options."""
         config = {}
 
         console.print("\n[cyan]Pydantic Options:[/cyan]")
 
         config["pydantic_use_field"] = Confirm.ask(
-            "Use Field() for metadata?", default=True
+            "Use Field() for metadata?",
+            default=True,
         )
 
         if config["pydantic_use_field"]:
             config["pydantic_use_alias"] = Confirm.ask(
-                "Generate field aliases for JSON keys?", default=True
+                "Generate field aliases for JSON keys?",
+                default=True,
             )
 
         config["pydantic_config_dict"] = Confirm.ask(
-            "Generate model_config?", default=True
+            "Generate model_config?",
+            default=True,
         )
 
         if config["pydantic_config_dict"]:
             config["pydantic_extra_forbid"] = Confirm.ask(
-                "Forbid extra fields (strict mode)?", default=False
+                "Forbid extra fields (strict mode)?",
+                default=False,
             )
 
         return config
 
-    def _configure_typeddict(self, console: Console) -> Dict[str, Any]:
+    def _configure_typeddict(self, console: Console) -> dict[str, Any]:
         """Configure TypedDict-specific options."""
         config = {}
 
         console.print("\n[cyan]TypedDict Options:[/cyan]")
 
         config["typeddict_total"] = Confirm.ask(
-            "Make all fields required by default (total=True)?", default=False
+            "Make all fields required by default (total=True)?",
+            default=False,
         )
 
         return config
 
-    def get_default_config(self) -> Dict[str, Any]:
+    def get_default_config(self) -> dict[str, Any]:
         """Get default Python configuration for quick setup."""
         return {
             "style": "dataclass",
@@ -211,83 +240,6 @@ class PythonInteractiveHandler:
             "dataclass_frozen": False,
             "dataclass_kw_only": False,
         }
-
-    def show_advanced_features(self, console: Console) -> None:
-        """Show advanced Python features and configuration options."""
-        advanced_panel = Panel(
-            """[bold]🚀 Advanced Python Features:[/bold]
-
-[bold]Type System:[/bold]
-• Modern unions: T | None instead of Optional[T]
-• Generic collections: list[T], dict[K, V]
-• NotRequired for TypedDict optional fields
-• Forward references for recursive types
-
-[bold]Dataclass Features:[/bold]
-• __slots__ for memory efficiency
-• frozen=True for immutability
-• kw_only=True for better APIs
-• field(default_factory=...) for mutable defaults
-
-[bold]Pydantic v2 Features:[/bold]
-• Field validation and constraints
-• model_config for behavior control
-• Field aliases for JSON mapping
-• Custom validators and serializers
-
-[bold]TypedDict Features:[/bold]
-• Pure type hints (no runtime overhead)
-• Compatible with structural typing
-• NotRequired for optional fields (3.11+)
-• Excellent mypy/pyright support
-
-[bold]Code Quality:[/bold]
-• PEP 8 compliant naming
-• Proper docstrings
-• Import organization
-• Type hint completeness""",
-            title="⚡ Advanced Configuration",
-            border_style="purple",
-        )
-
-        console.print()
-        console.print(advanced_panel)
-
-    def validate_python_config(self, config: Dict[str, Any]) -> list[str]:
-        """Validate Python-specific configuration and return warnings."""
-        warnings = []
-
-        style = config.get("style", "dataclass")
-
-        # Style-specific validations
-        if style == "dataclass":
-            if config.get("dataclass_frozen") and not config.get("dataclass_slots"):
-                warnings.append(
-                    "Consider enabling slots with frozen for better performance"
-                )
-
-        elif style == "pydantic":
-            if not config.get("pydantic_use_field"):
-                warnings.append(
-                    "Disabling Field() means no aliases or validation metadata"
-                )
-
-            if config.get("pydantic_extra_forbid"):
-                warnings.append(
-                    "extra='forbid' will reject any fields not in the model"
-                )
-
-        elif style == "typeddict":
-            warnings.append(
-                "TypedDict provides no runtime validation - consider Pydantic for validation"
-            )
-
-            if not config.get("use_optional"):
-                warnings.append(
-                    "TypedDict without NotRequired may cause type checking issues"
-                )
-
-        return warnings
 
     def show_examples(self, console: Console) -> None:
         """Show Python code generation examples."""
@@ -343,43 +295,50 @@ class Root(TypedDict, total=False):
         console.print()
         console.print(examples_panel)
 
-    def show_style_comparison(self, console: Console) -> None:
-        """Show comparison between Python styles."""
-        comparison_panel = Panel(
-            """[bold]📊 Style Comparison:[/bold]
+    def validate_config(self, config: dict[str, Any]) -> list[str]:
+        """
+        Validate Python-specific configuration.
 
-[bold]Dataclass:[/bold]
-✅ Standard library (no dependencies)
-✅ Fast and lightweight
-✅ Good IDE support
-❌ No runtime validation
-❌ Manual serialization
+        Args:
+            config: Configuration dictionary to validate
 
-[bold]Pydantic:[/bold]
-✅ Automatic validation
-✅ JSON serialization built-in
-✅ Extensive features
-✅ Great for APIs
-❌ External dependency
-❌ Slightly slower
+        Returns:
+            List of warning messages (empty if valid)
+        """
+        warnings = []
+        style = config.get("style", "dataclass")
 
-[bold]TypedDict:[/bold]
-✅ Zero runtime overhead
-✅ Pure type hints
-✅ Perfect for mypy
-✅ No dependencies
-❌ No validation
-❌ No serialization
-❌ Limited features
+        # Style-specific validations
+        match style:
+            case "dataclass":
+                if config.get("dataclass_frozen") and not config.get("dataclass_slots"):
+                    warnings.append(
+                        "Consider enabling slots with frozen for better performance"
+                    )
 
-[bold]Recommendations:[/bold]
-• REST APIs: Pydantic
-• Type checking: TypedDict
-• Simple data: Dataclass
-• Performance: Dataclass (frozen, slots)""",
-            title="🔍 Which Style to Choose?",
-            border_style="cyan",
-        )
+            case "pydantic":
+                if not config.get("pydantic_use_field"):
+                    warnings.append(
+                        "Disabling Field() means no aliases or validation metadata"
+                    )
 
-        console.print()
-        console.print(comparison_panel)
+                if config.get("pydantic_extra_forbid"):
+                    warnings.append(
+                        "extra='forbid' will reject any fields not in the model"
+                    )
+
+            case "typeddict":
+                warnings.append(
+                    "TypedDict provides no runtime validation - "
+                    "consider Pydantic for validation"
+                )
+
+                if not config.get("use_optional"):
+                    warnings.append(
+                        "TypedDict without NotRequired may cause type checking issues"
+                    )
+
+        if warnings:
+            logger.info(f"Config validation: {len(warnings)} warnings")
+
+        return warnings
