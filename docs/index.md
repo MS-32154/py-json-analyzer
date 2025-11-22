@@ -1015,7 +1015,7 @@ json_explorer data.json --generate python --field-case pascal
 
 ### Best Practices
 
-1. **Always handle file loading errors**:
+#### 1. **Always handle file loading errors**:
 
 ```python
 try:
@@ -1027,7 +1027,7 @@ except JSONLoaderError as e:
     print(f"JSON loading error: {e}")
 ```
 
-2. **Check generation results**:
+#### 2. **Check generation results**:
 
 ```python
 result = generate_from_analysis(analysis, "go", config)
@@ -1037,7 +1037,7 @@ if not result.success:
         raise result.exception
 ```
 
-3. **Validate configurations**:
+#### 3. **Validate configurations**:
 
 ```python
 from json_explorer.codegen import load_config
