@@ -7,7 +7,7 @@ Entry point for the JSON Explorer CLI tool.
 
 Author: MS-32154
 email: msttoffg@gmail.com
-Version: 0.2.0
+Version: 0.3.0
 License: MIT
 Date: 2025-09-01
 """
