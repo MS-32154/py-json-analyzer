@@ -251,14 +251,14 @@ def sanitize_name(
     reserved_words = reserved_words or set()
     used_names = used_names or set()
 
-    # Step 1: Clean
-    cleaned = clean_identifier(name)
+    # Step 1: Convert case
+    converted = convert_case(name, target_case)
 
-    # Step 2: Convert case
-    converted = convert_case(cleaned, target_case)
+    # Step 2: Clean
+    cleaned = clean_identifier(converted)
 
     # Step 3: Resolve conflicts
-    final_name = resolve_conflict(converted, reserved_words, used_names, suffix)
+    final_name = resolve_conflict(cleaned, reserved_words, used_names, suffix)
 
     if final_name != name:
         logger.debug(f"Name sanitization: {name} → {final_name}")
