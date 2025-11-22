@@ -65,27 +65,41 @@ class GoConfig:
     use_pointers_for_optional: bool = True
 
     # Declaration
-    type_map: dict = field(init=False)
+    type_map: dict = field(init=False, repr=False, default_factory=dict)
 
     def __post_init__(self) -> None:
         """Build type map with configured types."""
-        self.type_map = GO_TYPE_MAP.copy()
-        self.type_map[FieldType.INTEGER] = self.int_type
-        self.type_map[FieldType.FLOAT] = self.float_type
-        self.type_map[FieldType.STRING] = self.string_type
-        self.type_map[FieldType.BOOLEAN] = self.bool_type
-        self.type_map[FieldType.TIMESTAMP] = self.time_type
-        self.type_map[FieldType.UNKNOWN] = self.unknown_type
-        self.type_map[FieldType.CONFLICT] = self.unknown_type
+        type_map = GO_TYPE_MAP.copy()
+        type_map[FieldType.INTEGER] = self.int_type
+        type_map[FieldType.FLOAT] = self.float_type
+        type_map[FieldType.STRING] = self.string_type
+        type_map[FieldType.BOOLEAN] = self.bool_type
+        type_map[FieldType.TIMESTAMP] = self.time_type
+        type_map[FieldType.UNKNOWN] = self.unknown_type
+        type_map[FieldType.CONFLICT] = self.unknown_type
+
+        object.__setattr__(self, "type_map", type_map)
 
         logger.debug(
             f"GoConfig initialized: int={self.int_type}, "
             f"float={self.float_type}, pointers={self.use_pointers_for_optional}"
         )
 
+    def to_dict(self) -> dict:
+        """Convert to dict, excluding computed fields."""
+        return {
+            "int_type": self.int_type,
+            "float_type": self.float_type,
+            "string_type": self.string_type,
+            "bool_type": self.bool_type,
+            "time_type": self.time_type,
+            "unknown_type": self.unknown_type,
+            "use_pointers_for_optional": self.use_pointers_for_optional,
+        }
+
     def get_go_type(
         self,
-        field_type: FieldType,
+        field_type: FieldType | None,
         *,
         is_optional: bool = False,
         is_array: bool = False,
@@ -104,10 +118,18 @@ class GoConfig:
             Go type string (e.g., "string", "*int64", "[]User")
         """
         if is_array:
-            base = element_type or self.type_map.get(field_type, self.unknown_type)
+            base = (
+                element_type or self.type_map.get(field_type, self.unknown_type)
+                if field_type
+                else self.unknown_type
+            )
             return f"[]{base}"
 
-        go_type = self.type_map.get(field_type, self.unknown_type)
+        # Handle None field_type
+        if field_type is None:
+            go_type = self.unknown_type
+        else:
+            go_type = self.type_map.get(field_type, self.unknown_type)
 
         # Add pointer for optional fields if configured
         if is_optional and self.use_pointers_for_optional:

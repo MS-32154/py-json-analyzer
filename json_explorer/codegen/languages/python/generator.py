@@ -11,7 +11,7 @@ from typing import Any
 from ...core.config import GeneratorConfig
 from ...core.generator import CodeGenerator
 from ...core.schema import Schema, Field, FieldType
-from .config import PythonConfig, PythonStyle
+from .config import PythonConfig, PythonStyle, get_python_generator_config
 from .naming import create_python_name_tracker
 
 logger = logging.getLogger(__name__)
@@ -391,9 +391,8 @@ def create_dataclass_generator() -> PythonGenerator:
     from .config import get_dataclass_config
 
     config = GeneratorConfig(
-        package_name="models",
-        add_comments=True,
-        language_config=get_dataclass_config().__dict__,
+        **get_python_generator_config(),
+        language_config=get_dataclass_config().to_dict(),
     )
 
     return PythonGenerator(config)
@@ -404,9 +403,8 @@ def create_pydantic_generator() -> PythonGenerator:
     from .config import get_pydantic_config
 
     config = GeneratorConfig(
-        package_name="models",
-        add_comments=True,
-        language_config=get_pydantic_config().__dict__,
+        **get_python_generator_config(),
+        language_config=get_pydantic_config().to_dict(),
     )
 
     return PythonGenerator(config)
@@ -417,9 +415,8 @@ def create_typeddict_generator() -> PythonGenerator:
     from .config import get_typeddict_config
 
     config = GeneratorConfig(
-        package_name="types",
-        add_comments=True,
-        language_config=get_typeddict_config().__dict__,
+        **get_python_generator_config(),
+        language_config=get_typeddict_config().to_dict(),
     )
 
     return PythonGenerator(config)

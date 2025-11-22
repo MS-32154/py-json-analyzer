@@ -123,28 +123,53 @@ class PythonConfig:
     typeddict_total: bool = False
 
     # Declaration
-    type_map: dict = field(init=False)
+    type_map: dict = field(init=False, repr=False, default_factory=dict)
 
     def __post_init__(self) -> None:
         """Initialize type map and validate style."""
         # Convert string style to enum if needed
         if isinstance(self.style, str):
-            self.style = PythonStyle(self.style)
+            object.__setattr__(self, "style", PythonStyle(self.style))
 
         # Build type map
-        self.type_map = PYTHON_TYPE_MAP.copy()
-        self.type_map[FieldType.INTEGER] = self.int_type
-        self.type_map[FieldType.FLOAT] = self.float_type
-        self.type_map[FieldType.STRING] = self.string_type
-        self.type_map[FieldType.BOOLEAN] = self.bool_type
-        self.type_map[FieldType.TIMESTAMP] = self.datetime_type
-        self.type_map[FieldType.UNKNOWN] = self.unknown_type
-        self.type_map[FieldType.CONFLICT] = self.unknown_type
+        type_map = PYTHON_TYPE_MAP.copy()
+        type_map[FieldType.INTEGER] = self.int_type
+        type_map[FieldType.FLOAT] = self.float_type
+        type_map[FieldType.STRING] = self.string_type
+        type_map[FieldType.BOOLEAN] = self.bool_type
+        type_map[FieldType.TIMESTAMP] = self.datetime_type
+        type_map[FieldType.UNKNOWN] = self.unknown_type
+        type_map[FieldType.CONFLICT] = self.unknown_type
+
+        object.__setattr__(self, "type_map", type_map)
 
         logger.debug(
             f"PythonConfig initialized: style={self.style.value}, "
             f"optional={self.use_optional}"
         )
+
+    def to_dict(self) -> dict:
+        """Convert to dict, excluding computed fields."""
+        return {
+            "style": (
+                self.style.value if isinstance(self.style, PythonStyle) else self.style
+            ),
+            "int_type": self.int_type,
+            "float_type": self.float_type,
+            "string_type": self.string_type,
+            "bool_type": self.bool_type,
+            "datetime_type": self.datetime_type,
+            "unknown_type": self.unknown_type,
+            "use_optional": self.use_optional,
+            "dataclass_frozen": self.dataclass_frozen,
+            "dataclass_slots": self.dataclass_slots,
+            "dataclass_kw_only": self.dataclass_kw_only,
+            "pydantic_use_field": self.pydantic_use_field,
+            "pydantic_use_alias": self.pydantic_use_alias,
+            "pydantic_config_dict": self.pydantic_config_dict,
+            "pydantic_extra_forbid": self.pydantic_extra_forbid,
+            "typeddict_total": self.typeddict_total,
+        }
 
     def get_python_type(
         self,
@@ -244,6 +269,22 @@ class PythonConfig:
 # ============================================================================
 # Preset Configurations
 # ============================================================================
+def get_python_generator_config(**overrides) -> dict:
+    """
+    Get GeneratorConfig dict with Python-friendly defaults.
+
+    Python conventions:
+    - Classes: PascalCase (struct_case="pascal")
+    - Fields: snake_case (field_case="snake")
+    """
+    defaults = {
+        "package_name": "models",
+        "struct_case": "pascal",
+        "field_case": "snake",  # Python convention
+        "add_comments": True,
+    }
+    defaults.update(overrides)
+    return defaults
 
 
 def get_dataclass_config() -> PythonConfig:

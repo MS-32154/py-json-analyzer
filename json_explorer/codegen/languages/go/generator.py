@@ -314,9 +314,8 @@ def create_web_api_generator() -> GoGenerator:
         generate_json_tags=True,
         json_tag_omitempty=True,
         add_comments=True,
-        language_config=get_web_api_config().__dict__,
+        language_config=get_web_api_config().to_dict(),
     )
-
     return GoGenerator(config)
 
 
@@ -329,7 +328,6 @@ def create_strict_generator() -> GoGenerator:
         generate_json_tags=True,
         json_tag_omitempty=False,
         add_comments=True,
-        language_config=get_strict_config().__dict__,
+        language_config=get_strict_config().to_dict(),
     )
-
     return GoGenerator(config)
