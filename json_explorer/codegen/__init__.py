@@ -50,7 +50,7 @@ from .registry import (
 )
 
 # Version
-__version__ = "0.2.0"
+__version__ = "0.3.0"
 
 
 # ============================================================================
@@ -144,6 +144,12 @@ def quick_generate(
         analysis = analyze_json(json_data)
     except Exception as e:
         raise GeneratorError(f"JSON analysis failed: {e}")
+
+    # Apply language-specific defaults
+    if language.lower() in ("python", "py"):
+        # Python uses snake_case for fields by default
+        if "field_case" not in options:
+            options["field_case"] = "snake"
 
     # Generate code
     result = generate_from_analysis(analysis, language, options)
