@@ -1,5 +1,5 @@
 [![PyPI version](https://img.shields.io/pypi/v/py-json-analyzer.svg)](https://pypi.org/project/py-json-analyzer/)
-[![Python 3.9+](https://img.shields.io/badge/python-3.9+-blue.svg)](https://www.python.org/downloads/)
+[![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 # JSON Explorer
@@ -21,7 +21,7 @@
 ### Code Generation
 
 - Generate strongly-typed data structures from JSON
-- Multiple language support (Go, with Python, TypeScript, Rust coming soon)
+- Multiple language support (Go, Python, with TypeScript and Rust coming soon)
 - Smart type detection and conflict resolution
 - Configurable naming conventions and templates
 - JSON serialization tags and annotations
@@ -38,7 +38,7 @@
 
 ## Requirements
 
-- Python >= 3.9
+- Python >= 3.11
 
 Required packages:
 
@@ -90,6 +90,30 @@ pip install -e .
 
 ```bash
 pytest
+```
+
+### Test Coverage
+
+The project includes comprehensive tests for:
+
+- **Core modules**: Analysis, search, statistics, tree view, plotting
+- **Codegen core modules**: Naming, schema, configuration, templates
+- **Generators**: Go and Python with all styles
+- **Codegen registry**: Language registration and lookup
+- **Codegen integration**: End-to-end workflows
+- **Edge cases**: None handling, conflicts, deep nesting
+
+Run specific test suites:
+
+```bash
+# Core functionality
+pytest tests/test_core.py -v
+
+# Go generator
+pytest tests/test_go_generator.py -v
+
+# Python generator
+pytest tests/test_python_generator.py -v
 ```
 
 ---
@@ -166,6 +190,16 @@ Go-specific options:
   --no-omitempty        Don't add omitempty to JSON tags in Go
   --json-tag-case {original,snake,camel}
                         Case style for JSON tag names in Go
+
+Python-specific options:
+  --python-style {dataclass,pydantic,typeddict}
+                        Python code style (default: dataclass)
+  --no-slots            Don't use __slots__ in dataclasses
+  --frozen              Make dataclasses frozen (immutable)
+  --kw-only             Make dataclass fields keyword-only
+  --no-pydantic-field   Don't use Field() in Pydantic models
+  --pydantic-forbid-extra
+                        Forbid extra fields in Pydantic models
 ```
 
 ### Examples
@@ -192,10 +226,16 @@ json_explorer data.json --search "isinstance(value, int) and value > 10" --searc
 json_explorer --list-languages
 
 # Generate Go structs
-json_explorer data.json --generate go
+json_explorer data.json --generate go --output models.go
+
+# Generate Python dataclasses
+json_explorer data.json --generate python --output models.py
+
+# Generate Pydantic models
+json_explorer data.json --generate python --python-style pydantic --output models.py
 
 # Generate with custom configuration
-json_explorer data.json --generate go --output models.go --package-name models
+json_explorer data.json --generate go --package-name models --root-name User
 
 # Interactive code generation
 json_explorer data.json --interactive  # Then select code generation menu
@@ -282,9 +322,17 @@ from json_explorer.codegen import (
 )
 from json_explorer.analyzer import analyze_json
 
-# Quick generation
+# Quick generation - Go
 go_code = quick_generate(test_data, language="go")
 print(go_code)
+
+# Quick generation - Python dataclass
+python_code = quick_generate(test_data, language="python", style="dataclass")
+print(python_code)
+
+# Quick generation - Pydantic model
+pydantic_code = quick_generate(test_data, language="python", style="pydantic")
+print(pydantic_code)
 
 # Detailed generation workflow
 analysis = analyze_json(test_data)
@@ -307,21 +355,24 @@ print("Supported languages:", languages)
 go_info = get_language_info("go")
 print("Go generator info:", go_info)
 
-# Interactive code generation
-from json_explorer.codegen import create_interactive_handler
+python_info = get_language_info("python")
+print("Python generator info:", python_info)
 
-handler = create_interactive_handler(test_data)
+# Interactive code generation
+from json_explorer.codegen.interactive import CodegenInteractiveHandler
+
+handler = CodegenInteractiveHandler(test_data)
 handler.run_interactive()  # Launches interactive interface
 ```
 
 ### Supported Languages
 
-| Language       | Status          | Features                                         |
-| -------------- | --------------- | ------------------------------------------------ |
-| **Go**         | ✅ Full Support | Structs, JSON tags, pointers, configurable types |
-| **Python**     | 🚧 Coming Soon  | Dataclasses, Pydantic models, type hints         |
-| **TypeScript** | 🚧 Coming Soon  | Interfaces, types, optional properties           |
-| **Rust**       | 🚧 Coming Soon  | Structs, Serde annotations, Option types         |
+| Language       | Status          | Features                                            |
+| -------------- | --------------- | --------------------------------------------------- |
+| **Go**         | ✅ Full Support | Structs, JSON tags, pointers, configurable types    |
+| **Python**     | ✅ Full Support | Dataclasses, Pydantic models, TypedDict, type hints |
+| **TypeScript** | 🚧 Coming Soon  | Interfaces, types, optional properties              |
+| **Rust**       | 🚧 Coming Soon  | Structs, Serde annotations, Option types            |
 
 ### Code Generation Features
 
@@ -336,7 +387,7 @@ handler.run_interactive()  # Launches interactive interface
 
 ## Configuration
 
-### Code Generation Config Example
+### Go Configuration Example
 
 ```json
 {
@@ -346,9 +397,29 @@ handler.run_interactive()  # Launches interactive interface
   "json_tag_omitempty": true,
   "struct_case": "pascal",
   "field_case": "pascal",
-  "use_pointers_for_optional": true,
-  "int_type": "int64",
-  "float_type": "float64"
+  "language_config": {
+    "use_pointers_for_optional": true,
+    "int_type": "int64",
+    "float_type": "float64"
+  }
+}
+```
+
+### Python Configuration Example
+
+```json
+{
+  "package_name": "models",
+  "add_comments": true,
+  "struct_case": "pascal",
+  "field_case": "snake",
+  "language_config": {
+    "style": "pydantic",
+    "use_optional": true,
+    "pydantic_use_field": true,
+    "pydantic_use_alias": true,
+    "pydantic_config_dict": true
+  }
 }
 ```
 
@@ -356,19 +427,22 @@ Load configuration:
 
 ```bash
 json_explorer data.json --generate go --config config.json
+json_explorer data.json --generate python --config config.json
 ```
 
 ---
 
 ## API Reference
 
-For the complete API reference got to [JSON Explorer API Documentation](https://ms-32154.github.io/py-json-analyzer/) or see the source code.
+For the complete API reference go to [JSON Explorer API Documentation](https://ms-32154.github.io/py-json-analyzer/) or see the source code.
 
 ---
 
 ## License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+---
 
 ## Contributing
 
@@ -379,6 +453,8 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 3. Commit your changes (`git commit -m 'Add some AmazingFeature'`)
 4. Push to the branch (`git push origin feature/AmazingFeature`)
 5. Open a Pull Request
+
+---
 
 ## Support
 
