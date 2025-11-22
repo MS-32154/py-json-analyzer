@@ -103,19 +103,6 @@ The project includes comprehensive tests for:
 - **Codegen integration**: End-to-end workflows
 - **Edge cases**: None handling, conflicts, deep nesting
 
-Run specific test suites:
-
-```bash
-# Core functionality
-pytest tests/test_core.py -v
-
-# Go generator
-pytest tests/test_go_generator.py -v
-
-# Python generator
-pytest tests/test_python_generator.py -v
-```
-
 ---
 
 ## CLI Usage
