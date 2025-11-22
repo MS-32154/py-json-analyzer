@@ -1,5 +1,3 @@
-<link rel="stylesheet" href="index.css">
-
 # JSON Explorer API Documentation
 
 ## Table of Contents

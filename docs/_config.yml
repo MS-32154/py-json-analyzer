@@ -1,0 +1,4 @@
+remote_theme: just-the-docs/just-the-docs
+color_scheme: dark
+title: JSON Explorer
+baseurl: "/py-json-analyzer"
