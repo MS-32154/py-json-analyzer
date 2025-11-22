@@ -4,7 +4,7 @@ from rich.progress import Progress, SpinnerColumn, TextColumn
 
 
 def detect_timestamp(value):
-    if not isinstance(value, str):
+    if not isinstance(value, str) or len(value) < 4:
         return False
     parsed = dateparser.parse(value)
     return parsed is not None
@@ -27,6 +27,7 @@ def analyze_json(data):
                     progress.update(task, advance=1)
                     children[key] = analyze_node(val)
                 return {"type": "object", "children": children}
+
             elif isinstance(node, list):
                 # Skip empty or null-only lists
                 non_empty_items = [
@@ -67,6 +68,11 @@ def analyze_json(data):
                     }
 
                 return {"type": "list", "child_type": "mixed"}
+
+            elif node is None:
+                # Explicitly handle None - mark as unknown but with a flag
+                return {"type": "unknown", "is_none": True}
+
             else:
                 if isinstance(node, str):
                     if detect_timestamp(node):
@@ -79,11 +85,20 @@ def analyze_json(data):
         def merge_object_summaries(summaries):
             key_structures = {}
             key_counts = Counter()
+            key_none_counts = Counter()
             total = len(summaries)
 
             for summary in summaries:
+                seen_keys = set()
+
                 for key, val in summary.get("children", {}).items():
                     key_counts[key] += 1
+                    seen_keys.add(key)
+
+                    # Track if this value is None/unknown
+                    if val.get("type") == "unknown":
+                        key_none_counts[key] += 1
+
                     if key not in key_structures:
                         key_structures[key] = []
                     key_structures[key].append(val)
@@ -93,19 +108,34 @@ def analyze_json(data):
 
             for key, structures in key_structures.items():
                 count = key_counts[key]
-                optional = count < total
+                none_count = key_none_counts[key]
 
-                # Get unique types for this key
-                types = {s["type"] for s in structures}
+                # Field is optional if:
+                # 1. Missing from some objects (count < total)
+                # 2. Has None in some objects (none_count > 0)
+                optional = (count < total) or (none_count > 0)
+
+                # Filter out None/unknown types to find concrete types
+                concrete_structures = [
+                    s for s in structures if s.get("type") != "unknown"
+                ]
+
+                # If we have concrete types, use those; otherwise use all structures
+                working_structures = (
+                    concrete_structures if concrete_structures else structures
+                )
+
+                # Get unique types from working structures
+                types = {s["type"] for s in working_structures}
 
                 if len(types) == 1:
-                    # All structures have the same type
+                    # Single type (possibly with None values)
                     structure_type = list(types)[0]
 
                     if structure_type == "object":
                         # Recursively merge object structures
                         merged_children, child_conflicts = merge_object_summaries(
-                            structures
+                            working_structures
                         )
                         merged[key] = {
                             "type": "object",
@@ -117,7 +147,7 @@ def analyze_json(data):
 
                     elif structure_type == "list":
                         # Merge list structures
-                        merged_list = merge_list_summaries(structures)
+                        merged_list = merge_list_summaries(working_structures)
                         merged[key] = {
                             "type": "list",
                             "optional": optional,
@@ -125,12 +155,17 @@ def analyze_json(data):
                         }
 
                     else:
-                        # Primitive type
+                        # Primitive type (possibly with None)
                         merged[key] = {"type": structure_type, "optional": optional}
-                else:
-                    # Type conflict
+
+                elif len(types) > 1:
+                    # Multiple different types = real conflict
                     merged[key] = {"type": "conflict", "optional": optional}
                     conflicts[key] = list(types)
+
+                else:
+                    # Should not happen, but handle gracefully
+                    merged[key] = {"type": "unknown", "optional": optional}
 
             return merged, conflicts
 

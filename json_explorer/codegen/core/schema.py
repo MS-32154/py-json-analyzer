@@ -349,13 +349,53 @@ def _create_field_from_node(
         optional=optional,
     )
 
-    # Handle type conflicts
+    # Handle type conflicts with None/unknown handling
     if field_name in conflicts:
-        field_obj.type = FieldType.CONFLICT
-        field_obj.conflicting_types = [
-            map_analyzer_type(t) for t in conflicts[field_name]
-        ]
-        logger.warning(f"Type conflict in {parent_schema_name}.{field_name}")
+        conflict_types = conflicts[field_name]
+
+        if "unknown" in conflict_types:
+            # Filter out "unknown" to see what concrete types remain
+            concrete_types = [t for t in conflict_types if t != "unknown"]
+
+            if len(concrete_types) == 1:
+                # Single concrete type + None → Optional[ConcreteType]
+                # This is the most common case and should NOT be treated as a conflict
+                field_obj.type = map_analyzer_type(concrete_types[0])
+                field_obj.optional = True
+                logger.debug(
+                    f"Resolved None conflict in {parent_schema_name}.{field_name}: "
+                    f"using {concrete_types[0]} as optional"
+                )
+
+            elif len(concrete_types) > 1:
+                # Multiple concrete types + None → Real conflict
+                # Example: [{"value": None}, {"value": 1}, {"value": "text"}]
+                field_obj.type = FieldType.CONFLICT
+                field_obj.conflicting_types = [
+                    map_analyzer_type(t) for t in concrete_types
+                ]
+                field_obj.optional = True  # Can also be None
+                logger.warning(
+                    f"Type conflict in {parent_schema_name}.{field_name}: "
+                    f"{', '.join(concrete_types)} (plus None)"
+                )
+
+            else:
+                # Only "unknown" types → Keep as unknown but mark optional
+                field_obj.type = FieldType.UNKNOWN
+                field_obj.optional = True
+                logger.debug(
+                    f"Unknown type in {parent_schema_name}.{field_name} "
+                    f"(only None values found)"
+                )
+        else:
+            # Real conflict without None involved
+            field_obj.type = FieldType.CONFLICT
+            field_obj.conflicting_types = [map_analyzer_type(t) for t in conflict_types]
+            logger.warning(
+                f"Type conflict in {parent_schema_name}.{field_name}: "
+                f"{', '.join(conflict_types)}"
+            )
 
     # Handle specific field types
     elif field_type == FieldType.OBJECT:
