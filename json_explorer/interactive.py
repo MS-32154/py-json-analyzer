@@ -154,11 +154,12 @@ class InteractiveHandler:
         except Exception:
             return Prompt.ask(message, default=default, **kwargs)
 
-    def _input_path(self, message: str) -> str:
+    def _input_path(self, message: str, **kwargs) -> str:
         """
         Input for file paths with autocompletion.
         Falls back to Prompt.ask if prompt_toolkit is unavailable.
         """
+        default = kwargs.get("default")
         try:
 
             history = FileHistory(".json_explorer_path_history")
@@ -166,13 +167,14 @@ class InteractiveHandler:
 
             return prompt(
                 f"{message} > ",
+                default=default,
                 history=history,
                 completer=completer,
                 complete_while_typing=True,
             ).strip()
 
         except Exception:
-            return Prompt.ask(message)
+            return self._input(message)
 
     def _show_main_menu(self) -> None:
         """Display the main menu."""

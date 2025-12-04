@@ -16,6 +16,10 @@ from rich.syntax import Syntax
 from rich.table import Table
 from rich import box
 
+from prompt_toolkit import prompt
+from prompt_toolkit.history import FileHistory
+from prompt_toolkit.completion import PathCompleter, WordCompleter, FuzzyCompleter
+
 from . import (
     GeneratorError,
     generate_from_analysis,
@@ -123,6 +127,93 @@ class CodegenInteractiveHandler:
             return False
 
     # ========================================================================
+    # prompt_toolkit integration
+    # ========================================================================
+
+    def _input(self, message: str, default: str | None = None, **kwargs) -> str:
+        """
+        User friendly input with optional choices and autocompletion.
+        Falls back to Prompt.ask if prompt_toolkit is unavailable.
+
+        Args:
+            message: Prompt message.
+            default: Default value if user enters nothing.
+            kwargs: May include 'choices' (list of strings) for tab completion.
+
+        Returns:
+            User input as string (or default if empty).
+        """
+        choices = kwargs.get("choices")
+        try:
+
+            history = FileHistory(".json_explorer_input_history")
+
+            if choices:
+                str_choices = [str(c) for c in choices]
+                completer = FuzzyCompleter(WordCompleter(str_choices, ignore_case=True))
+                # Only show options in prompt, not above it
+                display_message = f"{message} ({'/'.join(str_choices)})"
+
+                while True:
+                    text = prompt(
+                        f"{display_message} > ",
+                        default=default or "",
+                        history=history,
+                        completer=completer,
+                        complete_while_typing=True,
+                    ).strip()
+
+                    if not text and default is not None:
+                        return default
+
+                    # Exact or case-insensitive match
+                    if text in str_choices:
+                        return text
+                    lowered = text.lower()
+                    ci_matches = [c for c in str_choices if c.lower() == lowered]
+                    if ci_matches:
+                        return ci_matches[0]
+
+                    # Prefix match
+                    prefix_matches = [
+                        c for c in str_choices if c.lower().startswith(lowered)
+                    ]
+                    if len(prefix_matches) == 1:
+                        return prefix_matches[0]
+
+                    self.console.print(f"[red]Invalid choice: {text}[/red]")
+
+            # Free text input
+            return prompt(
+                f"{message} > ", default=default or "", history=history
+            ).strip() or (default or "")
+
+        except Exception:
+            return self._input(message, default=default, **kwargs)
+
+    def _input_path(self, message: str, **kwargs) -> str:
+        """
+        Input for file paths with autocompletion.
+        Falls back to Prompt.ask if prompt_toolkit is unavailable.
+        """
+        default = kwargs.get("default")
+        try:
+
+            history = FileHistory(".json_explorer_path_history")
+            completer = PathCompleter(expanduser=True)
+
+            return prompt(
+                f"{message} > ",
+                default=default,
+                history=history,
+                completer=completer,
+                complete_while_typing=True,
+            ).strip()
+
+        except Exception:
+            return self._input(message)
+
+    # ========================================================================
     # Main Menu
     # ========================================================================
 
@@ -179,7 +270,7 @@ class CodegenInteractiveHandler:
                 return
 
             # Step 3: Root name
-            root_name = Prompt.ask("Root structure name", default="Root")
+            root_name = self._input("Root structure name", default="Root")
 
             # Step 4: Generate
             result = self._generate_code(language, config, root_name)
@@ -231,7 +322,7 @@ class CodegenInteractiveHandler:
         """Interactive configuration for code generation."""
         self.console.print(f"\n⚙️ [bold]Configure {language.title()} Generation[/bold]")
 
-        config_type = Prompt.ask(
+        config_type = self._input(
             "Configuration approach",
             choices=["quick", "custom", "template", "file"],
             default="quick",
@@ -252,7 +343,7 @@ class CodegenInteractiveHandler:
     def _quick_configuration(self, language: str) -> dict:
         """Quick configuration with sensible defaults."""
         config_dict = {
-            "package_name": Prompt.ask("Package/namespace name", default="main"),
+            "package_name": self._input("Package/namespace name", default="main"),
             "add_comments": Confirm.ask("Generate comments?", default=True),
         }
 
@@ -270,7 +361,7 @@ class CodegenInteractiveHandler:
         config_dict = {}
 
         # Basic configuration
-        config_dict["package_name"] = Prompt.ask(
+        config_dict["package_name"] = self._input(
             "Package/namespace name",
             default="main",
         )
@@ -281,12 +372,12 @@ class CodegenInteractiveHandler:
 
         # Naming conventions
         if Confirm.ask("Configure naming conventions?", default=False):
-            config_dict["struct_case"] = Prompt.ask(
+            config_dict["struct_case"] = self._input(
                 "Struct/class name case",
                 choices=["pascal", "camel", "snake"],
                 default="pascal",
             )
-            config_dict["field_case"] = Prompt.ask(
+            config_dict["field_case"] = self._input(
                 "Field name case",
                 choices=["pascal", "camel", "snake"],
                 default="pascal",
@@ -325,7 +416,7 @@ class CodegenInteractiveHandler:
 
         # Add custom option
         choices = list(templates.keys()) + ["custom", "back"]
-        template = Prompt.ask(
+        template = self._input(
             f"\nSelect {language} template",
             choices=choices,
             default=list(templates.keys())[0] if templates else "custom",
@@ -357,7 +448,7 @@ class CodegenInteractiveHandler:
 
     def _file_configuration(self) -> dict | None:
         """Load configuration from file."""
-        config_file = Prompt.ask(
+        config_file = self._input_path(
             "Configuration file path",
             default="codegen_config.json",
         )
@@ -446,7 +537,7 @@ class CodegenInteractiveHandler:
             self._display_metadata(result.metadata)
 
         # Main output handling
-        action = Prompt.ask(
+        action = self._input(
             "\nWhat would you like to do with the generated code?",
             choices=["preview", "save", "both", "regenerate"],
             default="preview",
@@ -506,7 +597,7 @@ class CodegenInteractiveHandler:
 
             # Suggest filename
             default_filename = f"{root_name.lower()}{extension}"
-            filename = Prompt.ask("Save as", default=default_filename)
+            filename = self._input_path("Save as", default=default_filename)
 
             # Ensure proper extension
             if not filename.endswith(extension):
@@ -521,7 +612,7 @@ class CodegenInteractiveHandler:
                     f"File {output_path} exists. Overwrite?",
                     default=False,
                 ):
-                    filename = Prompt.ask("Enter new filename")
+                    filename = self._input_path("Enter new filename")
                     output_path = Path(filename)
 
             output_path.write_text(code, encoding="utf-8")
@@ -566,7 +657,7 @@ class CodegenInteractiveHandler:
     def _show_languages_menu(self) -> None:
         """Show detailed languages information menu."""
         while True:
-            choice = Prompt.ask(
+            choice = self._input(
                 "\n[bold]Language Information[/bold]",
                 choices=["list", "details", "specific", "back"],
                 default="list",
@@ -638,7 +729,7 @@ class CodegenInteractiveHandler:
             self.console.print("[red]No languages available[/red]")
             return
 
-        language = Prompt.ask(
+        language = self._input(
             "Select language for detailed info",
             choices=languages + ["back"],
             default=languages[0],

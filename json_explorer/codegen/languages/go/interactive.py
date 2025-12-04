@@ -12,6 +12,10 @@ from rich.console import Console
 from rich.panel import Panel
 from rich.prompt import Prompt, Confirm
 
+from prompt_toolkit import prompt
+from prompt_toolkit.history import FileHistory
+from prompt_toolkit.completion import WordCompleter, FuzzyCompleter
+
 from ...core.config import GeneratorConfig
 from .config import get_web_api_config, get_strict_config, get_modern_config
 
@@ -136,7 +140,7 @@ class GoInteractiveHandler:
                 "Add 'omitempty' to JSON tags?",
                 default=True,
             )
-            go_config["json_tag_case"] = Prompt.ask(
+            go_config["json_tag_case"] = self._input(
                 "JSON tag case style",
                 choices=["original", "snake", "camel"],
                 default="original",
@@ -150,17 +154,17 @@ class GoInteractiveHandler:
 
         # Type preferences
         if Confirm.ask("Configure type preferences?", default=False):
-            go_config["int_type"] = Prompt.ask(
+            go_config["int_type"] = self._input(
                 "Integer type",
                 choices=["int", "int32", "int64"],
                 default="int64",
             )
-            go_config["float_type"] = Prompt.ask(
+            go_config["float_type"] = self._input(
                 "Float type",
                 choices=["float32", "float64"],
                 default="float64",
             )
-            go_config["unknown_type"] = Prompt.ask(
+            go_config["unknown_type"] = self._input(
                 "Unknown type representation",
                 choices=["interface{}", "any"],
                 default="interface{}",
@@ -168,7 +172,7 @@ class GoInteractiveHandler:
 
         # Advanced options
         if Confirm.ask("Configure advanced options?", default=False):
-            go_config["time_type"] = Prompt.ask(
+            go_config["time_type"] = self._input(
                 "Time type for timestamps",
                 choices=["time.Time", "string", "int64"],
                 default="time.Time",
@@ -274,3 +278,68 @@ type Root struct {
             logger.info(f"Config validation: {len(warnings)} warnings")
 
         return warnings
+
+    # ========================================================================
+    # prompt_toolkit integration
+    # ========================================================================
+
+    def _input(self, message: str, default: str | None = None, **kwargs) -> str:
+        """
+        User friendly input with optional choices and autocompletion.
+        Falls back to Prompt.ask if prompt_toolkit is unavailable.
+
+        Args:
+            message: Prompt message.
+            default: Default value if user enters nothing.
+            kwargs: May include 'choices' (list of strings) for tab completion.
+
+        Returns:
+            User input as string (or default if empty).
+        """
+        choices = kwargs.get("choices")
+        try:
+
+            history = FileHistory(".json_explorer_input_history")
+
+            if choices:
+                str_choices = [str(c) for c in choices]
+                completer = FuzzyCompleter(WordCompleter(str_choices, ignore_case=True))
+                # Only show options in prompt, not above it
+                display_message = f"{message} ({'/'.join(str_choices)})"
+
+                while True:
+                    text = prompt(
+                        f"{display_message} > ",
+                        default=default or "",
+                        history=history,
+                        completer=completer,
+                        complete_while_typing=True,
+                    ).strip()
+
+                    if not text and default is not None:
+                        return default
+
+                    # Exact or case-insensitive match
+                    if text in str_choices:
+                        return text
+                    lowered = text.lower()
+                    ci_matches = [c for c in str_choices if c.lower() == lowered]
+                    if ci_matches:
+                        return ci_matches[0]
+
+                    # Prefix match
+                    prefix_matches = [
+                        c for c in str_choices if c.lower().startswith(lowered)
+                    ]
+                    if len(prefix_matches) == 1:
+                        return prefix_matches[0]
+
+                    self.console.print(f"[red]Invalid choice: {text}[/red]")
+
+            # Free text input
+            return prompt(
+                f"{message} > ", default=default or "", history=history
+            ).strip() or (default or "")
+
+        except Exception:
+            return self._input(message, default=default, **kwargs)
