@@ -22,7 +22,6 @@ from . import (
     get_language_info,
     list_all_language_info,
     list_supported_languages,
-    load_config,
 )
 from json_explorer.analyzer import analyze_json
 from json_explorer.utils import load_json

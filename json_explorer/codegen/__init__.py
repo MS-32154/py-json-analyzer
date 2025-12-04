@@ -11,7 +11,7 @@ Example:
 
 import logging
 
-# Configure module-level logger
+
 logger = logging.getLogger(__name__)
 
 # Import core interfaces
