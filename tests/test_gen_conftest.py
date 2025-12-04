@@ -3,16 +3,6 @@ Pytest configuration for codegen tests.
 """
 
 import pytest
-import logging
-
-
-@pytest.fixture(scope="session", autouse=True)
-def configure_logging():
-    """Configure logging for tests."""
-    logging.basicConfig(
-        level=logging.WARNING,  # Reduce noise during tests
-        format="%(name)s - %(levelname)s - %(message)s",
-    )
 
 
 @pytest.fixture

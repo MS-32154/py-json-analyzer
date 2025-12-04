@@ -96,35 +96,31 @@ class PythonInteractiveHandler:
         """Create configuration from Python template."""
         match template_name:
             case "dataclass":
-                python_config = get_dataclass_config()
                 return GeneratorConfig(
                     package_name="models",
                     add_comments=True,
-                    language_config=python_config.__dict__,
+                    language_config=get_dataclass_config().to_dict(),
                 )
 
             case "pydantic":
-                python_config = get_pydantic_config()
                 return GeneratorConfig(
                     package_name="models",
                     add_comments=True,
-                    language_config=python_config.__dict__,
+                    language_config=get_pydantic_config().to_dict(),
                 )
 
             case "typeddict":
-                python_config = get_typeddict_config()
                 return GeneratorConfig(
                     package_name="types",
                     add_comments=True,
-                    language_config=python_config.__dict__,
+                    language_config=get_typeddict_config().to_dict(),
                 )
 
             case "strict-dataclass":
-                python_config = get_strict_dataclass_config()
                 return GeneratorConfig(
                     package_name="models",
                     add_comments=True,
-                    language_config=python_config.__dict__,
+                    language_config=get_strict_dataclass_config().to_dict(),
                 )
 
             case _:

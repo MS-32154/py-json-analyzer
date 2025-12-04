@@ -87,33 +87,30 @@ class GoInteractiveHandler:
         """Create configuration from Go template."""
         match template_name:
             case "web-api":
-                go_config = get_web_api_config()
                 return GeneratorConfig(
                     package_name="models",
                     add_comments=True,
                     generate_json_tags=True,
                     json_tag_omitempty=True,
-                    language_config=go_config.__dict__,
+                    language_config=get_web_api_config().to_dict(),
                 )
 
             case "strict":
-                go_config = get_strict_config()
                 return GeneratorConfig(
                     package_name="types",
                     add_comments=True,
                     generate_json_tags=True,
                     json_tag_omitempty=False,
-                    language_config=go_config.__dict__,
+                    language_config=get_strict_config().to_dict(),
                 )
 
             case "modern":
-                go_config = get_modern_config()
                 return GeneratorConfig(
                     package_name="main",
                     add_comments=True,
                     generate_json_tags=True,
                     json_tag_omitempty=True,
-                    language_config=go_config.__dict__,
+                    language_config=get_modern_config().to_dict(),
                 )
 
             case _:
