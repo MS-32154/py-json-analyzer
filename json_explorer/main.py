@@ -14,74 +14,107 @@ Date: 2025-09-01
 
 import argparse
 import sys
+from pathlib import Path
+
+from rich.console import Console
 
 from .cli import CLIHandler
 from .interactive import InteractiveHandler
 from .utils import load_json
 from .codegen.cli_integration import add_codegen_args, handle_codegen_command
-from rich.console import Console
+from .logging_config import configure_logging, get_logger
+
+logger = get_logger(__name__)
 
 
 class JSONExplorer:
     """Main JSON Explorer application coordinator."""
 
-    def __init__(self):
+    data: dict | list
+    source: str | None
+    console: Console
+    cli_handler: CLIHandler
+    interactive_handler: InteractiveHandler
+
+    def __init__(self) -> None:
+        """Initialize the JSON Explorer application."""
         self.data = None
         self.source = None
         self.console = Console()
         self.cli_handler = CLIHandler()
         self.interactive_handler = InteractiveHandler()
 
-    def load_data(self, file_path=None, url=None):
-        """Load JSON data from file or URL."""
+    def load_data(self, file_path: str | None = None, url: str | None = None) -> bool:
+        """
+        Load JSON data from a file or URL.
+
+        Args:
+            file_path: Path to a local JSON file.
+            url: URL to fetch JSON data from.
+
+        Returns:
+            True if data was loaded successfully, False otherwise.
+        """
         try:
             self.source, self.data = load_json(file_path, url)
+            logger.info("Loaded JSON data from %s", self.source)
             return True
         except Exception as e:
             self.console.print(f"❌ [red]Error loading data: {e}[/red]")
             return False
 
-    def run(self, args):
-        """Main execution method."""
-        # Handle codegen commands
+    def run(self, args: argparse.Namespace) -> int:
+        """
+        Main execution method.
+
+        Args:
+            args: Parsed command-line arguments.
+
+        Returns:
+            Exit code: 0 on success, 1 on failure.
+        """
+        # Handle codegen commands first
         if self._is_codegen_command(args):
-            # Some codegen commands don't need data (like --list-languages)
-            if hasattr(args, "list_languages") and args.list_languages:
+            if getattr(args, "list_languages", False):
                 return handle_codegen_command(args, None)
-
-            # Load data for generation commands
-            if not self.load_data(args.file, args.url):
+            if not self.load_data(args.file, getattr(args, "url", None)):
                 return 1
-
             return handle_codegen_command(args, self.data)
 
-        # For other operations, load data first
-        if not self.load_data(args.file, args.url):
+        # Load data for other operations
+        if not self.load_data(args.file, getattr(args, "url", None)):
             return 1
 
         self.cli_handler.set_data(self.data, self.source)
         self.interactive_handler.set_data(self.data, self.source)
 
-        if args.interactive or not self._has_cli_actions(args):
+        if getattr(args, "interactive", False) or not self._has_cli_actions(args):
             return self.interactive_handler.run()
         else:
             return self.cli_handler.run(args)
 
-    def _is_codegen_command(self, args) -> bool:
-        """Check if this is a code generation command."""
-        return (
-            (hasattr(args, "generate") and args.generate)
-            or (hasattr(args, "list_languages") and args.list_languages)
-            or (hasattr(args, "language_info") and args.language_info)
+    def _is_codegen_command(self, args: argparse.Namespace) -> bool:
+        """Check if the current command is related to code generation."""
+        return any(
+            getattr(args, attr, False)
+            for attr in ["generate", "list_languages", "language_info"]
         )
 
-    def _has_cli_actions(self, args) -> bool:
+    def _has_cli_actions(self, args: argparse.Namespace) -> bool:
         """Check if any CLI-specific actions are requested."""
-        return any([args.tree, args.search, args.stats, args.plot])
+        return any(
+            getattr(args, action, False)
+            for action in ["tree", "search", "stats", "plot"]
+        )
 
 
-def create_parser():
-    """Create and configure the argument parser."""
+def create_parser() -> argparse.ArgumentParser:
+    """
+    Create and configure the command-line argument parser.
+
+    Returns:
+        Configured argparse.ArgumentParser instance.
+    """
     parser = argparse.ArgumentParser(
         description="🔍 JSON Explorer - Analyze, visualize, and explore JSON data",
         formatter_class=argparse.RawDescriptionHelpFormatter,
@@ -99,6 +132,19 @@ Code Generation:
   %(prog)s data.json --generate go --config my-config.json
   %(prog)s --list-languages
         """,
+    )
+
+    # Logging arguments
+    logging_group = parser.add_argument_group("logging options")
+    logging_group.add_argument(
+        "--verbose_logging", "-vl", action="store_true", help="Enable verbose logging"
+    )
+    logging_group.add_argument("--log-file", type=Path, help="Write logs to file")
+    logging_group.add_argument(
+        "--log-level",
+        choices=["DEBUG", "INFO", "WARNING", "ERROR"],
+        default="INFO",
+        help="Set logging level",
     )
 
     # Data source
@@ -167,8 +213,8 @@ Code Generation:
     )
     viz_group.add_argument(
         "--plot-format",
-        choices=["terminal", "matplotlib", "browser", "all"],
-        default="matplotlib",
+        choices=["terminal", "interactive", "html", "all"],
+        default="interactive",
         help="Visualization format",
     )
     viz_group.add_argument("--save-path", type=str, help="Path to save visualizations")
@@ -178,17 +224,27 @@ Code Generation:
         help="Don't open browser for HTML visualizations",
     )
 
-    # Add codegen arguments
+    # Codegen arguments
     add_codegen_args(parser)
 
     return parser
 
 
-def main():
-    """Main entry point for the JSON Explorer."""
+def main() -> int:
+    """Main entry point for the JSON Explorer CLI tool."""
     parser = create_parser()
     args = parser.parse_args()
 
+    # Configure logging
+    log_level = (
+        "DEBUG"
+        if getattr(args, "verbose_logging", False)
+        else getattr(args, "log_level", "INFO")
+    )
+    configure_logging(level=log_level, log_file=getattr(args, "log_file", None))
+    logger.info("JSON Explorer starting")
+
+    # If no arguments, show help
     if len(sys.argv) == 1:
         parser.print_help()
         return 1

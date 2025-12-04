@@ -1,15 +1,25 @@
-from typing import Any, List, Optional
+"""Advanced JSON search functionality with multiple modes and filtering.
+
+This module provides comprehensive search capabilities for JSON structures,
+including key/value searches, pattern matching, and custom filter functions.
+"""
+
+import re
 from dataclasses import dataclass
 from enum import Enum
-import re
+from typing import Any, Callable
+
 from rich.console import Console
 from rich.table import Table
 from rich.tree import Tree
-from rich import print as rprint
+
+from .logging_config import get_logger
+
+logger = get_logger(__name__)
 
 
 class SearchMode(Enum):
-    """Search mode options."""
+    """Search mode options for pattern matching."""
 
     EXACT = "exact"
     CONTAINS = "contains"
@@ -18,11 +28,12 @@ class SearchMode(Enum):
     ENDSWITH = "endswith"
     CASE_INSENSITIVE = "case_insensitive"
 
-    def __str__(self):
+    def __str__(self) -> str:
         return self.value
 
     @classmethod
-    def _missing_(cls, value):
+    def _missing_(cls, value: object) -> "SearchMode | None":
+        """Handle missing enum values."""
         for member in cls:
             if member.value == value:
                 return member
@@ -31,36 +42,79 @@ class SearchMode(Enum):
 
 @dataclass
 class SearchResult:
-    """Represents a search result with path and context."""
+    """Represents a search result with path and context.
+
+    Attributes:
+        path: JSON path to the found item.
+        value: The value found.
+        parent_key: Key of the parent object (if applicable).
+        parent_value: Value of the parent (if applicable).
+        depth: Depth in the JSON structure.
+        data_type: Type name of the value.
+    """
 
     path: str
     value: Any
-    parent_key: Optional[str] = None
-    parent_value: Optional[Any] = None
+    parent_key: str | None = None
+    parent_value: Any | None = None
     depth: int = 0
     data_type: str = ""
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
+        """Initialize computed fields."""
         self.data_type = type(self.value).__name__
 
 
 class JsonSearcher:
-    """JSON search utility with multiple search modes and rich output."""
+    """JSON search utility with multiple search modes and rich output.
 
-    def __init__(self, console: Optional[Console] = None):
+    This class provides various search capabilities including key search,
+    value search, key-value pair search, and custom filter functions.
+
+    Example:
+        >>> searcher = JsonSearcher()
+        >>> results = searcher.search_keys(data, "user", SearchMode.CONTAINS)
+        >>> searcher.print_results(results)
+    """
+
+    def __init__(self, console: Console | None = None) -> None:
+        """Initialize the searcher.
+
+        Args:
+            console: Optional Rich console for output.
+        """
         self.console = console or Console()
-        self.results: List[SearchResult] = []
+        self.results: list[SearchResult] = []
+        logger.debug("JsonSearcher initialized")
 
     def search_keys(
         self,
-        data,
-        target_key,
+        data: Any,
+        target_key: str,
         mode: SearchMode = SearchMode.EXACT,
-        max_results=None,
-        min_depth=0,
-        max_depth=None,
-    ) -> List[SearchResult]:
-        """Search for keys in JSON data with various matching modes."""
+        max_results: int | None = None,
+        min_depth: int = 0,
+        max_depth: int | None = None,
+    ) -> list[SearchResult]:
+        """Search for keys in JSON data with various matching modes.
+
+        Args:
+            data: JSON data to search.
+            target_key: Key pattern to search for.
+            mode: Search mode for matching.
+            max_results: Maximum number of results to return.
+            min_depth: Minimum depth to search.
+            max_depth: Maximum depth to search.
+
+        Returns:
+            List of search results.
+
+        Example:
+            >>> results = searcher.search_keys(
+            ...     data, "email", SearchMode.CONTAINS, max_results=10
+            ... )
+        """
+        logger.info(f"Searching for key '{target_key}' with mode {mode}")
         self.results = []
         self._search_keys_recursive(
             data, target_key, mode, "root", 0, min_depth, max_depth
@@ -69,19 +123,40 @@ class JsonSearcher:
         if max_results:
             self.results = self.results[:max_results]
 
+        logger.info(f"Found {len(self.results)} results")
         return self.results
 
     def search_values(
         self,
-        data,
-        target_value,
+        data: Any,
+        target_value: Any,
         mode: SearchMode = SearchMode.EXACT,
-        value_types=None,
-        max_results=None,
-        min_depth=0,
-        max_depth=None,
-    ) -> List[SearchResult]:
-        """Search for values in JSON data with various matching modes."""
+        value_types: set[type] | None = None,
+        max_results: int | None = None,
+        min_depth: int = 0,
+        max_depth: int | None = None,
+    ) -> list[SearchResult]:
+        """Search for values in JSON data with various matching modes.
+
+        Args:
+            data: JSON data to search.
+            target_value: Value pattern to search for.
+            mode: Search mode for matching.
+            value_types: Optional set of types to filter by.
+            max_results: Maximum number of results to return.
+            min_depth: Minimum depth to search.
+            max_depth: Maximum depth to search.
+
+        Returns:
+            List of search results.
+
+        Example:
+            >>> # Find all strings containing '@'
+            >>> results = searcher.search_values(
+            ...     data, "@", SearchMode.CONTAINS, value_types={str}
+            ... )
+        """
+        logger.info(f"Searching for value '{target_value}' with mode {mode}")
         self.results = []
         self._search_values_recursive(
             data, target_value, mode, "root", 0, value_types, min_depth, max_depth
@@ -90,45 +165,85 @@ class JsonSearcher:
         if max_results:
             self.results = self.results[:max_results]
 
+        logger.info(f"Found {len(self.results)} results")
         return self.results
 
     def search_key_value_pairs(
         self,
-        data,
-        key_pattern,
-        value_pattern,
-        key_mode=SearchMode.EXACT,
-        value_mode=SearchMode.EXACT,
-    ) -> List[SearchResult]:
-        """Search for key-value pairs matching both patterns."""
+        data: Any,
+        key_pattern: str,
+        value_pattern: Any,
+        key_mode: SearchMode = SearchMode.EXACT,
+        value_mode: SearchMode = SearchMode.EXACT,
+    ) -> list[SearchResult]:
+        """Search for key-value pairs matching both patterns.
+
+        Args:
+            data: JSON data to search.
+            key_pattern: Key pattern to match.
+            value_pattern: Value pattern to match.
+            key_mode: Search mode for key matching.
+            value_mode: Search mode for value matching.
+
+        Returns:
+            List of search results.
+
+        Example:
+            >>> # Find all 'status' keys with value 'active'
+            >>> results = searcher.search_key_value_pairs(
+            ...     data, "status", "active"
+            ... )
+        """
+        logger.info(
+            f"Searching for pairs: key='{key_pattern}' ({key_mode}), "
+            f"value='{value_pattern}' ({value_mode})"
+        )
         self.results = []
         self._search_pairs_recursive(
             data, key_pattern, value_pattern, key_mode, value_mode, "root", 0
         )
+        logger.info(f"Found {len(self.results)} results")
         return self.results
 
     def search_with_filter(
         self,
-        data,
-        filter_func,
-        path="root",
-        depth=0,
-    ) -> List[SearchResult]:
-        """Search using a custom filter function."""
+        data: Any,
+        filter_func: Callable[[str, Any, int], bool],
+        path: str = "root",
+        depth: int = 0,
+    ) -> list[SearchResult]:
+        """Search using a custom filter function.
+
+        Args:
+            data: JSON data to search.
+            filter_func: Function that takes (key, value, depth) and returns bool.
+            path: Starting path (default: "root").
+            depth: Starting depth (default: 0).
+
+        Returns:
+            List of search results.
+
+        Example:
+            >>> # Find all integers greater than 10
+            >>> filter_func = lambda k, v, d: isinstance(v, int) and v > 10
+            >>> results = searcher.search_with_filter(data, filter_func)
+        """
+        logger.info("Searching with custom filter function")
         self.results = []
         self._search_with_filter_recursive(data, filter_func, path, depth)
+        logger.info(f"Found {len(self.results)} results")
         return self.results
 
     def _search_keys_recursive(
         self,
-        data,
-        target_key,
-        mode,
-        path,
-        depth,
-        min_depth,
-        max_depth,
-    ):
+        data: Any,
+        target_key: str,
+        mode: SearchMode,
+        path: str,
+        depth: int,
+        min_depth: int,
+        max_depth: int | None,
+    ) -> None:
         """Recursive key search implementation."""
         if max_depth is not None and depth > max_depth:
             return
@@ -137,14 +252,12 @@ class JsonSearcher:
             for key, value in data.items():
                 new_path = f"{path}.{key}"
 
-                # Check if key matches and depth is within range
                 if depth >= min_depth and self._matches(key, target_key, mode):
                     result = SearchResult(
                         path=new_path, value=value, parent_key=key, depth=depth
                     )
                     self.results.append(result)
 
-                # Continue searching in nested structures
                 self._search_keys_recursive(
                     value, target_key, mode, new_path, depth + 1, min_depth, max_depth
                 )
@@ -158,15 +271,15 @@ class JsonSearcher:
 
     def _search_values_recursive(
         self,
-        data,
-        target_value,
-        mode,
-        path,
-        depth,
-        value_types,
-        min_depth,
-        max_depth,
-    ):
+        data: Any,
+        target_value: Any,
+        mode: SearchMode,
+        path: str,
+        depth: int,
+        value_types: set[type] | None,
+        min_depth: int,
+        max_depth: int | None,
+    ) -> None:
         """Recursive value search implementation."""
         if max_depth is not None and depth > max_depth:
             return
@@ -199,7 +312,6 @@ class JsonSearcher:
                     max_depth,
                 )
         else:
-            # Check if this is a leaf value that matches criteria
             if depth >= min_depth:
                 if value_types is None or type(data) in value_types:
                     if self._matches(data, target_value, mode):
@@ -208,20 +320,19 @@ class JsonSearcher:
 
     def _search_pairs_recursive(
         self,
-        data,
-        key_pattern,
-        value_pattern,
-        key_mode,
-        value_mode,
-        path,
-        depth,
-    ):
+        data: Any,
+        key_pattern: str,
+        value_pattern: Any,
+        key_mode: SearchMode,
+        value_mode: SearchMode,
+        path: str,
+        depth: int,
+    ) -> None:
         """Recursive key-value pair search implementation."""
         if isinstance(data, dict):
             for key, value in data.items():
                 new_path = f"{path}.{key}"
 
-                # Check if both key and value match
                 if self._matches(key, key_pattern, key_mode) and self._matches(
                     value, value_pattern, value_mode
                 ):
@@ -230,7 +341,6 @@ class JsonSearcher:
                     )
                     self.results.append(result)
 
-                # Continue searching in nested structures
                 self._search_pairs_recursive(
                     value,
                     key_pattern,
@@ -256,11 +366,11 @@ class JsonSearcher:
 
     def _search_with_filter_recursive(
         self,
-        data,
-        filter_func,
-        path,
-        depth,
-    ):
+        data: Any,
+        filter_func: Callable[[str, Any, int], bool],
+        path: str,
+        depth: int,
+    ) -> None:
         """Recursive search with custom filter function."""
         if isinstance(data, dict):
             for key, value in data.items():
@@ -283,13 +393,21 @@ class JsonSearcher:
                     item, filter_func, new_path, depth + 1
                 )
 
-    def _matches(self, actual: Any, target: Any, mode: SearchMode):
-        """Check if actual value matches target based on mode."""
+    def _matches(self, actual: Any, target: Any, mode: SearchMode) -> bool:
+        """Check if actual value matches target based on mode.
+
+        Args:
+            actual: Actual value to check.
+            target: Target pattern to match.
+            mode: Search mode to use.
+
+        Returns:
+            True if match found, False otherwise.
+        """
         try:
             if mode == SearchMode.EXACT:
                 return actual == target
 
-            # Convert to strings for text-based matching
             actual_str = str(actual)
             target_str = str(target)
 
@@ -305,15 +423,27 @@ class JsonSearcher:
                 return bool(re.search(target_str, actual_str))
 
             return False
-        except (TypeError, AttributeError):
+        except (TypeError, AttributeError) as e:
+            logger.debug(f"Match error: {e}")
             return False
 
-    def print_results(self, results=None, show_tree=False, mode=None):
-        """Print search results in a formatted table or tree."""
+    def print_results(
+        self,
+        results: list[SearchResult] | None = None,
+        show_tree: bool = False,
+        mode: SearchMode | None = None,
+    ) -> None:
+        """Print search results in a formatted table or tree.
+
+        Args:
+            results: Results to print (uses self.results if None).
+            show_tree: If True, display as tree; otherwise as table.
+            mode: Optional search mode to display.
+        """
         results = results or self.results
 
         if mode:
-            self.console.print(f"⚙️ Search mode: [yellow]{mode}\n[/yellow]")
+            self.console.print(f"⚙️ Search mode: [yellow]{mode}[/yellow]\n")
 
         if not results:
             self.console.print("[yellow]No results found.[/yellow]")
@@ -324,7 +454,7 @@ class JsonSearcher:
         else:
             self._print_results_table(results)
 
-    def _print_results_table(self, results):
+    def _print_results_table(self, results: list[SearchResult]) -> None:
         """Print results in a table format."""
         table = Table(title=f"Search Results ({len(results)} found)")
         table.add_column("Path", style="cyan", no_wrap=True)
@@ -333,7 +463,6 @@ class JsonSearcher:
         table.add_column("Depth", style="blue", justify="center")
 
         for result in results:
-            # Truncate long values for display
             value_str = str(result.value)
             if len(value_str) > 50:
                 value_str = value_str[:47] + "..."
@@ -342,7 +471,7 @@ class JsonSearcher:
 
         self.console.print(table)
 
-    def _print_results_tree(self, results):
+    def _print_results_tree(self, results: list[SearchResult]) -> None:
         """Print results in a tree format."""
         tree = Tree("[bold blue]Search Results[/bold blue]")
 
@@ -351,73 +480,11 @@ class JsonSearcher:
             if len(value_str) > 100:
                 value_str = value_str[:97] + "..."
 
-            node_text = f"[cyan]{result.path}[/cyan] = [green]{value_str}[/green] [dim]({result.data_type})[/dim]"
+            node_text = (
+                f"[cyan]{result.path}[/cyan] = "
+                f"[green]{value_str}[/green] "
+                f"[dim]({result.data_type})[/dim]"
+            )
             tree.add(node_text)
 
         self.console.print(tree)
-
-
-if __name__ == "__main__":
-    test_data = {
-        "users": [
-            {
-                "id": 1,
-                "name": "Alice Johnson",
-                "email": "alice@example.com",
-                "profile": {
-                    "age": 30,
-                    "settings": {
-                        "theme": "dark",
-                        "notifications": True,
-                        "language": "en",
-                    },
-                },
-                "tags": ["admin", "user"],
-            },
-            {
-                "id": 2,
-                "name": "Bob Smith",
-                "email": "bob@company.com",
-                "profile": {
-                    "age": 25,
-                    "settings": {"theme": "light", "notifications": False},
-                },
-                "tags": ["user"],
-            },
-        ],
-        "metadata": {
-            "total_users": 2,
-            "created_date": "2024-01-01",
-            "settings_version": "1.0",
-        },
-    }
-
-    searcher = JsonSearcher()
-
-    rprint("\n[bold]🔍 Searching for keys containing 'settings':[/bold]")
-    results = searcher.search_keys(test_data, "settings", SearchMode.CONTAINS)
-    searcher.print_results(results)
-
-    rprint("\n[bold]🔍 Searching for values containing '@':[/bold]")
-    results = searcher.search_values(
-        test_data, "@", SearchMode.CONTAINS, value_types={str}
-    )
-    searcher.print_results(results)
-
-    rprint(
-        "\n[bold]🔍 Searching for 'key' = 'tags' and values containing 'user':[/bold]"
-    )
-    results = searcher.search_key_value_pairs(
-        test_data,
-        key_pattern="tags",
-        value_pattern="user",
-        value_mode=SearchMode.CONTAINS,
-    )
-    searcher.print_results(results, mode=SearchMode.CONTAINS)
-
-    rprint("\n[bold]🔍 Custom search for numeric values > 10:[/bold]")
-    results = searcher.search_with_filter(
-        test_data,
-        lambda key, value, depth: isinstance(value, (int, float)) and value > 10,
-    )
-    searcher.print_results(results, show_tree=True)

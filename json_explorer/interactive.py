@@ -1,12 +1,12 @@
+from __future__ import annotations
 import json
 from datetime import datetime
-
+from typing import Any
 
 from rich.console import Console
 from rich.prompt import Prompt, Confirm
 from rich.panel import Panel
 from rich.table import Table
-
 
 from .tree_view import print_json_analysis, print_compact_tree
 from .search import JsonSearcher, SearchMode
@@ -14,28 +14,42 @@ from .stats import DataStatsAnalyzer
 from .visualizer import JSONVisualizer
 from .filter_parser import FilterExpressionParser
 from .utils import load_json
-
 from .codegen.interactive import CodegenInteractiveHandler
+from .logging_config import get_logger
+
+logger = get_logger(__name__)
 
 
 class InteractiveHandler:
-    """Handle interactive mode operations."""
+    """Handle interactive mode operations for JSON analysis."""
 
-    def __init__(self):
-        self.data = None
-        self.source = None
+    def __init__(self) -> None:
+        """Initialize interactive handler with default components."""
+        self.data: Any | None = None
+        self.source: str | None = None
         self.console = Console()
         self.searcher = JsonSearcher()
         self.analyzer = DataStatsAnalyzer()
         self.visualizer = JSONVisualizer()
+        logger.debug("InteractiveHandler initialized")
 
-    def set_data(self, data, source):
-        """Set the data and source for processing."""
+    def set_data(self, data: Any, source: str) -> None:
+        """Set the JSON data and its source for interactive processing.
+
+        Args:
+            data: The JSON data to process.
+            source: Source name or identifier.
+        """
         self.data = data
         self.source = source
+        logger.info("Data set for interactive mode: %s", source)
 
-    def run(self):
-        """Run interactive mode."""
+    def run(self) -> int:
+        """Run the interactive JSON explorer loop.
+
+        Returns:
+            Exit code (0 for success, 1 if no data loaded).
+        """
         if not self.data:
             self.console.print("⚠ [red]No data loaded. Please load data first.[/red]")
             return 1
@@ -77,7 +91,7 @@ class InteractiveHandler:
 
         return 0
 
-    def _show_main_menu(self):
+    def _show_main_menu(self) -> None:
         """Display the main menu."""
         menu_panel = Panel.fit(
             """[bold blue]📋 Main Menu[/bold blue]
@@ -97,15 +111,15 @@ class InteractiveHandler:
         )
         self.console.print(menu_panel)
 
-    def _interactive_tree_view(self):
+    def _interactive_tree_view(self) -> None:
         """Interactive tree view options."""
         self.console.print("\n🌳 [bold]Tree View Options[/bold]")
-
         tree_type = Prompt.ask(
             "Select tree view type",
             choices=["compact", "analysis", "raw"],
             default="compact",
         )
+        logger.info("User selected tree view type: %s", tree_type)
 
         if tree_type == "raw":
             print_json_analysis(self.data, self.source, show_raw=True)
@@ -114,7 +128,7 @@ class InteractiveHandler:
         elif tree_type == "compact":
             print_compact_tree(self.data, self.source)
 
-    def _interactive_search(self):
+    def _interactive_search(self) -> None:
         """Interactive search functionality."""
         self.console.print("\n🔍 [bold]Search Options[/bold]")
 
@@ -123,9 +137,7 @@ class InteractiveHandler:
             choices=["key", "value", "pair"],
             default="key",
         )
-
         search_term = Prompt.ask("Enter search term")
-
         mode_str = Prompt.ask(
             "Search mode",
             choices=[
@@ -139,23 +151,27 @@ class InteractiveHandler:
             default="exact",
         )
         search_mode = SearchMode(mode_str)
+        logger.info(
+            "Interactive search: type=%s, term=%s, mode=%s",
+            search_type,
+            search_term,
+            mode_str,
+        )
+
+        results = []
 
         if search_type == "key":
             self.console.print(f"\n🔍 Searching for key: '{search_term}'")
             results = self.searcher.search_keys(self.data, search_term, search_mode)
-
         elif search_type == "value":
             limit_types = Confirm.ask("Limit search to specific data types?")
             value_types = None
-
             if limit_types:
                 value_types = self._get_value_types()
-
             self.console.print(f"\n🔍 Searching for value: '{search_term}'")
             results = self.searcher.search_values(
                 self.data, search_term, search_mode, value_types=value_types
             )
-
         elif search_type == "pair":
             value_term = Prompt.ask("Enter value to search for")
             self.console.print(
@@ -167,24 +183,21 @@ class InteractiveHandler:
 
         self.searcher.print_results(results, mode=search_mode)
 
-    def _interactive_stats(self):
+    def _interactive_stats(self) -> None:
         """Interactive statistics display."""
         self.console.print("\n📊 [bold]Statistics & Analysis[/bold]")
-
         detailed = Confirm.ask("Show detailed statistics?", default=False)
-
+        logger.info("Displaying statistics (detailed=%s)", detailed)
         self.analyzer.print_summary(self.data, detailed=detailed)
 
-    def _interactive_visualization(self):
+    def _interactive_visualization(self) -> None:
         """Interactive visualization options."""
         self.console.print("\n📈 [bold]Visualization Options[/bold]")
-
         viz_format = Prompt.ask(
             "Select visualization format",
-            choices=["terminal", "matplotlib", "browser", "all"],
-            default="matplotlib",
+            choices=["terminal", "interactive", "html", "all"],
+            default="interactive",
         )
-
         detailed = Confirm.ask("Generate detailed visualizations?", default=False)
         save_path = None
 
@@ -193,13 +206,20 @@ class InteractiveHandler:
             save_path = save_path if save_path else None
 
         open_browser = True
+
         if viz_format in ["browser", "all"]:
             open_browser = Confirm.ask(
                 "Open browser for HTML visualizations?", default=True
             )
 
-        try:
+        logger.info(
+            "Visualization requested: format=%s, detailed=%s, save_path=%s",
+            viz_format,
+            detailed,
+            save_path,
+        )
 
+        try:
             self.visualizer.visualize(
                 self.data,
                 output=viz_format,
@@ -207,14 +227,12 @@ class InteractiveHandler:
                 detailed=detailed,
                 open_browser=open_browser,
             )
-
         except Exception as e:
             self.console.print(f"⚠ [red]Visualization error: {e}[/red]")
 
-    def _interactive_filter_search(self):
+    def _interactive_filter_search(self) -> None:
         """Interactive filter search with expression builder."""
         self.console.print("\n🎯 [bold]Advanced Filter Search[/bold]")
-
         self._show_filter_examples()
 
         filter_expr = Prompt.ask(
@@ -224,36 +242,30 @@ class InteractiveHandler:
 
         try:
             filter_func = FilterExpressionParser.parse_filter(filter_expr)
-
             self.console.print(f"\n🎯 [yellow]Applying filter: {filter_expr}[/yellow]")
-
             results = self.searcher.search_with_filter(self.data, filter_func)
 
             if results:
                 show_tree = Confirm.ask("Display results as tree?", default=False)
                 self.searcher.print_results(results, show_tree=show_tree)
-
                 if Confirm.ask("Save results to file?"):
                     self._save_search_results(results, filter_expr)
             else:
                 self.console.print("[yellow]No results found.[/yellow]")
-
         except Exception as e:
             self.console.print(f"⚠ [red]Filter error: {e}[/red]")
             self.console.print(
                 "[yellow]Please check your filter expression syntax.[/yellow]"
             )
 
-    def _interactive_advanced_search(self):
+    def _interactive_advanced_search(self) -> None:
         """Advanced search with multiple criteria."""
         self.console.print("\n🔎 [bold]Advanced Search Options[/bold]")
-
         search_type = Prompt.ask(
             "Select search type",
             choices=["key", "value", "pair", "filter"],
             default="key",
         )
-
         if search_type == "filter":
             return self._interactive_filter_search()
 
@@ -317,7 +329,6 @@ class InteractiveHandler:
                     self.data, search_term, value_term, search_mode, search_mode
                 )
 
-            # Display results
             if results:
                 show_tree = Confirm.ask("Display results as tree?", default=False)
                 self.searcher.print_results(
@@ -325,20 +336,16 @@ class InteractiveHandler:
                 )
             else:
                 self.console.print("[yellow]No results found.[/yellow]")
-
         except Exception as e:
             self.console.print(f"⚠ [red]Search error: {e}[/red]")
 
-    def _interactive_codegen(self):
+    def _interactive_codegen(self) -> None:
         """Interactive code generation functionality."""
-
-        # Create dedicated codegen handler
         codegen_handler = CodegenInteractiveHandler(self.data, self.console)
-
-        # Run the codegen interactive interface
         codegen_handler.run_interactive()
+        logger.info("Interactive code generation completed")
 
-    def _get_value_types(self):
+    def _get_value_types(self) -> set[type] | None:
         """Get value types selection from user."""
         type_map = {
             "string": str,
@@ -348,34 +355,22 @@ class InteractiveHandler:
             "list": list,
             "dict": dict,
         }
-        selected_types = []
-        for type_name, type_class in type_map.items():
-            if Confirm.ask(f"Include {type_name}?"):
-                selected_types.append(type_class)
+        selected_types = [
+            t for name, t in type_map.items() if Confirm.ask(f"Include {name}?")
+        ]
         return set(selected_types) if selected_types else None
 
-    def _show_filter_examples(self):
+    def _show_filter_examples(self) -> None:
         """Show filter expression examples."""
         examples_panel = Panel.fit(
             """[bold]Example Filter Expressions:[/bold]
 
 [green]• isinstance(value, int) and value > 10[/green]
-  Find integer values greater than 10
-
 [green]• key.startswith('user') and depth <= 2[/green]
-  Find keys starting with 'user' at depth 2 or less
-
 [green]• 'email' in str(value).lower()[/green]
-  Find values containing 'email' (case-insensitive)
-
 [green]• len(str(value)) > 50[/green]
-  Find values with string length > 50
-
 [green]• isinstance(value, list) and len(value) > 5[/green]
-  Find lists with more than 5 items
-
-[green]• depth == 3 and isinstance(value, dict)[/green]
-  Find dictionaries at exactly depth 3""",
+[green]• depth == 3 and isinstance(value, dict)[/green]""",
             title="💡 Examples",
             border_style="green",
         )
@@ -420,10 +415,9 @@ class InteractiveHandler:
         )
         self.console.print(help_panel)
 
-    def _load_new_data(self):
-        """Load new JSON data."""
+    def _load_new_data(self) -> None:
+        """Load new JSON data from file or URL."""
         self.console.print("\n📁 [bold]Load New Data[/bold]")
-
         source_type = Prompt.ask("Data source", choices=["file", "url"], default="file")
 
         try:
@@ -435,70 +429,64 @@ class InteractiveHandler:
                 self.source, self.data = load_json(None, url)
 
             self.console.print(f"✅ [green]Successfully loaded: {self.source}[/green]")
-
         except Exception as e:
             self.console.print(f"⚠ [red]Failed to load data: {e}[/red]")
 
-    def _show_data_summary(self):
+    def _show_data_summary(self) -> None:
         """Show a quick summary of the loaded data."""
         if not self.data:
             self.console.print("⚠ [red]No data loaded[/red]")
             return
 
         self.console.print("\n📋 [bold]Data Summary[/bold]")
-
         summary_table = Table(title="Quick Overview")
         summary_table.add_column("Property", style="cyan")
         summary_table.add_column("Value", style="green")
 
-        data_type = type(self.data).__name__
-        summary_table.add_row("Data Type", data_type)
+        summary_table.add_row("Data Type", type(self.data).__name__)
         summary_table.add_row("Source", str(self.source))
 
         if isinstance(self.data, (dict, list)):
             summary_table.add_row("Length", str(len(self.data)))
-
         if isinstance(self.data, dict):
             summary_table.add_row("Top-level Keys", str(len(self.data.keys())))
             if self.data:
-                top_keys = list(self.data.keys())[:5]
                 summary_table.add_row(
-                    "Sample Keys", ", ".join(str(k) for k in top_keys)
+                    "Sample Keys", ", ".join(str(k) for k in list(self.data.keys())[:5])
                 )
 
         self.console.print(summary_table)
 
-    def _save_search_results(self, results, filter_expr):
-        """Save search results to a file."""
+    def _save_search_results(self, results: list, filter_expr: str) -> None:
+        """Save search results to a JSON file.
+
+        Args:
+            results: List of search result objects.
+            filter_expr: Filter expression used for the search.
+        """
         filename = Prompt.ask(
             "Enter filename",
             default=f"search_results_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json",
         )
-
         try:
-            serializable_results = []
-            for result in results:
-                serializable_results.append(
-                    {
-                        "path": result.path,
-                        "value": result.value,
-                        "parent_key": result.parent_key,
-                        "depth": result.depth,
-                        "data_type": result.data_type,
-                    }
-                )
-
+            serializable_results = [
+                {
+                    "path": r.path,
+                    "value": r.value,
+                    "parent_key": r.parent_key,
+                    "depth": r.depth,
+                    "data_type": r.data_type,
+                }
+                for r in results
+            ]
             output_data = {
                 "filter_expression": filter_expr,
                 "timestamp": datetime.now().isoformat(),
                 "total_results": len(results),
                 "results": serializable_results,
             }
-
             with open(filename, "w", encoding="utf-8") as f:
                 json.dump(output_data, f, indent=2, ensure_ascii=False)
-
             self.console.print(f"✅ [green]Results saved to: {filename}[/green]")
-
         except Exception as e:
             self.console.print(f"⚠ [red]Error saving results: {e}[/red]")

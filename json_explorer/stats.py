@@ -1,15 +1,32 @@
+"""Comprehensive data structure analysis and statistics generation.
+
+This module provides detailed statistical analysis of JSON data structures,
+including type distribution, depth analysis, and data quality metrics.
+"""
+
 from collections import Counter, defaultdict
+from typing import Any
+
+from .logging_config import get_logger
+
+logger = get_logger(__name__)
 
 
 class DataStatsAnalyzer:
-    """Data structure analyzer with comprehensive statistics and insights."""
+    """Data structure analyzer with comprehensive statistics and insights.
 
-    def __init__(self):
+    This analyzer traverses JSON structures and generates detailed statistics
+    about data types, structural patterns, and potential quality issues.
+    """
+
+    def __init__(self) -> None:
+        """Initialize the analyzer."""
         self.reset()
+        logger.debug("DataStatsAnalyzer initialized")
 
-    def reset(self):
+    def reset(self) -> None:
         """Reset all statistics for a new analysis."""
-        self.stats = {
+        self.stats: dict[str, Any] = {
             "total_keys": 0,
             "total_values": 0,
             "data_types": Counter(),
@@ -30,26 +47,43 @@ class DataStatsAnalyzer:
                 "key_naming_patterns": Counter(),
             },
         }
-        self._string_lengths = []
-        self._numeric_values = []
-        self._paths = []
+        self._string_lengths: list[int] = []
+        self._numeric_values: list[int | float] = []
+        self._paths: list[tuple[str, int, str]] = []
 
-    def generate_stats(self, data):
-        """
-        Generate comprehensive statistics for nested data structures.
+    def generate_stats(self, data: Any) -> dict[str, Any]:
+        """Generate comprehensive statistics for nested data structures.
 
         Args:
-            data: The data structure to analyze (dict, list, or primitive)
+            data: The data structure to analyze (dict, list, or primitive).
 
         Returns:
-            Dictionary containing detailed statistics and insights
+            Dictionary containing detailed statistics and insights.
+
+        Example:
+            >>> analyzer = DataStatsAnalyzer()
+            >>> stats = analyzer.generate_stats({"users": [{"id": 1}]})
+            >>> print(stats["total_keys"])
+            2
         """
+        logger.info("Starting statistics generation")
         self.reset()
         self._traverse(data, depth=0, path="root")
-        return self._finalize_stats()
+        result = self._finalize_stats()
+        logger.info(
+            f"Statistics generated: {result['total_values']} values, "
+            f"{result['total_keys']} keys, max depth {result['max_depth']}"
+        )
+        return result
 
-    def _traverse(self, obj, depth=0, path="root"):
-        """Recursively traverse and analyze the data structure."""
+    def _traverse(self, obj: Any, depth: int = 0, path: str = "root") -> None:
+        """Recursively traverse and analyze the data structure.
+
+        Args:
+            obj: Current object to analyze.
+            depth: Current depth in the structure.
+            path: Current path string.
+        """
         self.stats["max_depth"] = max(self.stats["max_depth"], depth)
         self.stats["depth_histogram"][depth] += 1
         self._paths.append((path, depth, type(obj).__name__))
@@ -75,8 +109,14 @@ class DataStatsAnalyzer:
             self.stats["data_types"][type(obj).__name__] += 1
             self.stats["total_values"] += 1
 
-    def _analyze_dict(self, obj, depth, path):
-        """Analyze dictionary objects."""
+    def _analyze_dict(self, obj: dict, depth: int, path: str) -> None:
+        """Analyze dictionary objects.
+
+        Args:
+            obj: Dictionary to analyze.
+            depth: Current depth.
+            path: Current path.
+        """
         if not obj:
             self.stats["value_patterns"]["empty_collections"] += 1
 
@@ -111,8 +151,14 @@ class DataStatsAnalyzer:
             self.stats["path_analysis"][new_path].append(type(val).__name__)
             self._traverse(val, depth + 1, new_path)
 
-    def _analyze_sequence(self, obj, depth, path):
-        """Analyze list and tuple objects."""
+    def _analyze_sequence(self, obj: list | tuple, depth: int, path: str) -> None:
+        """Analyze list and tuple objects.
+
+        Args:
+            obj: Sequence to analyze.
+            depth: Current depth.
+            path: Current path.
+        """
         seq_type = "list" if isinstance(obj, list) else "tuple"
 
         if not obj:
@@ -128,8 +174,12 @@ class DataStatsAnalyzer:
             self.stats["path_analysis"][new_path].append(type(item).__name__)
             self._traverse(item, depth + 1, new_path)
 
-    def _analyze_string(self, obj):
-        """Analyze string values."""
+    def _analyze_string(self, obj: str) -> None:
+        """Analyze string values.
+
+        Args:
+            obj: String to analyze.
+        """
         if not obj:
             self.stats["value_patterns"]["empty_strings"] += 1
 
@@ -143,8 +193,12 @@ class DataStatsAnalyzer:
         patterns["min"] = min(patterns["min"], length)
         patterns["max"] = max(patterns["max"], length)
 
-    def _analyze_numeric(self, obj):
-        """Analyze numeric values."""
+    def _analyze_numeric(self, obj: int | float) -> None:
+        """Analyze numeric values.
+
+        Args:
+            obj: Numeric value to analyze.
+        """
         self.stats["data_types"][type(obj).__name__] += 1
         self.stats["total_values"] += 1
         self._numeric_values.append(obj)
@@ -154,8 +208,12 @@ class DataStatsAnalyzer:
         ranges["min"] = min(ranges["min"], obj)
         ranges["max"] = max(ranges["max"], obj)
 
-    def _finalize_stats(self):
-        """Finalize statistics with computed averages and insights."""
+    def _finalize_stats(self) -> dict[str, Any]:
+        """Finalize statistics with computed averages and insights.
+
+        Returns:
+            Complete statistics dictionary.
+        """
         # Calculate string length average
         if self._string_lengths:
             avg_length = sum(self._string_lengths) / len(self._string_lengths)
@@ -179,8 +237,12 @@ class DataStatsAnalyzer:
 
         return dict(self.stats)
 
-    def _generate_insights(self):
-        """Generate high-level insights about the data structure."""
+    def _generate_insights(self) -> dict[str, Any]:
+        """Generate high-level insights about the data structure.
+
+        Returns:
+            Dictionary of computed insights.
+        """
         insights = {
             "complexity_score": self._calculate_complexity(),
             "most_common_type": (
@@ -194,8 +256,12 @@ class DataStatsAnalyzer:
 
         return insights
 
-    def _calculate_complexity(self):
-        """Calculate a complexity score based on depth and variety."""
+    def _calculate_complexity(self) -> int:
+        """Calculate a complexity score based on depth and variety.
+
+        Returns:
+            Complexity score (0-100).
+        """
         type_variety = len(self.stats["data_types"])
         max_depth = self.stats["max_depth"]
         total_elements = self.stats["total_values"]
@@ -203,8 +269,12 @@ class DataStatsAnalyzer:
         complexity = (type_variety * 2) + (max_depth * 3) + (total_elements // 10)
         return min(complexity, 100)
 
-    def _assess_uniformity(self):
-        """Assess how uniform the data structure is."""
+    def _assess_uniformity(self) -> str:
+        """Assess how uniform the data structure is.
+
+        Returns:
+            Uniformity assessment string.
+        """
         if not self.stats["structure_insights"]["repeated_structures"]:
             return "highly_varied"
 
@@ -224,8 +294,12 @@ class DataStatsAnalyzer:
         else:
             return "highly_varied"
 
-    def _identify_quality_issues(self):
-        """Identify potential data quality issues."""
+    def _identify_quality_issues(self) -> list[str]:
+        """Identify potential data quality issues.
+
+        Returns:
+            List of identified issues.
+        """
         issues = []
 
         total_values = self.stats["total_values"]
@@ -249,8 +323,13 @@ class DataStatsAnalyzer:
 
         return issues
 
-    def print_summary(self, data, detailed=False):
-        """Print a formatted summary of the statistics."""
+    def print_summary(self, data: Any, detailed: bool = False) -> None:
+        """Print a formatted summary of the statistics.
+
+        Args:
+            data: Data to analyze.
+            detailed: Whether to print detailed statistics.
+        """
         stats = self.generate_stats(data)
 
         print("📊 Data Structure Analysis Summary")
@@ -276,8 +355,12 @@ class DataStatsAnalyzer:
         if detailed:
             self._print_detailed_stats(stats)
 
-    def _print_detailed_stats(self, stats):
-        """Print detailed statistics."""
+    def _print_detailed_stats(self, stats: dict[str, Any]) -> None:
+        """Print detailed statistics.
+
+        Args:
+            stats: Statistics dictionary.
+        """
         print("\n🔍 Detailed Analysis:")
 
         if stats["key_frequency"]:
@@ -285,7 +368,7 @@ class DataStatsAnalyzer:
             for key, count in stats["key_frequency"].most_common(5):
                 print(f"  '{key}': {count}")
 
-        print(f"\nDepth Distribution:")
+        print("\nDepth Distribution:")
         for depth in sorted(stats["depth_histogram"].keys()):
             count = stats["depth_histogram"][depth]
             print(f"  Depth {depth}: {count} nodes")
@@ -298,40 +381,14 @@ class DataStatsAnalyzer:
                 print(f"  Size {size}: {count} arrays")
 
 
-def generate_stats(data):
-    """Generate statistics for nested data structures."""
+def generate_stats(data: Any) -> dict[str, Any]:
+    """Generate statistics for nested data structures.
+
+    Args:
+        data: Data to analyze.
+
+    Returns:
+        Statistics dictionary.
+    """
     analyzer = DataStatsAnalyzer()
     return analyzer.generate_stats(data)
-
-
-if __name__ == "__main__":
-    sample_data = {
-        "users": [
-            {
-                "id": 1,
-                "name": "Alice",
-                "email": "alice@example.com",
-                "profile": {"age": 30, "city": "NYC"},
-            },
-            {
-                "id": 2,
-                "name": "Bob",
-                "email": None,
-                "profile": {"age": 25, "city": "LA"},
-            },
-            {"id": 3, "name": "", "email": "charlie@example.com", "profile": None},
-        ],
-        "metadata": {
-            "total_count": 3,
-            "last_updated": "2025-06-26",
-            "settings": {
-                "notifications": True,
-                "privacy": {"level": "high", "options": ["email", "sms"]},
-            },
-        },
-        "empty_list": [],
-        "tags": ["user", "data", "sample"],
-    }
-
-    analyzer = DataStatsAnalyzer()
-    analyzer.print_summary(sample_data, detailed=True)
