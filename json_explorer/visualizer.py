@@ -98,7 +98,7 @@ class JSONVisualizer:
             else:
                 self._terminal_fallback(detailed)
 
-        elif output in ("interactive", "html"):
+        elif output == "html":
             if not PLOTLY_AVAILABLE:
                 raise RuntimeError(
                     "Plotly not available. Install with: pip install plotly"

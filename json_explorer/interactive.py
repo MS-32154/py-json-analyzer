@@ -72,11 +72,11 @@ class InteractiveHandler:
             elif choice == "2":
                 self._interactive_jmespath_search()
             elif choice == "3":
-                self._interactive_stats()
-            elif choice == "4":
-                self._interactive_visualization()
-            elif choice == "5":
                 self._show_jmespath_help()
+            elif choice == "4":
+                self._interactive_stats()
+            elif choice == "5":
+                self._interactive_visualization()
             elif choice == "6":
                 self._load_new_data()
             elif choice == "7":
@@ -95,9 +95,9 @@ class InteractiveHandler:
 
 [cyan]1.[/cyan] 🌳 Tree View (Structure Analysis)
 [cyan]2.[/cyan] 🔍 JMESPath Search
-[cyan]3.[/cyan] 📊 Statistics & Analysis
-[cyan]4.[/cyan] 📈 Visualizations
-[cyan]5.[/cyan] ❓ JMESPath Query Help
+[cyan]3.[/cyan] ❓ JMESPath Query Help
+[cyan]4.[/cyan] 📊 Statistics & Analysis
+[cyan]5.[/cyan] 📈 Visualizations
 [cyan]6.[/cyan] 📂 Load New Data
 [cyan]7.[/cyan] 📋 Data Summary
 [cyan]8.[/cyan] ⚡ Code Generation
@@ -175,19 +175,19 @@ class InteractiveHandler:
         self.console.print("\n📈 [bold]Visualization Options[/bold]")
         viz_format = Prompt.ask(
             "Select visualization format",
-            choices=["terminal", "interactive", "html", "all"],
-            default="interactive",
+            choices=["terminal", "html", "all"],
+            default="html",
         )
         detailed = Confirm.ask("Generate detailed visualizations?", default=False)
         save_path = None
 
-        if Confirm.ask("Save visualizations to file?"):
-            save_path = Prompt.ask("Enter save path (optional)", default="")
-            save_path = save_path if save_path else None
+        open_browser = False
 
-        open_browser = True
+        if viz_format in ["html", "all"]:
+            if Confirm.ask("Save visualizations to file?"):
+                save_path = Prompt.ask("Enter save path (optional)", default="")
+                save_path = save_path if save_path else None
 
-        if viz_format in ["interactive", "html", "all"]:
             open_browser = Confirm.ask(
                 "Open browser for HTML visualizations?", default=True
             )
