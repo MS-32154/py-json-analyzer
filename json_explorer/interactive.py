@@ -3,10 +3,15 @@ import json
 from datetime import datetime
 from typing import Any
 
+
 from rich.console import Console
 from rich.prompt import Prompt, Confirm
 from rich.panel import Panel
 from rich.table import Table
+
+from prompt_toolkit import prompt
+from prompt_toolkit.history import FileHistory
+from prompt_toolkit.completion import PathCompleter, WordCompleter, FuzzyCompleter
 
 from .tree_view import print_json_analysis, print_compact_tree
 from .search import JsonSearcher
@@ -88,6 +93,87 @@ class InteractiveHandler:
 
         return 0
 
+    def _input(self, message: str, default: str | None = None, **kwargs) -> str:
+        """
+        User friendly input with optional choices and autocompletion.
+        Falls back to Prompt.ask if prompt_toolkit is unavailable.
+
+        Args:
+            message: Prompt message.
+            default: Default value if user enters nothing.
+            kwargs: May include 'choices' (list of strings) for tab completion.
+
+        Returns:
+            User input as string (or default if empty).
+        """
+        choices = kwargs.get("choices")
+        try:
+
+            history = FileHistory(".json_explorer_input_history")
+
+            if choices:
+                str_choices = [str(c) for c in choices]
+                completer = FuzzyCompleter(WordCompleter(str_choices, ignore_case=True))
+                # Only show options in prompt, not above it
+                display_message = f"{message} ({'/'.join(str_choices)})"
+
+                while True:
+                    text = prompt(
+                        f"{display_message} > ",
+                        default=default or "",
+                        history=history,
+                        completer=completer,
+                        complete_while_typing=True,
+                    ).strip()
+
+                    if not text and default is not None:
+                        return default
+
+                    # Exact or case-insensitive match
+                    if text in str_choices:
+                        return text
+                    lowered = text.lower()
+                    ci_matches = [c for c in str_choices if c.lower() == lowered]
+                    if ci_matches:
+                        return ci_matches[0]
+
+                    # Prefix match
+                    prefix_matches = [
+                        c for c in str_choices if c.lower().startswith(lowered)
+                    ]
+                    if len(prefix_matches) == 1:
+                        return prefix_matches[0]
+
+                    self.console.print(f"[red]Invalid choice: {text}[/red]")
+
+            # Free text input
+            return prompt(
+                f"{message} > ", default=default or "", history=history
+            ).strip() or (default or "")
+
+        except Exception:
+            return Prompt.ask(message, default=default, **kwargs)
+
+    def _input_path(self, message: str) -> str:
+        """
+        Input for file paths with autocompletion.
+        Falls back to Prompt.ask if prompt_toolkit is unavailable.
+        """
+        try:
+
+            history = FileHistory(".json_explorer_path_history")
+            completer = PathCompleter(expanduser=True)
+
+            return prompt(
+                f"{message} > ",
+                history=history,
+                completer=completer,
+                complete_while_typing=True,
+            ).strip()
+
+        except Exception:
+            return Prompt.ask(message)
+
     def _show_main_menu(self) -> None:
         """Display the main menu."""
         menu_panel = Panel.fit(
@@ -110,7 +196,7 @@ class InteractiveHandler:
     def _interactive_tree_view(self) -> None:
         """Interactive tree view options."""
         self.console.print("\n🌳 [bold]Tree View Options[/bold]")
-        tree_type = Prompt.ask(
+        tree_type = self._input(
             "Select tree view type",
             choices=["compact", "analysis", "raw"],
             default="compact",
@@ -134,7 +220,7 @@ class InteractiveHandler:
             self.searcher.print_examples()
 
         # Get query from user
-        query = Prompt.ask(
+        query = self._input(
             "\n[bold]Enter JMESPath query[/bold]",
             default="@",  # @ returns entire document
         )
@@ -173,7 +259,7 @@ class InteractiveHandler:
     def _interactive_visualization(self) -> None:
         """Interactive visualization options."""
         self.console.print("\n📈 [bold]Visualization Options[/bold]")
-        viz_format = Prompt.ask(
+        viz_format = self._input(
             "Select visualization format",
             choices=["terminal", "html", "all"],
             default="html",
@@ -185,7 +271,7 @@ class InteractiveHandler:
 
         if viz_format in ["html", "all"]:
             if Confirm.ask("Save visualizations to file?"):
-                save_path = Prompt.ask("Enter save path (optional)", default="")
+                save_path = self._input("Enter save path (optional)", default="")
                 save_path = save_path if save_path else None
 
             open_browser = Confirm.ask(
@@ -258,14 +344,16 @@ class InteractiveHandler:
     def _load_new_data(self) -> None:
         """Load new JSON data from file or URL."""
         self.console.print("\n📂 [bold]Load New Data[/bold]")
-        source_type = Prompt.ask("Data source", choices=["file", "url"], default="file")
+        source_type = self._input(
+            "Data source", choices=["file", "url"], default="file"
+        )
 
         try:
             if source_type == "file":
-                file_path = Prompt.ask("Enter file path")
+                file_path = self._input_path("Enter file path")
                 self.source, self.data = load_json(file_path, None)
             else:
-                url = Prompt.ask("Enter URL")
+                url = self._input("Enter URL")
                 self.source, self.data = load_json(None, url)
 
             self.console.print(f"✅ [green]Successfully loaded: {self.source}[/green]")
@@ -302,7 +390,7 @@ class InteractiveHandler:
         Args:
             result: SearchResult object to save.
         """
-        filename = Prompt.ask(
+        filename = self._input(
             "Enter filename",
             default=f"search_result_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json",
         )
