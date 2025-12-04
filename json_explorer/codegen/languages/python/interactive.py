@@ -10,8 +10,9 @@ from typing import Any
 
 from rich.console import Console
 from rich.panel import Panel
-from rich.prompt import Prompt, Confirm
+from rich.prompt import Confirm
 
+from json_explorer.utils import prompt_input
 from ...core.config import GeneratorConfig
 from .config import (
     get_dataclass_config,
@@ -136,7 +137,7 @@ class PythonInteractiveHandler:
         console.print("\n[bold]Python-Specific Options:[/bold]")
 
         # Style selection
-        style = Prompt.ask(
+        style = self._input(
             "Select Python style",
             choices=["dataclass", "pydantic", "typeddict"],
             default="dataclass",
@@ -338,3 +339,13 @@ class Root(TypedDict, total=False):
             logger.info(f"Config validation: {len(warnings)} warnings")
 
         return warnings
+
+    # ========================================================================
+    # prompt_toolkit integration
+    # ========================================================================
+
+    def _input(self, message: str, default: str | None = None, **kwargs) -> str:
+        console = kwargs.get("console") or None
+        return prompt_input(
+            message, default=default, choices=kwargs.get("choices"), console=console
+        )

@@ -16,10 +16,6 @@ from rich.syntax import Syntax
 from rich.table import Table
 from rich import box
 
-from prompt_toolkit import prompt
-from prompt_toolkit.history import FileHistory
-from prompt_toolkit.completion import PathCompleter, WordCompleter, FuzzyCompleter
-
 from . import (
     GeneratorError,
     generate_from_analysis,
@@ -29,6 +25,7 @@ from . import (
     load_config,
 )
 from json_explorer.analyzer import analyze_json
+from json_explorer.utils import prompt_input, prompt_input_path
 
 logger = logging.getLogger(__name__)
 
@@ -131,87 +128,15 @@ class CodegenInteractiveHandler:
     # ========================================================================
 
     def _input(self, message: str, default: str | None = None, **kwargs) -> str:
-        """
-        User friendly input with optional choices and autocompletion.
-        Falls back to Prompt.ask if prompt_toolkit is unavailable.
+        return prompt_input(
+            message,
+            default=default,
+            choices=kwargs.get("choices"),
+            console=self.console,
+        )
 
-        Args:
-            message: Prompt message.
-            default: Default value if user enters nothing.
-            kwargs: May include 'choices' (list of strings) for tab completion.
-
-        Returns:
-            User input as string (or default if empty).
-        """
-        choices = kwargs.get("choices")
-        try:
-
-            history = FileHistory(".json_explorer_input_history")
-
-            if choices:
-                str_choices = [str(c) for c in choices]
-                completer = FuzzyCompleter(WordCompleter(str_choices, ignore_case=True))
-                # Only show options in prompt, not above it
-                display_message = f"{message} ({'/'.join(str_choices)})"
-
-                while True:
-                    text = prompt(
-                        f"{display_message} > ",
-                        default=default or "",
-                        history=history,
-                        completer=completer,
-                        complete_while_typing=True,
-                    ).strip()
-
-                    if not text and default is not None:
-                        return default
-
-                    # Exact or case-insensitive match
-                    if text in str_choices:
-                        return text
-                    lowered = text.lower()
-                    ci_matches = [c for c in str_choices if c.lower() == lowered]
-                    if ci_matches:
-                        return ci_matches[0]
-
-                    # Prefix match
-                    prefix_matches = [
-                        c for c in str_choices if c.lower().startswith(lowered)
-                    ]
-                    if len(prefix_matches) == 1:
-                        return prefix_matches[0]
-
-                    self.console.print(f"[red]Invalid choice: {text}[/red]")
-
-            # Free text input
-            return prompt(
-                f"{message} > ", default=default or "", history=history
-            ).strip() or (default or "")
-
-        except Exception:
-            return self._input(message, default=default, **kwargs)
-
-    def _input_path(self, message: str, **kwargs) -> str:
-        """
-        Input for file paths with autocompletion.
-        Falls back to Prompt.ask if prompt_toolkit is unavailable.
-        """
-        default = kwargs.get("default")
-        try:
-
-            history = FileHistory(".json_explorer_path_history")
-            completer = PathCompleter(expanduser=True)
-
-            return prompt(
-                f"{message} > ",
-                default=default,
-                history=history,
-                completer=completer,
-                complete_while_typing=True,
-            ).strip()
-
-        except Exception:
-            return self._input(message)
+    def _input_path(self, message: str, default: str = "") -> str:
+        return prompt_input_path(message, default=default)
 
     # ========================================================================
     # Main Menu

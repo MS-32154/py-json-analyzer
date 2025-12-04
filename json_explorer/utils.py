@@ -11,6 +11,13 @@ from urllib.parse import urlparse
 
 import requests
 
+from rich.console import Console
+from rich.prompt import Prompt
+
+from prompt_toolkit import prompt
+from prompt_toolkit.history import FileHistory
+from prompt_toolkit.completion import PathCompleter, WordCompleter, FuzzyCompleter
+
 from .logging_config import get_logger
 
 logger = get_logger(__name__)
@@ -143,3 +150,88 @@ def load_json(
         return load_json_from_file(file_path)
     else:
         return load_json_from_url(url, timeout)
+
+
+def prompt_input(message: str, default: str | None = None, **kwargs) -> str:
+    """
+    User friendly input with optional choices and autocompletion.
+    Falls back to Prompt.ask if prompt_toolkit is unavailable.
+
+    Args:
+        message: Prompt message.
+        default: Default value if user enters nothing.
+        kwargs: May include:
+                    - 'choices' (list of strings) for tab completion,
+                    - `console` (rich console object) for rich Console instance to print messages.
+
+    Returns:
+        User input as string (or default if empty).
+    """
+    choices = kwargs.get("choices")
+    console = kwargs.get("console") or Console()
+    try:
+
+        history = FileHistory(".json_explorer_input_history")
+
+        if choices:
+            str_choices = [str(c) for c in choices]
+            completer = FuzzyCompleter(WordCompleter(str_choices, ignore_case=True))
+            display_message = f"{message} ({'/'.join(str_choices)})"
+
+            while True:
+                text = prompt(
+                    f"{display_message} > ",
+                    default=default or "",
+                    history=history,
+                    completer=completer,
+                    complete_while_typing=True,
+                ).strip()
+
+                if not text and default is not None:
+                    return default
+
+                if text in str_choices:
+                    return text
+                lowered = text.lower()
+                ci_matches = [c for c in str_choices if c.lower() == lowered]
+                if ci_matches:
+                    return ci_matches[0]
+
+                prefix_matches = [
+                    c for c in str_choices if c.lower().startswith(lowered)
+                ]
+                if len(prefix_matches) == 1:
+                    return prefix_matches[0]
+
+                console.print(f"[red]Invalid choice: {text}[/red]")
+
+        # Free text input
+        return prompt(
+            f"{message} > ", default=default or "", history=history
+        ).strip() or (default or "")
+
+    except Exception:
+        return Prompt.ask(message, default=default, **kwargs)
+
+
+def prompt_input_path(message: str, **kwargs) -> str:
+    """
+    Input for file paths with autocompletion.
+    Falls back to Prompt.ask if prompt_toolkit is unavailable.
+    """
+    default = kwargs.get("default") or ""
+    try:
+
+        history = FileHistory(".json_explorer_path_history")
+        completer = PathCompleter(expanduser=True)
+
+        return prompt(
+            f"{message} > ",
+            default=default,
+            history=history,
+            completer=completer,
+            complete_while_typing=True,
+        ).strip()
+
+    except Exception:
+        return Prompt.ask(message)

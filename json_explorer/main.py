@@ -123,13 +123,13 @@ Examples:
   %(prog)s data.json --interactive
   %(prog)s data.json --tree compact --stats
   %(prog)s data.json --search "users[*].name"
-  %(prog)s data.json --search "users[?age > \`30\`]"
+  %(prog)s data.json --search "users[?age > `30`]"
   %(prog)s --url https://api.example.com/data --plot
   
 JMESPath Query Examples:
   %(prog)s data.json --search "users[0]"                    # First user
   %(prog)s data.json --search "users[*].email"              # All emails
-  %(prog)s data.json --search "users[?age > \`30\`]"        # Filter by age
+  %(prog)s data.json --search "users[?age > `30`]"          # Filter by age
   %(prog)s data.json --search "sort_by(users, &age)"        # Sort users
   %(prog)s data.json --search "length(users)"               # Count users
   
@@ -149,7 +149,7 @@ Code Generation:
     logging_group.add_argument(
         "--log-level",
         choices=["DEBUG", "INFO", "WARNING", "ERROR"],
-        default="INFO",
+        default="WARNING",
         help="Set logging level",
     )
 
