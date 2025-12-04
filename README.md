@@ -705,12 +705,6 @@ We welcome feature requests! Please open an issue with:
 
 ---
 
-## Changelog
-
-See [CHANGELOG.md](CHANGELOG.md) for version history and release notes.
-
----
-
 ## License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.

@@ -48,9 +48,6 @@ from .registry import (
     register,
 )
 
-# Version
-__version__ = "0.3.0"
-
 
 # ============================================================================
 # High-Level API Functions
@@ -187,8 +184,6 @@ def create_config(language: str = "go", **kwargs) -> GeneratorConfig:
 
 
 __all__ = [
-    # Version
-    "__version__",
     # High-level API
     "generate_from_analysis",
     "quick_generate",

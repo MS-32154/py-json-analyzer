@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "py-json-analyzer"
-version = "0.3.0"
+version = "0.4.0"
 description = "A powerful CLI and Python library for analyzing, visualizing, exploring, and generating code from JSON data"
 authors = [
     { name="MS-32154", email="msttoffg@gmail.com" }
