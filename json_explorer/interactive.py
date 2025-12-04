@@ -9,10 +9,9 @@ from rich.panel import Panel
 from rich.table import Table
 
 from .tree_view import print_json_analysis, print_compact_tree
-from .search import JsonSearcher, SearchMode
+from .search import JsonSearcher
 from .stats import DataStatsAnalyzer
 from .visualizer import JSONVisualizer
-from .filter_parser import FilterExpressionParser
 from .utils import load_json
 from .codegen.interactive import CodegenInteractiveHandler
 from .logging_config import get_logger
@@ -51,7 +50,7 @@ class InteractiveHandler:
             Exit code (0 for success, 1 if no data loaded).
         """
         if not self.data:
-            self.console.print("⚠ [red]No data loaded. Please load data first.[/red]")
+            self.console.print("⚠️ [red]No data loaded. Please load data first.[/red]")
             return 1
 
         self.console.print(f"\n🎯 [bold green]Interactive JSON Explorer[/bold green]")
@@ -61,7 +60,7 @@ class InteractiveHandler:
             self._show_main_menu()
             choice = Prompt.ask(
                 "\n[bold]Choose an option[/bold]",
-                choices=["1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "q"],
+                choices=["1", "2", "3", "4", "5", "6", "7", "8", "9", "q"],
                 default="q",
             )
 
@@ -71,23 +70,21 @@ class InteractiveHandler:
             elif choice == "1":
                 self._interactive_tree_view()
             elif choice == "2":
-                self._interactive_search()
+                self._interactive_jmespath_search()
             elif choice == "3":
                 self._interactive_stats()
             elif choice == "4":
                 self._interactive_visualization()
             elif choice == "5":
-                self._interactive_filter_search()
+                self._show_jmespath_help()
             elif choice == "6":
-                self._interactive_advanced_search()
-            elif choice == "7":
-                self._show_filter_help()
-            elif choice == "8":
                 self._load_new_data()
-            elif choice == "9":
+            elif choice == "7":
                 self._show_data_summary()
-            elif choice == "10":
+            elif choice == "8":
                 self._interactive_codegen()
+            elif choice == "9":
+                self._save_query_results()
 
         return 0
 
@@ -97,15 +94,14 @@ class InteractiveHandler:
             """[bold blue]📋 Main Menu[/bold blue]
 
 [cyan]1.[/cyan] 🌳 Tree View (Structure Analysis)
-[cyan]2.[/cyan] 🔍 Search (Keys/Values)
+[cyan]2.[/cyan] 🔍 JMESPath Search
 [cyan]3.[/cyan] 📊 Statistics & Analysis
 [cyan]4.[/cyan] 📈 Visualizations
-[cyan]5.[/cyan] 🎯 Advanced Filter Search
-[cyan]6.[/cyan] 🔎 Advanced Search Options
-[cyan]7.[/cyan] ❓ Filter Expression Help
-[cyan]8.[/cyan] 📁 Load New Data
-[cyan]9.[/cyan] 📋 Data Summary
-[cyan]10.[/cyan] ⚡ Code Generation
+[cyan]5.[/cyan] ❓ JMESPath Query Help
+[cyan]6.[/cyan] 📂 Load New Data
+[cyan]7.[/cyan] 📋 Data Summary
+[cyan]8.[/cyan] ⚡ Code Generation
+[cyan]9.[/cyan] 💾 Save Last Search Results
 [cyan]q.[/cyan] 🚪 Quit""",
             border_style="blue",
         )
@@ -128,60 +124,44 @@ class InteractiveHandler:
         elif tree_type == "compact":
             print_compact_tree(self.data, self.source)
 
-    def _interactive_search(self) -> None:
-        """Interactive search functionality."""
-        self.console.print("\n🔍 [bold]Search Options[/bold]")
+    def _interactive_jmespath_search(self) -> None:
+        """Interactive JMESPath search functionality."""
+        self.console.print("\n🔍 [bold]JMESPath Search[/bold]")
+        self.console.print("[dim]Enter a JMESPath query to search your data[/dim]\n")
 
-        search_type = Prompt.ask(
-            "What would you like to search for?",
-            choices=["key", "value", "pair"],
-            default="key",
-        )
-        search_term = Prompt.ask("Enter search term")
-        mode_str = Prompt.ask(
-            "Search mode",
-            choices=[
-                "exact",
-                "contains",
-                "regex",
-                "startswith",
-                "endswith",
-                "case_insensitive",
-            ],
-            default="exact",
-        )
-        search_mode = SearchMode(mode_str)
-        logger.info(
-            "Interactive search: type=%s, term=%s, mode=%s",
-            search_type,
-            search_term,
-            mode_str,
+        # Show examples first if user wants
+        if Confirm.ask("Show example queries?", default=True):
+            self.searcher.print_examples()
+
+        # Get query from user
+        query = Prompt.ask(
+            "\n[bold]Enter JMESPath query[/bold]",
+            default="@",  # @ returns entire document
         )
 
-        results = []
+        logger.info("Interactive JMESPath search: %s", query)
 
-        if search_type == "key":
-            self.console.print(f"\n🔍 Searching for key: '{search_term}'")
-            results = self.searcher.search_keys(self.data, search_term, search_mode)
-        elif search_type == "value":
-            limit_types = Confirm.ask("Limit search to specific data types?")
-            value_types = None
-            if limit_types:
-                value_types = self._get_value_types()
-            self.console.print(f"\n🔍 Searching for value: '{search_term}'")
-            results = self.searcher.search_values(
-                self.data, search_term, search_mode, value_types=value_types
-            )
-        elif search_type == "pair":
-            value_term = Prompt.ask("Enter value to search for")
-            self.console.print(
-                f"\n🔍 Searching for key-value pair: '{search_term}' = '{value_term}'"
-            )
-            results = self.searcher.search_key_value_pairs(
-                self.data, search_term, value_term, search_mode, search_mode
-            )
+        # Validate query
+        valid, error = self.searcher.validate_query(query)
+        if not valid:
+            self.console.print(f"❌ [red]Invalid query: {error}[/red]")
+            return
 
-        self.searcher.print_results(results, mode=search_mode)
+        # Execute search
+        result = self.searcher.search(self.data, query)
+
+        # Display results
+        if result:
+            show_tree = Confirm.ask("Display results as tree?", default=False)
+            self.searcher.print_result(result, show_tree=show_tree)
+
+            # Store last result for potential saving
+            self._last_search_result = result
+
+            if Confirm.ask("\nSave results to file?"):
+                self._save_search_result(result)
+        else:
+            self.console.print("[yellow]No results found.[/yellow]")
 
     def _interactive_stats(self) -> None:
         """Interactive statistics display."""
@@ -207,7 +187,7 @@ class InteractiveHandler:
 
         open_browser = True
 
-        if viz_format in ["browser", "all"]:
+        if viz_format in ["interactive", "html", "all"]:
             open_browser = Confirm.ask(
                 "Open browser for HTML visualizations?", default=True
             )
@@ -228,116 +208,7 @@ class InteractiveHandler:
                 open_browser=open_browser,
             )
         except Exception as e:
-            self.console.print(f"⚠ [red]Visualization error: {e}[/red]")
-
-    def _interactive_filter_search(self) -> None:
-        """Interactive filter search with expression builder."""
-        self.console.print("\n🎯 [bold]Advanced Filter Search[/bold]")
-        self._show_filter_examples()
-
-        filter_expr = Prompt.ask(
-            "\n[bold]Enter filter expression[/bold]",
-            default="isinstance(value, (int, float)) and value > 0",
-        )
-
-        try:
-            filter_func = FilterExpressionParser.parse_filter(filter_expr)
-            self.console.print(f"\n🎯 [yellow]Applying filter: {filter_expr}[/yellow]")
-            results = self.searcher.search_with_filter(self.data, filter_func)
-
-            if results:
-                show_tree = Confirm.ask("Display results as tree?", default=False)
-                self.searcher.print_results(results, show_tree=show_tree)
-                if Confirm.ask("Save results to file?"):
-                    self._save_search_results(results, filter_expr)
-            else:
-                self.console.print("[yellow]No results found.[/yellow]")
-        except Exception as e:
-            self.console.print(f"⚠ [red]Filter error: {e}[/red]")
-            self.console.print(
-                "[yellow]Please check your filter expression syntax.[/yellow]"
-            )
-
-    def _interactive_advanced_search(self) -> None:
-        """Advanced search with multiple criteria."""
-        self.console.print("\n🔎 [bold]Advanced Search Options[/bold]")
-        search_type = Prompt.ask(
-            "Select search type",
-            choices=["key", "value", "pair", "filter"],
-            default="key",
-        )
-        if search_type == "filter":
-            return self._interactive_filter_search()
-
-        search_term = Prompt.ask("Enter search term")
-        mode_str = Prompt.ask(
-            "Search mode",
-            choices=[
-                "exact",
-                "contains",
-                "regex",
-                "startswith",
-                "endswith",
-                "case_insensitive",
-            ],
-            default="exact",
-        )
-        search_mode = SearchMode(mode_str)
-
-        self.console.print("\n[bold]Advanced Options:[/bold]")
-
-        max_results = None
-        if Confirm.ask("Limit number of results?"):
-            max_results = int(Prompt.ask("Maximum results", default="10"))
-
-        min_depth = 0
-        max_depth = None
-        if Confirm.ask("Set depth limits?"):
-            min_depth = int(Prompt.ask("Minimum depth", default="0"))
-            if Confirm.ask("Set maximum depth?"):
-                max_depth = int(Prompt.ask("Maximum depth", default="5"))
-
-        try:
-
-            if search_type == "key":
-                results = self.searcher.search_keys(
-                    self.data,
-                    search_term,
-                    search_mode,
-                    max_results=max_results,
-                    min_depth=min_depth,
-                    max_depth=max_depth,
-                )
-            elif search_type == "value":
-                value_types = (
-                    self._get_value_types()
-                    if Confirm.ask("Limit to specific data types?")
-                    else None
-                )
-                results = self.searcher.search_values(
-                    self.data,
-                    search_term,
-                    search_mode,
-                    value_types=value_types,
-                    max_results=max_results,
-                    min_depth=min_depth,
-                    max_depth=max_depth,
-                )
-            elif search_type == "pair":
-                value_term = Prompt.ask("Enter value to search for")
-                results = self.searcher.search_key_value_pairs(
-                    self.data, search_term, value_term, search_mode, search_mode
-                )
-
-            if results:
-                show_tree = Confirm.ask("Display results as tree?", default=False)
-                self.searcher.print_results(
-                    results, show_tree=show_tree, mode=search_mode
-                )
-            else:
-                self.console.print("[yellow]No results found.[/yellow]")
-        except Exception as e:
-            self.console.print(f"⚠ [red]Search error: {e}[/red]")
+            self.console.print(f"⚠️ [red]Visualization error: {e}[/red]")
 
     def _interactive_codegen(self) -> None:
         """Interactive code generation functionality."""
@@ -345,79 +216,48 @@ class InteractiveHandler:
         codegen_handler.run_interactive()
         logger.info("Interactive code generation completed")
 
-    def _get_value_types(self) -> set[type] | None:
-        """Get value types selection from user."""
-        type_map = {
-            "string": str,
-            "integer": int,
-            "float": float,
-            "boolean": bool,
-            "list": list,
-            "dict": dict,
-        }
-        selected_types = [
-            t for name, t in type_map.items() if Confirm.ask(f"Include {name}?")
-        ]
-        return set(selected_types) if selected_types else None
-
-    def _show_filter_examples(self) -> None:
-        """Show filter expression examples."""
-        examples_panel = Panel.fit(
-            """[bold]Example Filter Expressions:[/bold]
-
-[green]• isinstance(value, int) and value > 10[/green]
-[green]• key.startswith('user') and depth <= 2[/green]
-[green]• 'email' in str(value).lower()[/green]
-[green]• len(str(value)) > 50[/green]
-[green]• isinstance(value, list) and len(value) > 5[/green]
-[green]• depth == 3 and isinstance(value, dict)[/green]""",
-            title="💡 Examples",
-            border_style="green",
-        )
-        self.console.print(examples_panel)
-
-    def _show_filter_help(self):
-        """Show comprehensive help for filter expressions."""
+    def _show_jmespath_help(self) -> None:
+        """Show comprehensive help for JMESPath queries."""
         help_panel = Panel.fit(
-            """[bold blue]🔧 Filter Expression Reference[/bold blue]
+            """[bold blue]🔧 JMESPath Query Reference[/bold blue]
 
-[bold]Available Variables:[/bold]
-• [cyan]key[/cyan] - The current key name (string)
-• [cyan]value[/cyan] - The current value (any type)
-• [cyan]depth[/cyan] - Current depth in the JSON structure (integer)
+[bold]Basic Expressions:[/bold]
+• [cyan]users[/cyan] - Get the 'users' key
+• [cyan]users[0][/cyan] - Get first item in users array
+• [cyan]users[-1][/cyan] - Get last item in users array
+• [cyan]users[*][/cyan] - Get all items in users array
 
-[bold]Available Functions:[/bold]
-• [cyan]isinstance(value, type)[/cyan] - Check value type
-• [cyan]len(value)[/cyan] - Get length of value
-• [cyan]str(value)[/cyan] - Convert to string
-• [cyan]int(value)[/cyan], [cyan]float(value)[/cyan] - Type conversion
-• [cyan]hasattr(value, attr)[/cyan] - Check if value has attribute
-• [cyan]type(value)[/cyan] - Get value type
+[bold]Nested Access:[/bold]
+• [cyan]users[0].name[/cyan] - Get name of first user
+• [cyan]users[*].name[/cyan] - Get all user names (projection)
+• [cyan]metadata.created_at[/cyan] - Access nested fields
 
-[bold]String Methods (use with str(value) or key):[/bold]
-• [cyan].startswith('prefix')[/cyan]
-• [cyan].endswith('suffix')[/cyan]
-• [cyan].lower()[/cyan], [cyan].upper()[/cyan]
-• [cyan]'substring' in string[/cyan]
+[bold]Filtering:[/bold]
+• [cyan]users[?age > `30`][/cyan] - Filter users by age
+• [cyan]users[?active == `true`][/cyan] - Filter by boolean
+• [cyan]users[?age > `30` && active == `true`][/cyan] - Multiple conditions
 
-[bold]Operators:[/bold]
-• Comparison: [cyan]==, !=, <, <=, >, >=[/cyan]
-• Logical: [cyan]and, or, not[/cyan]
-• Membership: [cyan]in, not in[/cyan]
-• Arithmetic: [cyan]+, -, *, /, %[/cyan]
+[bold]Functions:[/bold]
+• [cyan]length(users)[/cyan] - Count items
+• [cyan]sort_by(users, &age)[/cyan] - Sort by field
+• [cyan]max_by(users, &age)[/cyan] - Get item with max value
+• [cyan]contains(name, 'John')[/cyan] - Check if contains string
 
-[bold]Complex Examples:[/bold]
-[green]isinstance(value, dict) and len(value) > 3[/green]
-[green]key.endswith('_id') and isinstance(value, int)[/green]
-[green]depth >= 2 and 'user' in key.lower()[/green]
-[green]isinstance(value, str) and len(value) > 10 and '@' in value[/green]""",
+[bold]Projections:[/bold]
+• [cyan]users[*].{name: name, email: email}[/cyan] - Select fields
+• [cyan]users[?age > `30`].name[/cyan] - Filter then project
+
+[bold]Learn More:[/bold]
+• Tutorial: https://jmespath.org/tutorial.html
+• Specification: https://jmespath.org/specification.html
+• Try it online: https://jmespath.org/""",
             border_style="blue",
         )
         self.console.print(help_panel)
 
     def _load_new_data(self) -> None:
         """Load new JSON data from file or URL."""
-        self.console.print("\n📁 [bold]Load New Data[/bold]")
+        self.console.print("\n📂 [bold]Load New Data[/bold]")
         source_type = Prompt.ask("Data source", choices=["file", "url"], default="file")
 
         try:
@@ -430,12 +270,12 @@ class InteractiveHandler:
 
             self.console.print(f"✅ [green]Successfully loaded: {self.source}[/green]")
         except Exception as e:
-            self.console.print(f"⚠ [red]Failed to load data: {e}[/red]")
+            self.console.print(f"⚠️ [red]Failed to load data: {e}[/red]")
 
     def _show_data_summary(self) -> None:
         """Show a quick summary of the loaded data."""
         if not self.data:
-            self.console.print("⚠ [red]No data loaded[/red]")
+            self.console.print("⚠️ [red]No data loaded[/red]")
             return
 
         self.console.print("\n📋 [bold]Data Summary[/bold]")
@@ -451,42 +291,40 @@ class InteractiveHandler:
         if isinstance(self.data, dict):
             summary_table.add_row("Top-level Keys", str(len(self.data.keys())))
             if self.data:
-                summary_table.add_row(
-                    "Sample Keys", ", ".join(str(k) for k in list(self.data.keys())[:5])
-                )
+                sample_keys = ", ".join(str(k) for k in list(self.data.keys())[:5])
+                summary_table.add_row("Sample Keys", sample_keys)
 
         self.console.print(summary_table)
 
-    def _save_search_results(self, results: list, filter_expr: str) -> None:
-        """Save search results to a JSON file.
+    def _save_search_result(self, result: Any) -> None:
+        """Save a single search result to a JSON file.
 
         Args:
-            results: List of search result objects.
-            filter_expr: Filter expression used for the search.
+            result: SearchResult object to save.
         """
         filename = Prompt.ask(
             "Enter filename",
-            default=f"search_results_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json",
+            default=f"search_result_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json",
         )
         try:
-            serializable_results = [
-                {
-                    "path": r.path,
-                    "value": r.value,
-                    "parent_key": r.parent_key,
-                    "depth": r.depth,
-                    "data_type": r.data_type,
-                }
-                for r in results
-            ]
             output_data = {
-                "filter_expression": filter_expr,
+                "query": result.query,
                 "timestamp": datetime.now().isoformat(),
-                "total_results": len(results),
-                "results": serializable_results,
+                "result_type": result.data_type,
+                "result": result.value,
             }
             with open(filename, "w", encoding="utf-8") as f:
                 json.dump(output_data, f, indent=2, ensure_ascii=False)
-            self.console.print(f"✅ [green]Results saved to: {filename}[/green]")
+            self.console.print(f"✅ [green]Result saved to: {filename}[/green]")
         except Exception as e:
-            self.console.print(f"⚠ [red]Error saving results: {e}[/red]")
+            self.console.print(f"⚠️ [red]Error saving result: {e}[/red]")
+
+    def _save_query_results(self) -> None:
+        """Save the last search results if available."""
+        if not hasattr(self, "_last_search_result"):
+            self.console.print(
+                "[yellow]No search results to save. Run a search first.[/yellow]"
+            )
+            return
+
+        self._save_search_result(self._last_search_result)

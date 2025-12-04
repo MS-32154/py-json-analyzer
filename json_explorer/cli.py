@@ -3,10 +3,9 @@ from typing import Any
 from rich.console import Console
 
 from .tree_view import print_json_analysis, print_compact_tree
-from .search import JsonSearcher, SearchMode
+from .search import JsonSearcher
 from .stats import DataStatsAnalyzer
 from .visualizer import JSONVisualizer
-from .filter_parser import FilterExpressionParser
 from .logging_config import get_logger
 
 logger = get_logger(__name__)
@@ -69,8 +68,6 @@ class CLIHandler:
         if getattr(args, "plot", False):
             self._handle_visualization(args)
 
-        # Note: Code generation is handled by main.py -> handle_codegen_command()
-        # This keeps the CLI focused on core analysis features
         return 0
 
     def _handle_tree_display(self, tree_type: str) -> None:
@@ -93,53 +90,29 @@ class CLIHandler:
             self.console.print(f"❌ [red]Unknown tree type: {tree_type}[/red]")
 
     def _handle_search(self, args: Any) -> None:
-        """Handle search operations.
+        """Handle JMESPath search operations.
 
         Args:
             args: Parsed CLI arguments containing search parameters.
         """
-        search_mode = SearchMode(args.search_mode)
-        search_term = args.search
+        query = args.search
+        logger.info("Performing JMESPath search: %s", query)
 
-        logger.info(
-            "Performing search: type=%s, term=%s", args.search_type, search_term
-        )
-
-        # Determine search type
-        results = []
-        if args.search_type == "key":
-            results = self.searcher.search_keys(self.data, search_term, search_mode)
-        elif args.search_type == "value":
-            results = self.searcher.search_values(self.data, search_term, search_mode)
-        elif args.search_type == "pair":
-            if not getattr(args, "search_value", None):
-                self.console.print(
-                    "❌ [red]--search-value required for pair search[/red]"
-                )
-                logger.warning("Pair search attempted without search_value")
-                return
-            results = self.searcher.search_key_value_pairs(
-                self.data, search_term, args.search_value, search_mode, search_mode
-            )
-        elif args.search_type == "filter":
-            try:
-                filter_func = FilterExpressionParser.parse_filter(search_term)
-                results = self.searcher.search_with_filter(self.data, filter_func)
-            except Exception as e:
-                self.console.print(f"❌ [red]Filter error: {e}[/red]")
-                logger.error("Filter search failed: %s", e)
-                return
-        else:
-            self.console.print(f"❌ [red]Unknown search type: {args.search_type}[/red]")
-            logger.warning("Unknown search type: %s", args.search_type)
+        # Validate query first
+        valid, error = self.searcher.validate_query(query)
+        if not valid:
+            self.console.print(f"❌ [red]Invalid JMESPath query: {error}[/red]")
+            logger.error("Invalid JMESPath query: %s", error)
             return
 
+        # Execute search
+        result = self.searcher.search(self.data, query)
+
         # Display results
-        if results:
+        if result:
             show_tree = getattr(args, "tree_results", False)
-            self.searcher.print_results(results, show_tree=show_tree, mode=search_mode)
-            self.console.print(f"\n📊 Found {len(results)} result(s)")
-            logger.info("Search completed: %d results found", len(results))
+            self.searcher.print_result(result, show_tree=show_tree)
+            logger.info("Search completed successfully")
         else:
             self.console.print("[yellow]No results found.[/yellow]")
             logger.info("Search completed: no results found")
@@ -161,7 +134,7 @@ class CLIHandler:
         Args:
             args: Parsed CLI arguments containing visualization options.
         """
-        plot_format = getattr(args, "plot_format", "matplotlib")
+        plot_format = getattr(args, "plot_format", "interactive")
         save_path = getattr(args, "save_path", None)
         detailed = getattr(args, "detailed", False)
         open_browser = not getattr(args, "no_browser", False)

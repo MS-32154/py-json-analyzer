@@ -2,7 +2,7 @@
 
 from .logging_config import configure_logging, get_logger
 from .analyzer import analyze_json
-from .search import JsonSearcher, SearchMode, SearchResult
+from .search import JsonSearcher, SearchResult
 from .stats import DataStatsAnalyzer, generate_stats
 from .visualizer import JSONVisualizer, visualize_json
 from .utils import load_json, JSONLoaderError
@@ -16,9 +16,8 @@ __all__ = [
     # Core
     "analyze_json",
     "load_json",
-    # Search
+    # Search (now JMESPath-based)
     "JsonSearcher",
-    "SearchMode",
     "SearchResult",
     # Statistics
     "DataStatsAnalyzer",

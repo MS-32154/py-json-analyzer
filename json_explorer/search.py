@@ -1,14 +1,14 @@
-"""Advanced JSON search functionality with multiple modes and filtering.
+"""JMESPath-based JSON search functionality.
 
-This module provides comprehensive search capabilities for JSON structures,
-including key/value searches, pattern matching, and custom filter functions.
+This module provides JSON search capabilities using JMESPath query language,
+which offers powerful and declarative JSON querying.
 """
 
-import re
 from dataclasses import dataclass
-from enum import Enum
-from typing import Any, Callable
+from typing import Any
 
+import jmespath
+from jmespath.exceptions import JMESPathError
 from rich.console import Console
 from rich.table import Table
 from rich.tree import Tree
@@ -18,46 +18,20 @@ from .logging_config import get_logger
 logger = get_logger(__name__)
 
 
-class SearchMode(Enum):
-    """Search mode options for pattern matching."""
-
-    EXACT = "exact"
-    CONTAINS = "contains"
-    REGEX = "regex"
-    STARTSWITH = "startswith"
-    ENDSWITH = "endswith"
-    CASE_INSENSITIVE = "case_insensitive"
-
-    def __str__(self) -> str:
-        return self.value
-
-    @classmethod
-    def _missing_(cls, value: object) -> "SearchMode | None":
-        """Handle missing enum values."""
-        for member in cls:
-            if member.value == value:
-                return member
-        return None
-
-
 @dataclass
 class SearchResult:
     """Represents a search result with path and context.
 
     Attributes:
-        path: JSON path to the found item.
-        value: The value found.
-        parent_key: Key of the parent object (if applicable).
-        parent_value: Value of the parent (if applicable).
-        depth: Depth in the JSON structure.
+        path: JSON path expression used.
+        value: The value(s) found.
+        query: Original JMESPath query.
         data_type: Type name of the value.
     """
 
     path: str
     value: Any
-    parent_key: str | None = None
-    parent_value: Any | None = None
-    depth: int = 0
+    query: str
     data_type: str = ""
 
     def __post_init__(self) -> None:
@@ -66,15 +40,15 @@ class SearchResult:
 
 
 class JsonSearcher:
-    """JSON search utility with multiple search modes and rich output.
+    """JMESPath-based JSON search utility with rich output.
 
-    This class provides various search capabilities including key search,
-    value search, key-value pair search, and custom filter functions.
+    This class provides JSON search capabilities using JMESPath query language,
+    which is more powerful and standardized than custom search implementations.
 
     Example:
         >>> searcher = JsonSearcher()
-        >>> results = searcher.search_keys(data, "user", SearchMode.CONTAINS)
-        >>> searcher.print_results(results)
+        >>> result = searcher.search(data, "users[?age > `30`].name")
+        >>> searcher.print_result(result)
     """
 
     def __init__(self, console: Console | None = None) -> None:
@@ -84,407 +58,250 @@ class JsonSearcher:
             console: Optional Rich console for output.
         """
         self.console = console or Console()
-        self.results: list[SearchResult] = []
         logger.debug("JsonSearcher initialized")
 
-    def search_keys(
+    def search(
         self,
         data: Any,
-        target_key: str,
-        mode: SearchMode = SearchMode.EXACT,
-        max_results: int | None = None,
-        min_depth: int = 0,
-        max_depth: int | None = None,
-    ) -> list[SearchResult]:
-        """Search for keys in JSON data with various matching modes.
+        query: str,
+        compile_query: bool = False,
+    ) -> SearchResult | None:
+        """Search JSON data using JMESPath query.
 
         Args:
             data: JSON data to search.
-            target_key: Key pattern to search for.
-            mode: Search mode for matching.
-            max_results: Maximum number of results to return.
-            min_depth: Minimum depth to search.
-            max_depth: Maximum depth to search.
+            query: JMESPath query expression.
+            compile_query: If True, compile query for better performance
+                          when running same query multiple times.
 
         Returns:
-            List of search results.
+            SearchResult object or None if query fails.
 
         Example:
-            >>> results = searcher.search_keys(
-            ...     data, "email", SearchMode.CONTAINS, max_results=10
+            >>> # Simple path
+            >>> result = searcher.search(data, "users[0].name")
+
+            >>> # Filter with condition
+            >>> result = searcher.search(data, "users[?age > `30`]")
+
+            >>> # Projection
+            >>> result = searcher.search(data, "users[*].email")
+
+            >>> # Complex query
+            >>> result = searcher.search(
+            ...     data,
+            ...     "users[?age > `30`].{name: name, email: email}"
             ... )
         """
-        logger.info(f"Searching for key '{target_key}' with mode {mode}")
-        self.results = []
-        self._search_keys_recursive(
-            data, target_key, mode, "root", 0, min_depth, max_depth
-        )
+        logger.info(f"Executing JMESPath query: {query}")
 
-        if max_results:
-            self.results = self.results[:max_results]
+        try:
+            if compile_query:
+                compiled = jmespath.compile(query)
+                result_value = compiled.search(data)
+            else:
+                result_value = jmespath.search(query, data)
 
-        logger.info(f"Found {len(self.results)} results")
-        return self.results
+            if result_value is None:
+                logger.info("Query returned no results")
+                return None
 
-    def search_values(
+            result = SearchResult(path=query, value=result_value, query=query)
+            logger.info(f"Query successful, result type: {result.data_type}")
+            return result
+
+        except JMESPathError as e:
+            logger.error(f"JMESPath query error: {e}")
+            self.console.print(f"[red]Query error: {e}[/red]")
+            return None
+        except Exception as e:
+            logger.error(f"Unexpected error during search: {e}", exc_info=True)
+            self.console.print(f"[red]Unexpected error: {e}[/red]")
+            return None
+
+    def search_multiple(
         self,
         data: Any,
-        target_value: Any,
-        mode: SearchMode = SearchMode.EXACT,
-        value_types: set[type] | None = None,
-        max_results: int | None = None,
-        min_depth: int = 0,
-        max_depth: int | None = None,
-    ) -> list[SearchResult]:
-        """Search for values in JSON data with various matching modes.
+        queries: list[str],
+    ) -> dict[str, SearchResult]:
+        """Execute multiple JMESPath queries on the same data.
 
         Args:
             data: JSON data to search.
-            target_value: Value pattern to search for.
-            mode: Search mode for matching.
-            value_types: Optional set of types to filter by.
-            max_results: Maximum number of results to return.
-            min_depth: Minimum depth to search.
-            max_depth: Maximum depth to search.
+            queries: List of JMESPath query expressions.
 
         Returns:
-            List of search results.
+            Dictionary mapping query strings to SearchResult objects.
 
         Example:
-            >>> # Find all strings containing '@'
-            >>> results = searcher.search_values(
-            ...     data, "@", SearchMode.CONTAINS, value_types={str}
-            ... )
+            >>> queries = [
+            ...     "users[*].name",
+            ...     "users[?age > `30`]",
+            ...     "metadata.total"
+            ... ]
+            >>> results = searcher.search_multiple(data, queries)
         """
-        logger.info(f"Searching for value '{target_value}' with mode {mode}")
-        self.results = []
-        self._search_values_recursive(
-            data, target_value, mode, "root", 0, value_types, min_depth, max_depth
-        )
+        logger.info(f"Executing {len(queries)} JMESPath queries")
+        results = {}
 
-        if max_results:
-            self.results = self.results[:max_results]
+        for query in queries:
+            result = self.search(data, query)
+            if result is not None:
+                results[query] = result
 
-        logger.info(f"Found {len(self.results)} results")
-        return self.results
+        logger.info(f"Completed {len(results)}/{len(queries)} queries successfully")
+        return results
 
-    def search_key_value_pairs(
-        self,
-        data: Any,
-        key_pattern: str,
-        value_pattern: Any,
-        key_mode: SearchMode = SearchMode.EXACT,
-        value_mode: SearchMode = SearchMode.EXACT,
-    ) -> list[SearchResult]:
-        """Search for key-value pairs matching both patterns.
+    def validate_query(self, query: str) -> tuple[bool, str | None]:
+        """Validate a JMESPath query without executing it.
 
         Args:
-            data: JSON data to search.
-            key_pattern: Key pattern to match.
-            value_pattern: Value pattern to match.
-            key_mode: Search mode for key matching.
-            value_mode: Search mode for value matching.
+            query: JMESPath query expression to validate.
 
         Returns:
-            List of search results.
+            Tuple of (is_valid, error_message).
 
         Example:
-            >>> # Find all 'status' keys with value 'active'
-            >>> results = searcher.search_key_value_pairs(
-            ...     data, "status", "active"
-            ... )
-        """
-        logger.info(
-            f"Searching for pairs: key='{key_pattern}' ({key_mode}), "
-            f"value='{value_pattern}' ({value_mode})"
-        )
-        self.results = []
-        self._search_pairs_recursive(
-            data, key_pattern, value_pattern, key_mode, value_mode, "root", 0
-        )
-        logger.info(f"Found {len(self.results)} results")
-        return self.results
-
-    def search_with_filter(
-        self,
-        data: Any,
-        filter_func: Callable[[str, Any, int], bool],
-        path: str = "root",
-        depth: int = 0,
-    ) -> list[SearchResult]:
-        """Search using a custom filter function.
-
-        Args:
-            data: JSON data to search.
-            filter_func: Function that takes (key, value, depth) and returns bool.
-            path: Starting path (default: "root").
-            depth: Starting depth (default: 0).
-
-        Returns:
-            List of search results.
-
-        Example:
-            >>> # Find all integers greater than 10
-            >>> filter_func = lambda k, v, d: isinstance(v, int) and v > 10
-            >>> results = searcher.search_with_filter(data, filter_func)
-        """
-        logger.info("Searching with custom filter function")
-        self.results = []
-        self._search_with_filter_recursive(data, filter_func, path, depth)
-        logger.info(f"Found {len(self.results)} results")
-        return self.results
-
-    def _search_keys_recursive(
-        self,
-        data: Any,
-        target_key: str,
-        mode: SearchMode,
-        path: str,
-        depth: int,
-        min_depth: int,
-        max_depth: int | None,
-    ) -> None:
-        """Recursive key search implementation."""
-        if max_depth is not None and depth > max_depth:
-            return
-
-        if isinstance(data, dict):
-            for key, value in data.items():
-                new_path = f"{path}.{key}"
-
-                if depth >= min_depth and self._matches(key, target_key, mode):
-                    result = SearchResult(
-                        path=new_path, value=value, parent_key=key, depth=depth
-                    )
-                    self.results.append(result)
-
-                self._search_keys_recursive(
-                    value, target_key, mode, new_path, depth + 1, min_depth, max_depth
-                )
-
-        elif isinstance(data, list):
-            for idx, item in enumerate(data):
-                new_path = f"{path}[{idx}]"
-                self._search_keys_recursive(
-                    item, target_key, mode, new_path, depth + 1, min_depth, max_depth
-                )
-
-    def _search_values_recursive(
-        self,
-        data: Any,
-        target_value: Any,
-        mode: SearchMode,
-        path: str,
-        depth: int,
-        value_types: set[type] | None,
-        min_depth: int,
-        max_depth: int | None,
-    ) -> None:
-        """Recursive value search implementation."""
-        if max_depth is not None and depth > max_depth:
-            return
-
-        if isinstance(data, dict):
-            for key, value in data.items():
-                new_path = f"{path}.{key}"
-                self._search_values_recursive(
-                    value,
-                    target_value,
-                    mode,
-                    new_path,
-                    depth + 1,
-                    value_types,
-                    min_depth,
-                    max_depth,
-                )
-
-        elif isinstance(data, list):
-            for idx, item in enumerate(data):
-                new_path = f"{path}[{idx}]"
-                self._search_values_recursive(
-                    item,
-                    target_value,
-                    mode,
-                    new_path,
-                    depth + 1,
-                    value_types,
-                    min_depth,
-                    max_depth,
-                )
-        else:
-            if depth >= min_depth:
-                if value_types is None or type(data) in value_types:
-                    if self._matches(data, target_value, mode):
-                        result = SearchResult(path=path, value=data, depth=depth)
-                        self.results.append(result)
-
-    def _search_pairs_recursive(
-        self,
-        data: Any,
-        key_pattern: str,
-        value_pattern: Any,
-        key_mode: SearchMode,
-        value_mode: SearchMode,
-        path: str,
-        depth: int,
-    ) -> None:
-        """Recursive key-value pair search implementation."""
-        if isinstance(data, dict):
-            for key, value in data.items():
-                new_path = f"{path}.{key}"
-
-                if self._matches(key, key_pattern, key_mode) and self._matches(
-                    value, value_pattern, value_mode
-                ):
-                    result = SearchResult(
-                        path=new_path, value=value, parent_key=key, depth=depth
-                    )
-                    self.results.append(result)
-
-                self._search_pairs_recursive(
-                    value,
-                    key_pattern,
-                    value_pattern,
-                    key_mode,
-                    value_mode,
-                    new_path,
-                    depth + 1,
-                )
-
-        elif isinstance(data, list):
-            for idx, item in enumerate(data):
-                new_path = f"{path}[{idx}]"
-                self._search_pairs_recursive(
-                    item,
-                    key_pattern,
-                    value_pattern,
-                    key_mode,
-                    value_mode,
-                    new_path,
-                    depth + 1,
-                )
-
-    def _search_with_filter_recursive(
-        self,
-        data: Any,
-        filter_func: Callable[[str, Any, int], bool],
-        path: str,
-        depth: int,
-    ) -> None:
-        """Recursive search with custom filter function."""
-        if isinstance(data, dict):
-            for key, value in data.items():
-                new_path = f"{path}.{key}"
-
-                if filter_func(key, value, depth):
-                    result = SearchResult(
-                        path=new_path, value=value, parent_key=key, depth=depth
-                    )
-                    self.results.append(result)
-
-                self._search_with_filter_recursive(
-                    value, filter_func, new_path, depth + 1
-                )
-
-        elif isinstance(data, list):
-            for idx, item in enumerate(data):
-                new_path = f"{path}[{idx}]"
-                self._search_with_filter_recursive(
-                    item, filter_func, new_path, depth + 1
-                )
-
-    def _matches(self, actual: Any, target: Any, mode: SearchMode) -> bool:
-        """Check if actual value matches target based on mode.
-
-        Args:
-            actual: Actual value to check.
-            target: Target pattern to match.
-            mode: Search mode to use.
-
-        Returns:
-            True if match found, False otherwise.
+            >>> valid, error = searcher.validate_query("users[*].name")
+            >>> if not valid:
+            ...     print(f"Invalid query: {error}")
         """
         try:
-            if mode == SearchMode.EXACT:
-                return actual == target
+            jmespath.compile(query)
+            return True, None
+        except JMESPathError as e:
+            return False, str(e)
+        except Exception as e:
+            return False, f"Unexpected error: {e}"
 
-            actual_str = str(actual)
-            target_str = str(target)
-
-            if mode == SearchMode.CASE_INSENSITIVE:
-                return actual_str.lower() == target_str.lower()
-            elif mode == SearchMode.CONTAINS:
-                return target_str in actual_str
-            elif mode == SearchMode.STARTSWITH:
-                return actual_str.startswith(target_str)
-            elif mode == SearchMode.ENDSWITH:
-                return actual_str.endswith(target_str)
-            elif mode == SearchMode.REGEX:
-                return bool(re.search(target_str, actual_str))
-
-            return False
-        except (TypeError, AttributeError) as e:
-            logger.debug(f"Match error: {e}")
-            return False
-
-    def print_results(
+    def print_result(
         self,
-        results: list[SearchResult] | None = None,
+        result: SearchResult | None,
         show_tree: bool = False,
-        mode: SearchMode | None = None,
+        max_display_length: int = 100,
     ) -> None:
-        """Print search results in a formatted table or tree.
+        """Print search result in a formatted way.
 
         Args:
-            results: Results to print (uses self.results if None).
+            result: SearchResult to print.
             show_tree: If True, display as tree; otherwise as table.
-            mode: Optional search mode to display.
+            max_display_length: Maximum length for displayed values.
         """
-        results = results or self.results
-
-        if mode:
-            self.console.print(f"⚙️ Search mode: [yellow]{mode}[/yellow]\n")
-
-        if not results:
+        if result is None:
             self.console.print("[yellow]No results found.[/yellow]")
             return
 
+        self.console.print(f"\n[cyan]Query:[/cyan] {result.query}")
+        self.console.print(f"[cyan]Result Type:[/cyan] {result.data_type}\n")
+
         if show_tree:
-            self._print_results_tree(results)
+            self._print_result_tree(result)
         else:
-            self._print_results_table(results)
+            self._print_result_table(result, max_display_length)
 
-    def _print_results_table(self, results: list[SearchResult]) -> None:
-        """Print results in a table format."""
-        table = Table(title=f"Search Results ({len(results)} found)")
-        table.add_column("Path", style="cyan", no_wrap=True)
-        table.add_column("Value", style="green")
-        table.add_column("Type", style="yellow")
-        table.add_column("Depth", style="blue", justify="center")
+    def _print_result_table(self, result: SearchResult, max_length: int) -> None:
+        """Print result in a table format."""
 
-        for result in results:
+        # For list results, show each item
+        if isinstance(result.value, list):
+            table = Table(title=f"Results ({len(result.value)} items)")
+            table.add_column("Index", style="cyan", justify="center")
+            table.add_column("Value", style="green")
+            table.add_column("Type", style="yellow")
+
+            for idx, item in enumerate(result.value):
+                value_str = str(item)
+                if len(value_str) > max_length:
+                    value_str = value_str[: max_length - 3] + "..."
+
+                table.add_row(str(idx), value_str, type(item).__name__)
+
+            self.console.print(table)
+
+        # For dict results, show key-value pairs
+        elif isinstance(result.value, dict):
+            table = Table(title="Result")
+            table.add_column("Key", style="cyan")
+            table.add_column("Value", style="green")
+            table.add_column("Type", style="yellow")
+
+            for key, value in result.value.items():
+                value_str = str(value)
+                if len(value_str) > max_length:
+                    value_str = value_str[: max_length - 3] + "..."
+
+                table.add_row(str(key), value_str, type(value).__name__)
+
+            self.console.print(table)
+
+        # For scalar results, show directly
+        else:
             value_str = str(result.value)
+            if len(value_str) > max_length:
+                value_str = value_str[: max_length - 3] + "..."
+
+            self.console.print(f"[green]{value_str}[/green]")
+
+    def _print_result_tree(self, result: SearchResult) -> None:
+        """Print result in a tree format."""
+        tree = Tree(f"[bold blue]Query Result[/bold blue]: {result.query}")
+        self._add_tree_node(tree, result.value, "result")
+        self.console.print(tree)
+
+    def _add_tree_node(self, parent: Tree, value: Any, key: str = "") -> None:
+        """Recursively add nodes to tree."""
+        if isinstance(value, dict):
+            node = parent.add(f"[cyan]{key}[/cyan] [dim](dict)[/dim]")
+            for k, v in value.items():
+                self._add_tree_node(node, v, k)
+
+        elif isinstance(value, list):
+            node = parent.add(f"[cyan]{key}[/cyan] [dim](list)[/dim]")
+            for idx, item in enumerate(value):
+                self._add_tree_node(node, item, f"[{idx}]")
+
+        else:
+            value_str = str(value)
             if len(value_str) > 50:
                 value_str = value_str[:47] + "..."
+            parent.add(f"[cyan]{key}[/cyan] = [green]{value_str}[/green]")
 
-            table.add_row(result.path, value_str, result.data_type, str(result.depth))
+    def get_query_examples(self) -> dict[str, str]:
+        """Get common JMESPath query examples with descriptions.
+
+        Returns:
+            Dictionary mapping descriptions to query examples.
+        """
+        return {
+            "Get all user names": "users[*].name",
+            "Filter users over 30": "users[?age > `30`]",
+            "Get first user": "users[0]",
+            "Get last user": "users[-1]",
+            "Select specific fields": "users[*].{name: name, email: email}",
+            "Filter and project": "users[?age > `30`].name",
+            "Count items": "length(users)",
+            "Get nested value": "metadata.created_at",
+            "Flatten nested arrays": "users[].tags[]",
+            "Filter with contains": "users[?contains(name, 'John')]",
+            "Sort by field": "sort_by(users, &age)",
+            "Get max value": "max_by(users, &age).name",
+            "Multi-condition filter": "users[?age > `30` && active == `true`]",
+        }
+
+    def print_examples(self) -> None:
+        """Print JMESPath query examples."""
+        examples = self.get_query_examples()
+
+        table = Table(title="🔍 JMESPath Query Examples")
+        table.add_column("Description", style="cyan")
+        table.add_column("Query", style="green")
+
+        for description, query in examples.items():
+            table.add_row(description, query)
 
         self.console.print(table)
 
-    def _print_results_tree(self, results: list[SearchResult]) -> None:
-        """Print results in a tree format."""
-        tree = Tree("[bold blue]Search Results[/bold blue]")
-
-        for result in results:
-            value_str = str(result.value)
-            if len(value_str) > 100:
-                value_str = value_str[:97] + "..."
-
-            node_text = (
-                f"[cyan]{result.path}[/cyan] = "
-                f"[green]{value_str}[/green] "
-                f"[dim]({result.data_type})[/dim]"
-            )
-            tree.add(node_text)
-
-        self.console.print(tree)
+        self.console.print("\n[bold]Additional Resources:[/bold]")
+        self.console.print("• Tutorial: https://jmespath.org/tutorial.html")
+        self.console.print("• Specification: https://jmespath.org/specification.html")
+        self.console.print("• Interactive: https://jmespath.org/")

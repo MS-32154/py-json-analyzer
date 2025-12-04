@@ -7,9 +7,9 @@ Entry point for the JSON Explorer CLI tool.
 
 Author: MS-32154
 email: msttoffg@gmail.com
-Version: 0.3.0
+Version: 0.4.0
 License: MIT
-Date: 2025-09-01
+Date: 2025-01-01
 """
 
 import argparse
@@ -122,14 +122,20 @@ def create_parser() -> argparse.ArgumentParser:
 Examples:
   %(prog)s data.json --interactive
   %(prog)s data.json --tree compact --stats
-  %(prog)s data.json --search "name" --search-type key
-  %(prog)s data.json --search "isinstance(value, int) and value > 10" --search-type filter
+  %(prog)s data.json --search "users[*].name"
+  %(prog)s data.json --search "users[?age > \`30\`]"
   %(prog)s --url https://api.example.com/data --plot
+  
+JMESPath Query Examples:
+  %(prog)s data.json --search "users[0]"                    # First user
+  %(prog)s data.json --search "users[*].email"              # All emails
+  %(prog)s data.json --search "users[?age > \`30\`]"        # Filter by age
+  %(prog)s data.json --search "sort_by(users, &age)"        # Sort users
+  %(prog)s data.json --search "length(users)"               # Count users
   
 Code Generation:
   %(prog)s data.json --generate go --output user.go --root-name User
-  %(prog)s data.json --generate go --package-name models --no-pointers
-  %(prog)s data.json --generate go --config my-config.json
+  %(prog)s data.json --generate python --package-name models
   %(prog)s --list-languages
         """,
     )
@@ -163,40 +169,22 @@ Code Generation:
         help="Display JSON tree structure",
     )
 
-    # Search operations
-    search_group = parser.add_argument_group("search options")
+    # JMESPath search operations
+    search_group = parser.add_argument_group("JMESPath search options")
     search_group.add_argument(
-        "--search", type=str, help="Search query or filter expression"
-    )
-    search_group.add_argument(
-        "--search-type",
-        choices=["key", "value", "pair", "filter"],
-        default="key",
-        help="Type of search to perform",
-    )
-    search_group.add_argument(
-        "--search-value",
+        "--search",
         type=str,
-        help="Value to search for (used with --search-type pair)",
-    )
-    search_group.add_argument(
-        "--search-mode",
-        type=str,
-        choices=[
-            "exact",
-            "contains",
-            "regex",
-            "startswith",
-            "endswith",
-            "case_insensitive",
-        ],
-        default="exact",
-        help="Search mode",
+        help="JMESPath query expression (e.g., 'users[*].name' or 'users[?age > `30`]')",
     )
     search_group.add_argument(
         "--tree-results",
         action="store_true",
         help="Display search results in tree format",
+    )
+    search_group.add_argument(
+        "--show-examples",
+        action="store_true",
+        help="Show JMESPath query examples",
     )
 
     # Analysis options
@@ -257,6 +245,13 @@ def main() -> int:
     if hasattr(args, "language_info") and args.language_info:
         explorer = JSONExplorer()
         return explorer.run(args)
+
+    if hasattr(args, "show_examples") and args.show_examples:
+        from .search import JsonSearcher
+
+        searcher = JsonSearcher()
+        searcher.print_examples()
+        return 0
 
     # For codegen, we need either file or url
     if hasattr(args, "generate") and args.generate:
