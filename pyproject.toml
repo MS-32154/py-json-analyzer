@@ -10,15 +10,15 @@ authors = [
     { name="MS-32154", email="msttoffg@gmail.com" }
 ]
 dependencies = [
-    "dateparser"
-    "jmespath"
-    "jinja2"
-    "numpy"
-    "plotly"
-    "prompt_toolkit"
-    "requests"
-    "rich"
-    "setuptools"
+    "dateparser",
+    "jmespath",
+    "jinja2",
+    "numpy",
+    "plotly",
+    "prompt_toolkit",
+    "requests",
+    "rich",
+    "setuptools",
     "windows-curses; sys_platform == 'win32'"
 ]
 requires-python = ">=3.7"
