@@ -9,10 +9,9 @@ Example:
     >>> print(code)
 """
 
-import logging
+from json_explorer.logging_config import get_logger
 
-
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 # Import core interfaces
 from .core import (

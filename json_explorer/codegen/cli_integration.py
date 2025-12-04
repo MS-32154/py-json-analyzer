@@ -6,7 +6,6 @@ Provides command-line interface for the codegen module.
 
 import argparse
 import json
-import logging
 import sys
 from pathlib import Path
 
@@ -26,7 +25,9 @@ from . import (
 from json_explorer.analyzer import analyze_json
 from json_explorer.utils import load_json
 
-logger = logging.getLogger(__name__)
+from json_explorer.logging_config import get_logger
+
+logger = get_logger(__name__)
 console = Console()
 
 

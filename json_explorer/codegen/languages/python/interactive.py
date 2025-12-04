@@ -5,7 +5,6 @@ Provides Python-specific configuration options, templates, and examples
 for the interactive code generation interface.
 """
 
-import logging
 from typing import Any
 
 from rich.console import Console
@@ -21,7 +20,9 @@ from .config import (
     get_strict_dataclass_config,
 )
 
-logger = logging.getLogger(__name__)
+from json_explorer.logging_config import get_logger
+
+logger = get_logger(__name__)
 
 
 # ============================================================================

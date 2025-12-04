@@ -5,12 +5,13 @@ Converts analyzer output into normalized Schema/Field objects that
 generators can work with consistently across languages.
 """
 
-import logging
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any
 
-logger = logging.getLogger(__name__)
+from json_explorer.logging_config import get_logger
+
+logger = get_logger(__name__)
 
 
 # ============================================================================

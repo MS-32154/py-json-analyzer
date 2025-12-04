@@ -4,7 +4,6 @@ Python code generator implementation.
 Generates Python dataclasses, Pydantic models, or TypedDict using templates.
 """
 
-import logging
 from pathlib import Path
 from typing import Any
 
@@ -14,7 +13,9 @@ from ...core.schema import Schema, Field, FieldType
 from .config import PythonConfig, PythonStyle, get_python_generator_config
 from .naming import create_python_name_tracker
 
-logger = logging.getLogger(__name__)
+from json_explorer.logging_config import get_logger
+
+logger = get_logger(__name__)
 
 
 # ============================================================================

@@ -5,7 +5,6 @@ Provides language-agnostic interactive interface for code generation
 with delegation to language-specific handlers for customization.
 """
 
-import logging
 from pathlib import Path
 from typing import Any, Protocol
 
@@ -27,7 +26,9 @@ from . import (
 from json_explorer.analyzer import analyze_json
 from json_explorer.utils import prompt_input, prompt_input_path
 
-logger = logging.getLogger(__name__)
+from json_explorer.logging_config import get_logger
+
+logger = get_logger(__name__)
 
 
 # ============================================================================

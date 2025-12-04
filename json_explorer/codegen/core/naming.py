@@ -5,12 +5,13 @@ Handles name sanitization, case conversions, and conflict resolution
 for generating valid identifiers across different programming languages.
 """
 
-import logging
 import re
 from functools import cache
 from typing import Literal
 
-logger = logging.getLogger(__name__)
+from json_explorer.logging_config import get_logger
+
+logger = get_logger(__name__)
 
 # Type aliases for better readability
 CaseStyle = Literal["snake", "camel", "pascal", "kebab", "screaming_snake"]

@@ -5,14 +5,15 @@ Thin wrapper around Jinja2 with code-generation-specific filters
 and utilities.
 """
 
-import logging
 from pathlib import Path
 from typing import Any
 
 import jinja2
 from jinja2 import Environment
 
-logger = logging.getLogger(__name__)
+from json_explorer.logging_config import get_logger
+
+logger = get_logger(__name__)
 
 
 class TemplateError(Exception):

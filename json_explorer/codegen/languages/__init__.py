@@ -5,9 +5,9 @@ This module contains generators for different programming languages.
 Each language is in its own submodule with generator, config, and interactive handler.
 """
 
-import logging
+from json_explorer.logging_config import get_logger
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 # Track available languages
 __all__ = []

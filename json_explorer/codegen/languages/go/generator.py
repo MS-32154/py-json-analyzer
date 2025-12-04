@@ -4,7 +4,6 @@ Go code generator implementation.
 Generates Go structs with JSON tags using templates.
 """
 
-import logging
 from pathlib import Path
 from typing import Any
 
@@ -14,7 +13,9 @@ from ...core.schema import Schema, Field, FieldType
 from .config import GoConfig
 from .naming import create_go_name_tracker
 
-logger = logging.getLogger(__name__)
+from json_explorer.logging_config import get_logger
+
+logger = get_logger(__name__)
 
 
 # ============================================================================

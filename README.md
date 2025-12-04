@@ -4,7 +4,7 @@
 
 # JSON Explorer
 
-**JSON Explorer** is a powerful CLI and Python library for analyzing, visualizing, exploring, and generating code from JSON data.
+**JSON Explorer** is a powerful CLI and Python library for analyzing, visualizing, exploring, and generating code from JSON data. Built with modern Python practices and featuring JMESPath-powered search capabilities.
 
 ---
 
@@ -12,53 +12,58 @@
 
 ### Analysis & Exploration
 
-- View JSON as a tree (compact, raw, or analytical)
-- Search by key, value, key-value pairs, or custom filter expressions
-- Generate statistical summaries and insights
-- Create visualizations in terminal, browser, or matplotlib
-- Interactive terminal exploration mode
+- **Structural Analysis**: Deep JSON structure analysis with type detection and conflict resolution
+- **JMESPath Search**: Industry-standard query language for powerful JSON searching and filtering
+- **Tree Visualization**: Multiple view modes (compact, analytical, raw) with rich terminal output
+- **Statistical Analysis**: Comprehensive data quality metrics and structural insights
+- **Multi-Format Visualization**: Terminal (curses/ASCII), interactive HTML (Plotly), or combined output
+- **Interactive Mode**: Full-featured terminal UI for exploration and analysis
 
 ### Code Generation
 
-- Generate strongly-typed data structures from JSON
-- Multiple language support (Go, Python, with TypeScript and Rust coming soon)
-- Smart type detection and conflict resolution
-- Configurable naming conventions and templates
-- JSON serialization tags and annotations
-- Interactive configuration and preview
+- **Multi-Language Support**: Generate strongly-typed code from JSON schemas
+  - **Go**: Structs with JSON tags, pointer handling, configurable types
+  - **Python**: Dataclasses, Pydantic v2 models, TypedDict with type hints
+  - **Coming Soon**: TypeScript interfaces, Rust structs with Serde
+- **Smart Type Detection**: Automatic conflict resolution and optional field handling
+- **Flexible Configuration**: Template-based system with extensive customization
+- **Interactive Configuration**: Guided setup with real-time preview and validation
 
 ### Library Features
 
-- Usable as a Python library with modular components
-- Extensible architecture for custom generators
-- Template-based code generation
-- Configuration profiles and validation
+- **Modular Architecture**: Use individual components independently
+- **Extensible Design**: Plugin-based generator system for custom languages
+- **Production Ready**: Comprehensive error handling and logging
+- **Well Documented**: Extensive API documentation and examples
 
 ---
 
 ## Requirements
 
-- Python >= 3.11
+- **Python**: 3.11 or higher
 
-Required packages:
+### Core Dependencies
 
 ```
-numpy==2.3.2
-requests==2.32.5
-rich==14.1.0
-setuptools==80.9.0
-matplotlib==3.10.5
-dateparser==1.2.2
-jinja2>=3.0.0
+dateparser>=1.2.0        # Timestamp detection
+jmespath>=1.0.1          # JMESPath query language
+jinja2>=3.0.0            # Template engine for code generation
+prompt-toolkit>=3.0.0    # Interactive input with autocomplete
+requests>=2.32.0         # HTTP requests for URL loading
+rich>=13.0.0             # Rich terminal formatting
 ```
 
-> Note: On Windows, the `windows-curses` package will be installed automatically to enable terminal UI features.
+### Optional Dependencies
+
+```
+windows-curses           # Terminal UI support on Windows (auto-installed)
+```
 
 ---
 
 ## Installation
 
-### From PyPI
+### From PyPI (Recommended)
 
 ```bash
 pip install py-json-analyzer
@@ -74,314 +79,396 @@ pip install --upgrade py-json-analyzer
 
 ```bash
 git clone https://github.com/MS-32154/py-json-analyzer
-cd json_explorer
-pip install .
+cd py-json-analyzer
+pip install -e .
 ```
 
-### Development Mode
+For development with all optional dependencies:
 
 ```bash
-pip install -e .
+pip install -e ".[dev]"
 ```
 
 ---
 
-## Running Tests
+## Quick Start
+
+### Command Line
 
 ```bash
-pytest
+# Interactive mode (recommended for first-time users)
+json_explorer data.json --interactive
+
+# Quick analysis
+json_explorer data.json --tree compact --stats
+
+# JMESPath search
+json_explorer data.json --search "users[*].email"
+
+# Generate Go code
+json_explorer data.json --generate go --output models.go
+
+# Generate Pydantic models
+json_explorer data.json --generate python --python-style pydantic --output models.py
+
+# Create visualizations
+json_explorer data.json --plot --plot-format html
 ```
 
-### Test Coverage
+### Python Library
 
-The project includes comprehensive tests for:
+```python
+from json_explorer import analyze_json, JsonSearcher, quick_generate
 
-- **Core modules**: Analysis, search, statistics, tree view, plotting
-- **Codegen core modules**: Naming, schema, configuration, templates
-- **Generators**: Go and Python with all styles
-- **Codegen registry**: Language registration and lookup
-- **Codegen integration**: End-to-end workflows
-- **Edge cases**: None handling, conflicts, deep nesting
+# Analyze structure
+data = {"users": [{"id": 1, "name": "Alice", "email": "alice@example.com"}]}
+analysis = analyze_json(data)
+print(analysis)
+
+# JMESPath search
+searcher = JsonSearcher()
+result = searcher.search(data, "users[*].email")
+searcher.print_result(result)
+
+# Generate code
+go_code = quick_generate(data, language="go", package_name="models")
+python_code = quick_generate(data, language="python", style="pydantic")
+```
 
 ---
 
 ## CLI Usage
 
-```
-json_explorer [-h] [--url URL] [--interactive] [--tree {compact,analysis,raw}]
-              [--search SEARCH] [--search-type {key,value,pair,filter}]
-              [--search-value SEARCH_VALUE] [--search-mode {exact,contains,regex,startswith,endswith,case_insensitive}]
-              [--tree-results] [--stats] [--detailed] [--plot] [--plot-format {terminal,matplotlib,browser,all}]
-              [--save-path SAVE_PATH] [--no-browser]
-              [--generate LANGUAGE] [--output FILE] [--config FILE] [--package-name NAME] [--root-name NAME]
-              [--list-languages] [--language-info LANGUAGE] [--verbose]
-              [file]
-
-JSON Explorer - Analyze, visualize, explore, and generate code from JSON data
-
-positional arguments:
-  file                  Path to JSON file
-
-options:
-  -h, --help            show this help message and exit
-  --url URL             URL to fetch JSON from
-  --interactive, -i     Run in interactive mode
-
-analysis options:
-  --tree {compact,analysis,raw}
-                        Display JSON tree structure
-  --stats               Show statistics
-  --detailed            Show detailed analysis/statistics
-
-search options:
-  --search SEARCH       Search query or filter expression
-  --search-type {key,value,pair,filter}
-                        Type of search to perform
-  --search-value SEARCH_VALUE
-                        Value to search for (used with --search-type pair)
-  --search-mode {exact,contains,regex,startswith,endswith,case_insensitive}
-                        Search mode
-  --tree-results        Display search results in tree format
-
-visualization options:
-  --plot                Generate visualizations
-  --plot-format {terminal,matplotlib,browser,all}
-                        Visualization format
-  --save-path SAVE_PATH
-                        Path to save visualizations
-  --no-browser          Don't open browser for HTML visualizations
-
-code generation options:
-  --generate LANGUAGE, -g LANGUAGE
-                        Generate code in specified language
-  --output FILE, -o FILE
-                        Output file for generated code (default: stdout)
-  --config FILE         JSON configuration file for code generation
-  --package-name NAME   Package/namespace name for generated code
-  --root-name NAME      Name for the root data structure (default: Root)
-  --list-languages      List supported target languages and exit
-  --language-info LANGUAGE
-                        Show detailed information about a specific language
-  --verbose             Show generation result metadata
-
-common generation options:
-  --no-comments         Don't generate comments in output code
-  --struct-case {pascal,camel,snake}
-                        Case style for struct/class names
-  --field-case {pascal,camel,snake}
-                        Case style for field names
-
-Go-specific options:
-  --no-pointers         Don't use pointers for optional fields in Go
-  --no-json-tags        Don't generate JSON struct tags in Go
-  --no-omitempty        Don't add omitempty to JSON tags in Go
-  --json-tag-case {original,snake,camel}
-                        Case style for JSON tag names in Go
-
-Python-specific options:
-  --python-style {dataclass,pydantic,typeddict}
-                        Python code style (default: dataclass)
-  --no-slots            Don't use __slots__ in dataclasses
-  --frozen              Make dataclasses frozen (immutable)
-  --kw-only             Make dataclass fields keyword-only
-  --no-pydantic-field   Don't use Field() in Pydantic models
-  --pydantic-forbid-extra
-                        Forbid extra fields in Pydantic models
-```
-
-### Examples
-
-**Basic Analysis:**
+### Basic Commands
 
 ```bash
-json_explorer data.json --interactive
-json_explorer data.json --tree compact --stats
-json_explorer --url https://api.example.com/data --plot
+json_explorer [FILE] [OPTIONS]
+
+# Data Sources
+json_explorer data.json              # Load from file
+json_explorer --url https://api.example.com/data  # Load from URL
+
+# Display Modes
+--interactive, -i                    # Interactive mode (full UI)
+--tree {compact,analysis,raw}        # Display tree structure
+--stats                              # Show statistics
+--detailed                           # Show detailed information
+--plot                               # Generate visualizations
 ```
 
-**Search Examples:**
+### JMESPath Search
+
+The search functionality now uses [JMESPath](https://jmespath.org/), an industry-standard query language for JSON:
 
 ```bash
-json_explorer data.json --search "name" --search-type key
-json_explorer data.json --search "isinstance(value, int) and value > 10" --search-type filter
+# Basic path expressions
+json_explorer data.json --search "users"              # Get users array
+json_explorer data.json --search "users[0]"           # First user
+json_explorer data.json --search "users[*].name"      # All names
+
+# Filtering
+json_explorer data.json --search "users[?age > \`30\`]"           # Filter by age
+json_explorer data.json --search "users[?active == \`true\`]"     # Filter by boolean
+
+# Functions
+json_explorer data.json --search "length(users)"                  # Count users
+json_explorer data.json --search "sort_by(users, &age)"          # Sort by field
+json_explorer data.json --search "max_by(users, &age).name"      # Get name of oldest
+
+# Projections (field selection)
+json_explorer data.json --search "users[*].{name: name, email: email}"
+
+# Complex queries
+json_explorer data.json --search "users[?age > \`30\` && active == \`true\`].name"
+
+# Display options
+--tree-results                       # Show results as tree
+--show-examples                      # Display JMESPath examples
 ```
 
-**Code Generation Examples:**
+**JMESPath Resources:**
+
+- [Tutorial](https://jmespath.org/tutorial.html)
+- [Specification](https://jmespath.org/specification.html)
+- [Online Playground](https://jmespath.org/)
+
+### Code Generation
 
 ```bash
 # List supported languages
 json_explorer --list-languages
 
-# Generate Go structs
-json_explorer data.json --generate go --output models.go
+# Get language details
+json_explorer --language-info go
+json_explorer --language-info python
 
-# Generate Python dataclasses
-json_explorer data.json --generate python --output models.py
+# Generate Go code
+json_explorer data.json --generate go \
+  --output models.go \
+  --package-name models \
+  --root-name User
 
-# Generate Pydantic models
-json_explorer data.json --generate python --python-style pydantic --output models.py
+# Go-specific options
+--no-pointers                        # Don't use pointers for optional fields
+--no-json-tags                       # Don't generate JSON tags
+--json-tag-case {original,snake,camel}
 
-# Generate with custom configuration
-json_explorer data.json --generate go --package-name models --root-name User
+# Generate Python code
+json_explorer data.json --generate python \
+  --output models.py \
+  --python-style {dataclass,pydantic,typeddict}
 
-# Interactive code generation
-json_explorer data.json --interactive  # Then select code generation menu
+# Python-specific options
+--frozen                             # Make dataclasses immutable
+--no-slots                           # Don't use __slots__
+--kw-only                            # Make fields keyword-only
+--pydantic-forbid-extra              # Forbid extra fields in Pydantic
+
+# Common options
+--config config.json                 # Load configuration from file
+--struct-case {pascal,camel,snake}   # Class/struct name convention
+--field-case {pascal,camel,snake}    # Field name convention
+--no-comments                        # Don't generate comments
+--verbose                            # Show detailed generation info
 ```
 
-### Screenshots
+### Visualization
 
-**Main Interactive Mode:**
-![interactive-mode](/screenshots/main.gif)
+```bash
+# Terminal visualization (ASCII/curses)
+json_explorer data.json --plot --plot-format terminal
 
-**Code Generation Interface:**
-![code generation interface - Go](/screenshots/codegen_go.gif)
+# Interactive HTML (Plotly)
+json_explorer data.json --plot --plot-format html
+
+# All formats
+json_explorer data.json --plot --plot-format all
+
+# Options
+--detailed                           # Generate detailed charts
+--save-path output.html              # Save to specific file
+--no-browser                         # Don't auto-open browser
+```
+
+### Logging
+
+```bash
+--log-level {DEBUG,INFO,WARNING,ERROR}
+--log-file output.log
+--verbose-logging, -vl
+```
 
 ---
 
-## Library Usage
+## Python API
 
-### Analysis & Exploration
+### Core Analysis
 
 ```python
-from json_explorer.stats import DataStatsAnalyzer
-from json_explorer.analyzer import analyze_json
-from json_explorer.search import JsonSearcher, SearchMode
-from json_explorer.tree_view import print_json_analysis
-from json_explorer.visualizer import JSONVisualizer
+from json_explorer import analyze_json, load_json
 
-test_data = {
-    "users": [
-        {
-            "id": 1,
-            "name": "Alice",
-            "profile": {"age": 30, "settings": {"theme": "dark"}},
-            "tags": ["admin", "user"]
-        }
-    ],
-    "metadata": {"total": 1, "created": "2024-01-01"}
-}
+# Load data
+source, data = load_json("data.json")
+# or
+source, data = load_json(url="https://api.example.com/data")
 
-# Statistical analysis
-analyzer = DataStatsAnalyzer()
-analyzer.print_summary(test_data, detailed=True)
+# Analyze structure
+analysis = analyze_json(data)
+print(f"Type: {analysis['type']}")
+print(f"Children: {analysis.get('children', {})}")
+print(f"Conflicts: {analysis.get('conflicts', {})}")
+```
 
-# Structure inference
-summary = analyze_json(test_data)
-print(summary)
+### JMESPath Search
 
-# Search functionality
+```python
+from json_explorer import JsonSearcher
+
 searcher = JsonSearcher()
 
-results = searcher.search_keys(test_data, "settings", SearchMode.CONTAINS) # Search keys containing "settings"
+# Basic search
+result = searcher.search(data, "users[*].email")
+if result:
+    searcher.print_result(result)
 
-results = searcher.search_values(test_data, "@", SearchMode.CONTAINS, value_types={str}) # Search for values containing '@'
+# Multiple queries
+queries = [
+    "users[*].name",
+    "users[?age > `30`]",
+    "length(users)"
+]
+results = searcher.search_multiple(data, queries)
 
-results = searcher.search_key_value_pairs(
-    test_data,
-    key_pattern="tags",
-    value_pattern="user",
-    value_mode=SearchMode.CONTAINS,
-) # Searching for 'key' = 'tags' and values containing 'user'
+# Validate query before executing
+valid, error = searcher.validate_query("users[*].invalid...")
+if valid:
+    result = searcher.search(data, query)
 
-results = searcher.search_with_filter(
-    test_data,
-    lambda k, v, d: isinstance(v, (int, float)) and v > 10
-) # Filter values > 10
-searcher.print_results(results, show_tree=True)
+# Get example queries
+examples = searcher.get_query_examples()
+searcher.print_examples()
+```
 
-# Tree visualization
-print_json_analysis(test_data, "Sample Data", show_raw=True)
+### Statistics & Analysis
 
-# Data visualizations
+```python
+from json_explorer import DataStatsAnalyzer, generate_stats
+
+# Generate statistics
+analyzer = DataStatsAnalyzer()
+stats = analyzer.generate_stats(data)
+
+# Print formatted summary
+analyzer.print_summary(data, detailed=True)
+
+# Or use convenience function
+stats = generate_stats(data)
+print(f"Total values: {stats['total_values']}")
+print(f"Max depth: {stats['max_depth']}")
+print(f"Complexity: {stats['computed_insights']['complexity_score']}")
+```
+
+### Visualization
+
+```python
+from json_explorer import JSONVisualizer, visualize_json
+
+# Create visualizer
 visualizer = JSONVisualizer()
-visualizer.visualize(test_data, output="terminal", detailed=True)  # 'terminal', 'matplotlib', or 'browser' output
+
+# Terminal visualization
+visualizer.visualize(data, output="terminal", detailed=True)
+
+# HTML visualization
+visualizer.visualize(
+    data,
+    output="html",
+    save_path="report.html",
+    detailed=True,
+    open_browser=True
+)
+
+# Or use convenience function
+visualize_json(data, output="html", detailed=True)
+```
+
+### Tree Display
+
+```python
+from json_explorer import print_json_analysis, print_compact_tree
+
+# Full analysis with tree
+print_json_analysis(data, source="API Response", show_raw=False)
+
+# Compact tree (no annotations)
+print_compact_tree(data, source="Config File")
+
+# Custom tree builder
+from json_explorer.tree_view import JsonTreeBuilder
+
+builder = JsonTreeBuilder(show_conflicts=True, show_optional=True)
+# ... use builder for custom visualization
 ```
 
 ### Code Generation
 
 ```python
 from json_explorer.codegen import (
-    generate_from_analysis,
     quick_generate,
+    generate_from_analysis,
+    create_config,
     list_supported_languages,
-    get_language_info,
-    create_config
+    get_language_info
 )
-from json_explorer.analyzer import analyze_json
 
-# Quick generation - Go
-go_code = quick_generate(test_data, language="go")
-print(go_code)
-
-# Quick generation - Python dataclass
-python_code = quick_generate(test_data, language="python", style="dataclass")
-print(python_code)
-
-# Quick generation - Pydantic model
-pydantic_code = quick_generate(test_data, language="python", style="pydantic")
-print(pydantic_code)
-
-# Detailed generation workflow
-analysis = analyze_json(test_data)
-config = create_config(
+# Quick generation
+go_code = quick_generate(
+    data,
     language="go",
     package_name="models",
-    add_comments=True
+    root_name="User"
 )
-result = generate_from_analysis(analysis, "go", config, "User")
 
+python_code = quick_generate(
+    data,
+    language="python",
+    style="pydantic",
+    package_name="models"
+)
+
+# Detailed workflow
+analysis = analyze_json(data)
+config = create_config(
+    language="go",
+    package_name="api",
+    add_comments=True,
+    language_config={
+        "use_pointers_for_optional": True,
+        "int_type": "int64"
+    }
+)
+
+result = generate_from_analysis(analysis, "go", config, "User")
 if result.success:
     print(result.code)
-    if result.warnings:
-        print("Warnings:", result.warnings)
+    with open("models.go", "w") as f:
+        f.write(result.code)
+else:
+    print(f"Error: {result.error_message}")
 
-# List available languages and info
+# Discover capabilities
 languages = list_supported_languages()
-print("Supported languages:", languages)
+print(f"Supported: {languages}")
 
-go_info = get_language_info("go")
-print("Go generator info:", go_info)
-
-python_info = get_language_info("python")
-print("Python generator info:", python_info)
-
-# Interactive code generation
-from json_explorer.codegen.interactive import CodegenInteractiveHandler
-
-handler = CodegenInteractiveHandler(test_data)
-handler.run_interactive()  # Launches interactive interface
+info = get_language_info("python")
+print(f"Python styles: {info.get('styles', [])}")
 ```
 
-### Supported Languages
+### Interactive Mode
 
-| Language       | Status          | Features                                            |
-| -------------- | --------------- | --------------------------------------------------- |
-| **Go**         | ✅ Full Support | Structs, JSON tags, pointers, configurable types    |
-| **Python**     | ✅ Full Support | Dataclasses, Pydantic models, TypedDict, type hints |
-| **TypeScript** | 🚧 Coming Soon  | Interfaces, types, optional properties              |
-| **Rust**       | 🚧 Coming Soon  | Structs, Serde annotations, Option types            |
+```python
+from json_explorer import InteractiveHandler
 
-### Code Generation Features
-
-- **Smart Type Detection**: Handles mixed types, conflicts, and unknown values
-- **Configurable Output**: Multiple templates and naming conventions
-- **Language-Specific Options**: Tailored features for each target language
-- **Validation & Warnings**: Comprehensive validation with helpful warnings
-- **Template System**: Extensible Jinja2-based template architecture
-- **Interactive Configuration**: Guided setup with preview and validation
+handler = InteractiveHandler()
+handler.set_data(data, source="my_data.json")
+exit_code = handler.run()  # Launches interactive UI
+```
 
 ---
 
 ## Configuration
 
-### Go Configuration Example
+### Configuration File Format
+
+JSON Explorer uses JSON configuration files for code generation:
 
 ```json
 {
   "package_name": "models",
   "add_comments": true,
+  "struct_case": "pascal",
+  "field_case": "snake",
   "generate_json_tags": true,
   "json_tag_omitempty": true,
+  "language_config": {
+    "use_pointers_for_optional": true,
+    "int_type": "int64",
+    "float_type": "float64"
+  }
+}
+```
+
+### Language-Specific Examples
+
+#### Go Configuration
+
+```json
+{
+  "package_name": "api",
+  "add_comments": true,
+  "generate_json_tags": true,
+  "json_tag_omitempty": true,
+  "json_tag_case": "snake",
   "struct_case": "pascal",
   "field_case": "pascal",
   "language_config": {
@@ -392,7 +479,25 @@ handler.run_interactive()  # Launches interactive interface
 }
 ```
 
-### Python Configuration Example
+#### Python Dataclass Configuration
+
+```json
+{
+  "package_name": "models",
+  "add_comments": true,
+  "struct_case": "pascal",
+  "field_case": "snake",
+  "language_config": {
+    "style": "dataclass",
+    "dataclass_slots": true,
+    "dataclass_frozen": false,
+    "dataclass_kw_only": false,
+    "use_optional": true
+  }
+}
+```
+
+#### Python Pydantic Configuration
 
 ```json
 {
@@ -402,10 +507,11 @@ handler.run_interactive()  # Launches interactive interface
   "field_case": "snake",
   "language_config": {
     "style": "pydantic",
-    "use_optional": true,
     "pydantic_use_field": true,
     "pydantic_use_alias": true,
-    "pydantic_config_dict": true
+    "pydantic_config_dict": true,
+    "pydantic_extra_forbid": false,
+    "use_optional": true
   }
 }
 ```
@@ -413,15 +519,195 @@ handler.run_interactive()  # Launches interactive interface
 Load configuration:
 
 ```bash
-json_explorer data.json --generate go --config config.json
-json_explorer data.json --generate python --config config.json
+json_explorer data.json --generate go --config go_config.json
+```
+
+```python
+from json_explorer.codegen import load_config, generate_from_analysis
+
+config = load_config("go_config.json")
+result = generate_from_analysis(analysis, "go", config, "User")
 ```
 
 ---
 
-## API Reference
+## Architecture
 
-For the complete API reference go to [JSON Explorer API Documentation](https://ms-32154.github.io/py-json-analyzer/) or see the source code.
+### Project Structure
+
+```
+json_explorer/
+├── __init__.py              # Public API exports
+├── __main__.py              # Entry point for `python -m json_explorer`
+├── main.py                  # CLI application coordinator
+├── cli.py                   # CLI command handler
+├── interactive.py           # Interactive mode handler
+│
+├── analyzer.py              # JSON structure analysis
+├── search.py                # JMESPath-based search
+├── stats.py                 # Statistical analysis
+├── tree_view.py             # Tree visualization
+├── visualizer.py            # Multi-format charts (Plotly/curses)
+├── utils.py                 # File/URL loading utilities
+├── logging_config.py        # Centralized logging
+│
+└── codegen/
+    ├── __init__.py          # Code generation API
+    ├── registry.py          # Generator registry system
+    ├── cli_integration.py   # CLI integration
+    ├── interactive.py       # Interactive codegen UI
+    │
+    ├── core/                # Core codegen infrastructure
+    │   ├── naming.py        # Naming convention system
+    │   ├── config.py        # Configuration management
+    │   ├── templates.py     # Template engine
+    │   ├── schema.py        # Internal schema representation
+    │   └── generator.py     # Base generator interface
+    │
+    └── languages/           # Language-specific generators
+        ├── go/
+        │   ├── generator.py
+        │   ├── config.py
+        │   ├── naming.py
+        │   ├── interactive.py
+        │   └── templates/   # Jinja2 templates
+        │
+        └── python/
+            ├── generator.py
+            ├── config.py
+            ├── naming.py
+            ├── interactive.py
+            └── templates/   # Jinja2 templates
+```
+
+### Key Design Patterns
+
+- **Registry Pattern**: Extensible generator system
+- **Template Method**: Base generator defines workflow
+- **Strategy Pattern**: Multiple naming conventions and styles
+- **Factory Pattern**: Generator creation and configuration
+- **Builder Pattern**: Schema construction from analysis
+
+---
+
+## Testing
+
+Run the test suite:
+
+```bash
+pytest
+```
+
+Run with coverage:
+
+```bash
+pytest --cov=json_explorer --cov-report=html
+```
+
+Test categories:
+
+- **Core modules**: analyzer, search, stats, tree_view, visualizer
+- **Codegen core**: naming, schema, config, templates
+- **Generators**: Go and Python (all styles)
+- **Integration**: End-to-end workflows
+- **Edge cases**: None handling, conflicts, deep nesting
+
+---
+
+## Supported Languages
+
+| Language       | Status          | Features                                                 |
+| -------------- | --------------- | -------------------------------------------------------- |
+| **Go**         | ✅ Full Support | Structs, JSON tags, pointers, customizable type mappings |
+| **Python**     | ✅ Full Support | Dataclasses, Pydantic v2, TypedDict, modern type hints   |
+| **TypeScript** | 🚧 Coming Soon  | Interfaces, types, optional properties                   |
+| **Rust**       | 🚧 Coming Soon  | Structs, Serde annotations, Option types                 |
+
+---
+
+## Documentation
+
+- **API Documentation**: [https://ms-32154.github.io/py-json-analyzer/](https://ms-32154.github.io/py-json-analyzer/)
+- **GitHub Repository**: [https://github.com/MS-32154/py-json-analyzer](https://github.com/MS-32154/py-json-analyzer)
+- **Issue Tracker**: [https://github.com/MS-32154/py-json-analyzer/issues](https://github.com/MS-32154/py-json-analyzer/issues)
+
+---
+
+## Contributing
+
+Contributions are welcome! Here's how to get started:
+
+1. **Fork** the repository
+2. **Clone** your fork: `git clone https://github.com/YOUR_USERNAME/py-json-analyzer`
+3. **Create** a feature branch: `git checkout -b feature/amazing-feature`
+4. **Make** your changes and add tests
+5. **Run** tests: `pytest`
+6. **Commit**: `git commit -m 'Add amazing feature'`
+7. **Push**: `git push origin feature/amazing-feature`
+8. **Open** a Pull Request
+
+### Development Setup
+
+```bash
+# Clone and setup
+git clone https://github.com/MS-32154/py-json-analyzer
+cd py-json-analyzer
+pip install -e ".[dev]"
+
+# Run tests
+pytest
+
+# Format code
+black json_explorer/
+isort json_explorer/
+
+# Type checking (if using mypy)
+mypy json_explorer/
+```
+
+### Adding a New Language Generator
+
+1. Create `json_explorer/codegen/languages/yourlang/`
+2. Implement `generator.py` extending `CodeGenerator`
+3. Create templates in `templates/`
+4. Register in `json_explorer/codegen/languages/__init__.py`
+5. Add tests in `tests/codegen/languages/test_yourlang.py`
+
+---
+
+## Support
+
+### Getting Help
+
+- **Documentation**: Check the [API docs](https://ms-32154.github.io/py-json-analyzer/)
+- **Examples**: See the examples section above
+- **Issues**: [GitHub Issues](https://github.com/MS-32154/py-json-analyzer/issues)
+
+### Reporting Issues
+
+When reporting issues, please include:
+
+1. **Python version**: `python --version`
+2. **Package version**: `pip show py-json-analyzer`
+3. **Operating system**
+4. **Minimal reproducible example**
+5. **Full error traceback**
+6. **Expected vs actual behavior**
+
+### Feature Requests
+
+We welcome feature requests! Please open an issue with:
+
+- Clear description of the feature
+- Use cases and benefits
+- Example of how it would work
+- Any relevant mockups or examples
+
+---
+
+## Changelog
+
+See [CHANGELOG.md](CHANGELOG.md) for version history and release notes.
 
 ---
 
@@ -431,29 +717,21 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ---
 
-## Contributing
+## Acknowledgments
 
-Contributions are welcome! Please feel free to submit a Pull Request.
-
-1. Fork the repository
-2. Create your feature branch (`git checkout -b feature/AmazingFeature`)
-3. Commit your changes (`git commit -m 'Add some AmazingFeature'`)
-4. Push to the branch (`git push origin feature/AmazingFeature`)
-5. Open a Pull Request
+- **JMESPath**: Powerful JSON query language
+- **Rich**: Beautiful terminal formatting
+- **Plotly**: Interactive visualizations
+- **Jinja2**: Flexible template engine
 
 ---
 
-## Support
+## Author
 
-If you encounter any issues or have questions, please:
+**MS-32154**
 
-1. Check the [examples](#examples) section
-2. Search existing [GitHub Issues](https://github.com/MS-32154/py-json-analyzer/issues)
-3. Create a new issue with:
-   - Python version
-   - Operating system
-   - Minimal code example reproducing the issue
-   - Full error traceback (if applicable)
+- GitHub: [@MS-32154](https://github.com/MS-32154)
+- Email: msttoffg@gmail.com
 
 ---
 

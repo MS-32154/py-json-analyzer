@@ -5,14 +5,15 @@ Manages available code generators and provides lookup by language name.
 Uses a simple dict-based approach instead of complex singleton pattern.
 """
 
-import logging
 from pathlib import Path
 from typing import Any
 
 from .core.config import GeneratorConfig, load_config
 from .core.generator import CodeGenerator
 
-logger = logging.getLogger(__name__)
+from json_explorer.logging_config import get_logger
+
+logger = get_logger(__name__)
 
 
 # ============================================================================

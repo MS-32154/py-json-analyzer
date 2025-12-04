@@ -8,12 +8,13 @@ Handles loading, validation, and merging of configuration from multiple sources:
 """
 
 import json
-import logging
 from dataclasses import dataclass, field, asdict
 from pathlib import Path
 from typing import Any
 
-logger = logging.getLogger(__name__)
+from json_explorer.logging_config import get_logger
+
+logger = get_logger(__name__)
 
 
 class ConfigError(Exception):

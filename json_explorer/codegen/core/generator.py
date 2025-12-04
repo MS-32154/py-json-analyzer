@@ -4,7 +4,6 @@ Base generator interface for code generation.
 Defines the contract that all language generators must implement.
 """
 
-import logging
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -14,7 +13,9 @@ from .config import GeneratorConfig
 from .schema import Schema, FieldType
 from .templates import TemplateManager
 
-logger = logging.getLogger(__name__)
+from json_explorer.logging_config import get_logger
+
+logger = get_logger(__name__)
 
 
 # ============================================================================

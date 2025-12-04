@@ -2,13 +2,14 @@
 Go-specific configuration and type mappings.
 """
 
-import logging
 from dataclasses import dataclass, field
 from typing import Literal
 
 from ...core.schema import FieldType
 
-logger = logging.getLogger(__name__)
+from json_explorer.logging_config import get_logger
+
+logger = get_logger(__name__)
 
 
 # ============================================================================

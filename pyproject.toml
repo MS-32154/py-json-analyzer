@@ -13,7 +13,6 @@ dependencies = [
     "dateparser",
     "jmespath",
     "jinja2",
-    "numpy",
     "plotly",
     "prompt_toolkit",
     "requests",
