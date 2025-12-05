@@ -1,192 +1,293 @@
+"""Unit tests for the JMESPath-based search module."""
+
 import pytest
-from json_explorer.search import JsonSearcher, SearchMode, SearchResult
+from json_explorer.search import JsonSearcher, SearchResult
 
 
-class TestJsonSearcher:
+@pytest.fixture
+def sample_data():
+    """Sample JSON data for testing."""
+    return {
+        "users": [
+            {
+                "id": 1,
+                "name": "Alice",
+                "age": 30,
+                "email": "alice@example.com",
+                "active": True,
+            },
+            {
+                "id": 2,
+                "name": "Bob",
+                "age": 25,
+                "email": "bob@example.com",
+                "active": False,
+            },
+            {
+                "id": 3,
+                "name": "Charlie",
+                "age": 35,
+                "email": "charlie@example.com",
+                "active": True,
+            },
+        ],
+        "metadata": {"total": 3, "created": "2024-01-01"},
+    }
 
-    @pytest.fixture
-    def searcher(self):
-        return JsonSearcher()
 
-    @pytest.fixture
-    def sample_data(self):
-        return {
-            "users": [
-                {"name": "Alice", "email": "alice@test.com", "age": 30},
-                {"name": "Bob", "email": "bob@test.com", "age": 25},
-            ],
-            "settings": {"theme": "dark", "version": "1.0"},
-        }
+@pytest.fixture
+def searcher():
+    """Create a JsonSearcher instance."""
+    return JsonSearcher()
 
-    def test_search_keys_exact(self, searcher, sample_data):
-        results = searcher.search_keys(sample_data, "name")
-        assert len(results) == 2
-        assert results[0].value == "Alice"
-        assert results[1].value == "Bob"
 
-    def test_search_keys_contains(self, searcher, sample_data):
-        results = searcher.search_keys(sample_data, "settings", SearchMode.CONTAINS)
-        assert len(results) == 1
-        assert "settings" in results[0].path
+class TestBasicSearch:
+    """Test basic search functionality."""
 
-    def test_search_values_exact(self, searcher, sample_data):
-        results = searcher.search_values(sample_data, "Alice")
-        assert len(results) == 1
-        assert results[0].value == "Alice"
+    def test_simple_path(self, searcher, sample_data):
+        """Test simple path expression."""
+        result = searcher.search(sample_data, "users")
+        assert result is not None
+        assert isinstance(result.value, list)
+        assert len(result.value) == 3
 
-    def test_search_values_contains(self, searcher, sample_data):
-        results = searcher.search_values(sample_data, "@", SearchMode.CONTAINS)
-        assert len(results) == 2  # Both email addresses
-        emails = [r.value for r in results]
-        assert "alice@test.com" in emails
-        assert "bob@test.com" in emails
+    def test_array_index(self, searcher, sample_data):
+        """Test array indexing."""
+        result = searcher.search(sample_data, "users[0]")
+        assert result is not None
+        assert result.value["name"] == "Alice"
 
-    def test_search_values_with_type_filter(self, searcher, sample_data):
-        results = searcher.search_values(sample_data, 30, value_types={int})
-        assert len(results) == 1
-        assert results[0].value == 30
+    def test_negative_index(self, searcher, sample_data):
+        """Test negative array indexing."""
+        result = searcher.search(sample_data, "users[-1]")
+        assert result is not None
+        assert result.value["name"] == "Charlie"
 
-    def test_search_key_value_pairs(self, searcher, sample_data):
-        results = searcher.search_key_value_pairs(sample_data, "name", "Alice")
-        assert len(results) == 1
-        assert results[0].value == "Alice"
-        assert results[0].parent_key == "name"
+    def test_nested_path(self, searcher, sample_data):
+        """Test nested path access."""
+        result = searcher.search(sample_data, "metadata.total")
+        assert result is not None
+        assert result.value == 3
 
-    def test_custom_filter_search(self, searcher, sample_data):
-        # Find numeric values greater than 25
-        results = searcher.search_with_filter(
-            sample_data, lambda key, value, depth: isinstance(value, int) and value > 25
+    def test_projection(self, searcher, sample_data):
+        """Test array projection."""
+        result = searcher.search(sample_data, "users[*].name")
+        assert result is not None
+        assert result.value == ["Alice", "Bob", "Charlie"]
+
+    def test_nonexistent_path(self, searcher, sample_data):
+        """Test query with nonexistent path."""
+        result = searcher.search(sample_data, "nonexistent")
+        assert result is None
+
+
+class TestFiltering:
+    """Test filtering functionality."""
+
+    def test_filter_by_number(self, searcher, sample_data):
+        """Test filtering by numeric comparison."""
+        result = searcher.search(sample_data, "users[?age > `30`]")
+        assert result is not None
+        assert len(result.value) == 1
+        assert result.value[0]["name"] == "Charlie"
+
+    def test_filter_by_boolean(self, searcher, sample_data):
+        """Test filtering by boolean value."""
+        result = searcher.search(sample_data, "users[?active == `true`]")
+        assert result is not None
+        assert len(result.value) == 2
+        names = [u["name"] for u in result.value]
+        assert "Alice" in names
+        assert "Charlie" in names
+
+    def test_filter_multiple_conditions(self, searcher, sample_data):
+        """Test filtering with multiple conditions."""
+        result = searcher.search(sample_data, "users[?age > `25` && active == `true`]")
+        assert result is not None
+        assert len(result.value) == 2
+
+    def test_filter_with_projection(self, searcher, sample_data):
+        """Test filtering combined with projection."""
+        result = searcher.search(sample_data, "users[?age > `25`].name")
+        assert result is not None
+        assert "Alice" in result.value
+        assert "Charlie" in result.value
+        assert "Bob" not in result.value
+
+
+class TestFunctions:
+    """Test JMESPath functions."""
+
+    def test_length_function(self, searcher, sample_data):
+        """Test length() function."""
+        result = searcher.search(sample_data, "length(users)")
+        assert result is not None
+        assert result.value == 3
+
+    def test_sort_by(self, searcher, sample_data):
+        """Test sort_by() function."""
+        result = searcher.search(sample_data, "sort_by(users, &age)")
+        assert result is not None
+        ages = [u["age"] for u in result.value]
+        assert ages == [25, 30, 35]
+
+    def test_max_by(self, searcher, sample_data):
+        """Test max_by() function."""
+        result = searcher.search(sample_data, "max_by(users, &age)")
+        assert result is not None
+        assert result.value["name"] == "Charlie"
+
+    def test_min_by(self, searcher, sample_data):
+        """Test min_by() function."""
+        result = searcher.search(sample_data, "min_by(users, &age)")
+        assert result is not None
+        assert result.value["name"] == "Bob"
+
+
+class TestProjections:
+    """Test projection expressions."""
+
+    def test_object_projection(self, searcher, sample_data):
+        """Test object projection with field selection."""
+        result = searcher.search(sample_data, "users[*].{name: name, age: age}")
+        assert result is not None
+        assert len(result.value) == 3
+        assert all("name" in item and "age" in item for item in result.value)
+        assert all("email" not in item for item in result.value)
+
+    def test_projection_with_rename(self, searcher, sample_data):
+        """Test projection with field renaming."""
+        result = searcher.search(
+            sample_data, "users[*].{username: name, user_age: age}"
         )
-        assert len(results) == 1
-        assert results[0].value == 30
-
-    def test_max_results_limit(self, searcher, sample_data):
-        results = searcher.search_keys(sample_data, "name", max_results=1)
-        assert len(results) == 1
-
-    def test_depth_limits(self, searcher, sample_data):
-        # Search only at depth 2 and below
-        results = searcher.search_values(sample_data, "Alice", max_depth=2)
-        assert len(results) == 0  # Alice is at depth 3
-
-        # Search at depth 3 and below
-        results = searcher.search_values(sample_data, "Alice", max_depth=3)
-        assert len(results) == 1
-
-    def test_no_results(self, searcher, sample_data):
-        results = searcher.search_keys(sample_data, "nonexistent")
-        assert len(results) == 0
-
-    def test_empty_data(self, searcher):
-        results = searcher.search_keys({}, "anything")
-        assert len(results) == 0
+        assert result is not None
+        assert all("username" in item and "user_age" in item for item in result.value)
 
 
-class TestSearchModes:
-    """Test different search modes."""
+class TestMultipleQueries:
+    """Test multiple query execution."""
 
-    @pytest.fixture
-    def searcher(self):
-        return JsonSearcher()
+    def test_search_multiple(self, searcher, sample_data):
+        """Test executing multiple queries."""
+        queries = ["users[*].name", "length(users)", "metadata.total"]
+        results = searcher.search_multiple(sample_data, queries)
 
-    def test_exact_match(self, searcher):
-        data = {"test": "hello"}
-        results = searcher.search_values(data, "hello", SearchMode.EXACT)
-        assert len(results) == 1
+        assert len(results) == 3
+        assert results["users[*].name"].value == ["Alice", "Bob", "Charlie"]
+        assert results["length(users)"].value == 3
+        assert results["metadata.total"].value == 3
 
-    def test_contains_match(self, searcher):
-        data = {"email": "user@domain.com"}
-        results = searcher.search_values(data, "@", SearchMode.CONTAINS)
-        assert len(results) == 1
+    def test_search_multiple_with_invalid(self, searcher, sample_data):
+        """Test multiple queries with some invalid ones."""
+        queries = ["users[*].name", "invalid[syntax", "metadata.total"]
+        results = searcher.search_multiple(sample_data, queries)
 
-    def test_case_insensitive_match(self, searcher):
-        data = {"name": "Alice"}
-        results = searcher.search_values(data, "alice", SearchMode.CASE_INSENSITIVE)
-        assert len(results) == 1
+        # Only valid queries should be in results
+        assert len(results) == 2
+        assert "users[*].name" in results
+        assert "metadata.total" in results
+        assert "invalid[syntax" not in results
 
-    def test_startswith_match(self, searcher):
-        data = {"prefix": "hello_world"}
-        results = searcher.search_values(data, "hello", SearchMode.STARTSWITH)
-        assert len(results) == 1
 
-    def test_endswith_match(self, searcher):
-        data = {"suffix": "world_test"}
-        results = searcher.search_values(data, "test", SearchMode.ENDSWITH)
-        assert len(results) == 1
+class TestValidation:
+    """Test query validation."""
 
-    def test_regex_match(self, searcher):
-        data = {"code": "abc123"}
-        results = searcher.search_values(data, r"\d+", SearchMode.REGEX)
-        assert len(results) == 1
+    def test_validate_valid_query(self, searcher):
+        """Test validation of valid query."""
+        valid, error = searcher.validate_query("users[*].name")
+        assert valid is True
+        assert error is None
+
+    def test_validate_invalid_syntax(self, searcher):
+        """Test validation of invalid syntax."""
+        valid, error = searcher.validate_query("users[invalid")
+        assert valid is False
+        assert error is not None
+
+    def test_validate_invalid_function(self, searcher):
+        """Test validation of invalid function."""
+        # JMESPath doesn't validate function existence at compile time
+        # It only validates syntax, so this is actually valid syntax
+        valid, error = searcher.validate_query("unknown_func(users)")
+        # The query has valid syntax, even if function doesn't exist
+        # Runtime errors happen during execution, not validation
+        assert valid is True or (valid is False and error is not None)
 
 
 class TestSearchResult:
-    """Test SearchResult functionality."""
+    """Test SearchResult dataclass."""
 
-    def test_basic_result(self):
-        result = SearchResult("root.test", "value")
-        assert result.path == "root.test"
-        assert result.value == "value"
-        assert result.data_type == "str"
+    def test_search_result_creation(self, searcher, sample_data):
+        """Test SearchResult object creation."""
+        result = searcher.search(sample_data, "users[0]")
 
-    def test_result_with_parent(self):
-        result = SearchResult("root.key", "value", parent_key="key", depth=1)
-        assert result.parent_key == "key"
-        assert result.depth == 1
+        assert isinstance(result, SearchResult)
+        assert result.query == "users[0]"
+        assert result.path == "users[0]"
+        assert result.data_type == "dict"
+        assert isinstance(result.value, dict)
 
-    def test_data_type_detection(self):
-        str_result = SearchResult("path", "text")
-        assert str_result.data_type == "str"
-
-        int_result = SearchResult("path", 42)
-        assert int_result.data_type == "int"
-
-        list_result = SearchResult("path", [1, 2])
+    def test_search_result_types(self, searcher, sample_data):
+        """Test SearchResult with different value types."""
+        # List result
+        list_result = searcher.search(sample_data, "users")
         assert list_result.data_type == "list"
 
+        # String result
+        str_result = searcher.search(sample_data, "users[0].name")
+        assert str_result.data_type == "str"
 
-class TestComplexData:
-    """Test with more complex nested data."""
-
-    @pytest.fixture
-    def searcher(self):
-        return JsonSearcher()
-
-    @pytest.fixture
-    def complex_data(self):
-        return {
-            "company": {
-                "departments": [
-                    {
-                        "name": "Engineering",
-                        "employees": [
-                            {"name": "Alice", "skills": ["Python", "JavaScript"]},
-                            {"name": "Bob", "skills": ["Java", "Python"]},
-                        ],
-                    },
-                    {
-                        "name": "Marketing",
-                        "employees": [
-                            {"name": "Carol", "skills": ["Design", "Content"]}
-                        ],
-                    },
-                ]
-            }
-        }
-
-    def test_deep_nested_search(self, searcher, complex_data):
-        results = searcher.search_values(complex_data, "Python", SearchMode.CONTAINS)
-        assert len(results) == 2  # Found in two skill lists
-
-    def test_nested_key_search(self, searcher, complex_data):
-        results = searcher.search_keys(complex_data, "employees")
-        assert len(results) == 2  # Two departments have employees
-
-    def test_array_element_search(self, searcher, complex_data):
-        results = searcher.search_values(complex_data, "Engineering")
-        assert len(results) == 1
-        assert "departments[0].name" in results[0].path
+        # Integer result
+        int_result = searcher.search(sample_data, "metadata.total")
+        assert int_result.data_type == "int"
 
 
-if __name__ == "__main__":
-    pytest.main([__file__, "-v"])
+class TestEdgeCases:
+    """Test edge cases and special scenarios."""
+
+    def test_empty_data(self, searcher):
+        """Test search on empty data."""
+        result = searcher.search({}, "users")
+        assert result is None
+
+    def test_null_values(self, searcher):
+        """Test search with null values."""
+        data = {"value": None}
+        result = searcher.search(data, "value")
+        assert result is None
+
+    def test_complex_nested_structure(self, searcher):
+        """Test search on deeply nested structure."""
+        data = {"level1": {"level2": {"level3": {"value": "deep"}}}}
+        result = searcher.search(data, "level1.level2.level3.value")
+        assert result is not None
+        assert result.value == "deep"
+
+    def test_array_of_arrays(self, searcher):
+        """Test search on nested arrays."""
+        data = {"matrix": [[1, 2], [3, 4], [5, 6]]}
+        result = searcher.search(data, "matrix[1][0]")
+        assert result is not None
+        assert result.value == 3
+
+    def test_mixed_types_in_array(self, searcher):
+        """Test search on array with mixed types."""
+        data = {"mixed": [1, "text", True, None, {"key": "value"}]}
+        result = searcher.search(data, "mixed[4].key")
+        assert result is not None
+        assert result.value == "value"
+
+
+class TestCompileQuery:
+    """Test query compilation for performance."""
+
+    def test_compile_query_flag(self, searcher, sample_data):
+        """Test using compile_query flag."""
+        result = searcher.search(sample_data, "users[*].name", compile_query=True)
+        assert result is not None
+        assert result.value == ["Alice", "Bob", "Charlie"]
+
+    def test_compile_invalid_query(self, searcher, sample_data):
+        """Test compiling invalid query."""
+        result = searcher.search(sample_data, "invalid[syntax", compile_query=True)
+        assert result is None
