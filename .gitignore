@@ -1,6 +1,7 @@
 .vscode/
 temp/
 venv/
+*_env/
 __pycache__/
 *.egg-info/
 notes/
