@@ -48,15 +48,24 @@
 dateparser>=1.2.0        # Timestamp detection
 jmespath>=1.0.1          # JMESPath query language
 jinja2>=3.0.0            # Template engine for code generation
+plotly>=5.0.0            # Interactive, browser-based graphing
 prompt-toolkit>=3.0.0    # Interactive input with autocomplete
 requests>=2.32.0         # HTTP requests for URL loading
 rich>=13.0.0             # Rich terminal formatting
+windows-curses>=2.4.0    # Terminal UI support on Windows (auto-installed)
 ```
 
 ### Optional Dependencies
 
 ```
-windows-curses           # Terminal UI support on Windows (auto-installed)
+pytest>=7.0.0
+pytest-cov>=4.0.0
+black>=23.0.0
+isort>=5.12.0
+mypy>=1.0.0
+flake8>=6.0.0
+types-requests>=2.31.0
+types-dateparser>=1.1.0
 ```
 
 ---
