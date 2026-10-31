@@ -10,3 +10,7 @@ generated_examples/
 codegen_*_test.py
 
 .*_history
+.venv/
+.pytest_cache/
+.coverage
+htmlcov/

@@ -7,7 +7,7 @@ name = "py-json-analyzer"
 version = "0.4.0"
 description = "A powerful CLI and Python library for analyzing, visualizing, exploring, and generating code from JSON data"
 readme = "README.md"
-requires-python = ">=3.11"
+requires-python = ">=3.14"
 license = {text = "MIT"}
 authors = [
     {name = "MS-32154", email = "msttoffg@gmail.com"}
@@ -42,9 +42,9 @@ classifiers = [
     "License :: OSI Approved :: MIT License",
     "Operating System :: OS Independent",
     "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.11",
-    "Programming Language :: Python :: 3.12",
-    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
+    "Programming Language :: Python :: 3.15",
+    "Programming Language :: Python :: 3 :: Only",
     "Topic :: Software Development :: Code Generators",
     "Topic :: Software Development :: Libraries :: Python Modules",
     "Topic :: Utilities",
@@ -59,7 +59,7 @@ dependencies = [
     "dateparser>=1.2.0",
     "jinja2>=3.0.0",
     "prompt-toolkit>=3.0.0",
-    "windows-curses; sys_platform == 'win32'",
+    "windows-curses; sys_platform == 'win32' and python_version < '3.15'",
 ]
 
 [project.optional-dependencies]
@@ -136,7 +136,6 @@ exclude_lines = [
 
 [tool.black]
 line-length = 88
-target-version = ['py311']
 include = '\.pyi?$'
 extend-exclude = '''
 /(
@@ -162,7 +161,7 @@ use_parentheses = true
 ensure_newline_before_comments = true
 
 [tool.mypy]
-python_version = "3.11"
+python_version = "3.14"
 warn_return_any = true
 warn_unused_configs = true
 disallow_untyped_defs = false

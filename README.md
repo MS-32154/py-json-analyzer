@@ -1,5 +1,5 @@
 [![PyPI version](https://img.shields.io/pypi/v/py-json-analyzer.svg)](https://pypi.org/project/py-json-analyzer/)
-[![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
+[![Python 3.15+ (3.14+ on Windows)](https://img.shields.io/badge/python-3.15+%20%7C%203.14+%20Windows-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 # JSON Explorer
@@ -40,7 +40,8 @@
 
 ## Requirements
 
-- **Python**: 3.11 or higher
+- **Python**: 3.15 or higher (Linux/macOS); 3.14 or higher on Windows
+  - On Windows, the curses terminal view needs Python 3.14, since `windows-curses` has no 3.15 wheels yet. On 3.15 the other output formats still work.
 
 ### Core Dependencies
 
@@ -52,7 +53,7 @@ plotly>=5.0.0            # Interactive, browser-based graphing
 prompt-toolkit>=3.0.0    # Interactive input with autocomplete
 requests>=2.32.0         # HTTP requests for URL loading
 rich>=13.0.0             # Rich terminal formatting
-windows-curses>=2.4.0    # Terminal UI support on Windows (auto-installed)
+windows-curses>=2.4.0    # Terminal UI on Windows (auto-installed on Python 3.14)
 ```
 
 ### Optional Dependencies
@@ -89,13 +90,13 @@ pip install --upgrade py-json-analyzer
 ```bash
 git clone https://github.com/MS-32154/py-json-analyzer
 cd py-json-analyzer
-pip install -e .
+uv sync              # or: pip install -e .
 ```
 
 For development with all optional dependencies:
 
 ```bash
-pip install -e ".[dev]"
+uv sync --extra dev  # or: pip install -e ".[dev]"
 ```
 
 ---
@@ -661,17 +662,17 @@ Contributions are welcome! Here's how to get started:
 # Clone and setup
 git clone https://github.com/MS-32154/py-json-analyzer
 cd py-json-analyzer
-pip install -e ".[dev]"
+uv sync --extra dev
 
 # Run tests
-pytest
+uv run pytest
 
 # Format code
-black json_explorer/
-isort json_explorer/
+uv run black json_explorer/
+uv run isort json_explorer/
 
 # Type checking (if using mypy)
-mypy json_explorer/
+uv run mypy json_explorer/
 ```
 
 ### Adding a New Language Generator

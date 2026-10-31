@@ -4,27 +4,69 @@ on:
   release:
     types: [published]
 
+permissions:
+  contents: read
+
+concurrency:
+  group: publish
+  cancel-in-progress: false
+
 jobs:
-  publish:
+  test:
+    uses: ./.github/workflows/ci.yml
+
+  build:
+    needs: test
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: ">=3.11"
+      - uses: astral-sh/setup-uv@v10
 
-      - name: Install dependencies
+      - name: Check release tag matches package version
+        shell: bash
         run: |
-          python -m pip install --upgrade pip
-          pip install build twine
+          tag="${GITHUB_REF_NAME#v}"
+          pkg="$(uv version --short)"
+          lib="$(grep -Po '^__version__ = "\K[^"]+' json_explorer/__init__.py)"
+          echo "tag=$tag pyproject=$pkg __init__=$lib"
+          [[ "$tag" == "$pkg" && "$pkg" == "$lib" ]]
 
-      - name: Build package
-        run: python -m build
+      - name: Build sdist and wheel
+        run: uv build
 
-      - name: Publish to PyPI
+      - name: Check distribution metadata
+        run: uvx twine check --strict dist/*
+
+      - name: Smoke-test the built wheel
+        run: uv run --isolated --no-project --with dist/*.whl python -c "import json_explorer, sys; print(json_explorer.__version__); sys.exit(json_explorer.__version__ != '${GITHUB_REF_NAME#v}')"
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: dist
+          path: dist/
+          if-no-files-found: error
+
+  publish:
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment:
+      name: pypi
+      url: https://pypi.org/project/py-json-analyzer/
+    permissions:
+      id-token: write # enables PyPI Trusted Publishing
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          name: dist
+          path: dist/
+
+      - uses: astral-sh/setup-uv@v10
+
+      - name: Publish
+        run: uv publish
         env:
-          TWINE_USERNAME: __token__
-          TWINE_PASSWORD: ${{ secrets.PYPI_API_TOKEN }}
-        run: twine upload dist/*
+          # Remove this once Trusted Publishing is configured on PyPI.
+          UV_PUBLISH_TOKEN: ${{ secrets.PYPI_API_TOKEN }}
