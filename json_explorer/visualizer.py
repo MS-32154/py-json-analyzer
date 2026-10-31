@@ -98,7 +98,9 @@ class JSONVisualizer:
             else:
                 self._terminal_fallback(detailed)
 
-        elif output == "html":
+        elif output in ("html", "interactive"):
+            # html: write the report (open it only when no save path is given);
+            # interactive: write it and always open it in the browser.
             if not PLOTLY_AVAILABLE:
                 raise RuntimeError(
                     "Plotly not available. Install with: pip install plotly"

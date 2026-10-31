@@ -430,3 +430,24 @@ class TestDataWithVariousPatterns:
 
         captured = capsys.readouterr()
         assert "QUALITY METRICS" in captured.out or "DATA TYPES" in captured.out
+
+
+class TestInteractiveFormat:
+    """#3: "interactive" is the CLI's default --plot-format."""
+
+    def test_interactive_writes_report(self, visualizer, simple_data, tmp_path):
+        report = tmp_path / "report.html"
+        with patch("webbrowser.open") as opened:
+            visualizer.visualize(simple_data, output="interactive", save_path=report)
+        assert report.exists()
+        opened.assert_called_once()
+
+    def test_interactive_respects_no_browser(self, visualizer, simple_data, tmp_path):
+        with patch("webbrowser.open") as opened:
+            visualizer.visualize(
+                simple_data,
+                output="interactive",
+                save_path=tmp_path / "r.html",
+                open_browser=False,
+            )
+        opened.assert_not_called()
