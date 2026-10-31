@@ -131,17 +131,6 @@ class TestDataStatsAnalyzer(unittest.TestCase):
         # Uniform data should be more uniform than varied data
         self.assertNotEqual(uniform_uniformity, varied_uniformity)
 
-    def test_path_analysis(self):
-        """Test path tracking through nested structures"""
-        data = {"user": {"profile": {"name": "Alice"}}}
-
-        stats = self.analyzer.generate_stats(data)
-        paths = stats["path_analysis"]
-
-        self.assertIn("user", paths)
-        self.assertIn("user.profile", paths)
-        self.assertIn("user.profile.name", paths)
-
     def test_mixed_data_types(self):
         """Test analysis of mixed data types"""
         data = {
@@ -196,3 +185,11 @@ class TestDataStatsAnalyzer(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)
+
+
+def test_booleans_are_not_numbers():
+    from json_explorer.stats import generate_stats
+
+    stats = generate_stats({"flag": False, "n": 5})
+    assert stats["value_patterns"]["numeric_ranges"] == {"min": 5, "max": 5}
+    assert stats["data_types"]["bool"] == 1

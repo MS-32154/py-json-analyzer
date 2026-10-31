@@ -350,31 +350,32 @@ analyzer.print_summary(data, detailed=True)
 #### Statistics Output Structure
 
 ```python
+# generate_stats(data) for a small document (Counters abbreviated)
 {
     "total_keys": 45,
     "total_values": 1234,
-    "data_types": Counter({"str": 500, "int": 300, "dict": 100, ...}),
-    "key_frequency": Counter({"id": 10, "name": 10, "email": 8, ...}),
+    "data_types": Counter({"str": 500, "int": 300, "dict": 100, "bool": 20}),
+    "key_frequency": Counter({"id": 10, "name": 10, "email": 8}),
     "max_depth": 5,
-    "depth_histogram": Counter({0: 1, 1: 10, 2: 20, ...}),
+    "depth_histogram": Counter({0: 1, 1: 10, 2: 20}),
     "value_patterns": {
         "null_count": 15,
         "empty_strings": 5,
         "empty_collections": 3,
-        "numeric_ranges": {"min": 0, "max": 1000},
-        "string_lengths": {"min": 0, "max": 100, "avg": 25.5}
+        "numeric_ranges": {"min": 0, "max": 1000},  # booleans are not numbers
+        "string_lengths": {"min": 0, "max": 100, "avg": 25.5},
     },
     "structure_insights": {
-        "repeated_structures": Counter({...}),
-        "array_sizes": Counter({5: 10, 10: 5, ...}),
-        "key_naming_patterns": Counter({"snake_case": 30, "camelCase": 15})
+        "repeated_structures": Counter({("int", "str", "str"): 10}),
+        "array_sizes": Counter({5: 10, 10: 5}),
+        "key_naming_patterns": Counter({"snake_case": 30, "camelCase": 15}),
     },
     "computed_insights": {
         "complexity_score": 67,
         "most_common_type": ("str", 500),
         "structure_uniformity": "moderately_uniform",
-        "data_quality_issues": ["high_null_rate (12.2%)"]
-    }
+        "data_quality_issues": ["high_null_rate (12.2%)"],
+    },
 }
 ```
 
@@ -525,7 +526,7 @@ Print tree visualization and optionally raw analysis.
 **Example:**
 
 ```python
-from json_explorer import print_json_analysis
+from json_explorer.tree_view import print_json_analysis
 
 print_json_analysis(data, source="Config File", show_raw=True)
 ```
@@ -542,7 +543,7 @@ Print tree without optional/conflict annotations for cleaner view.
 **Example:**
 
 ```python
-from json_explorer import print_compact_tree
+from json_explorer.tree_view import print_compact_tree
 
 print_compact_tree(data, source="Simple View")
 ```
@@ -1367,13 +1368,13 @@ json_explorer data.json --generate go --config config.json
 
 ```python
 from json_explorer import (
-    load_json,
-    analyze_json,
-    JsonSearcher,
     DataStatsAnalyzer,
     JSONVisualizer,
-    quick_generate
+    JsonSearcher,
+    analyze_json,
+    load_json,
 )
+from json_explorer.codegen import quick_generate
 
 # Load data
 source, data = load_json("data.json")
@@ -1599,7 +1600,8 @@ python_code = quick_generate(data, language="python")
 ### Best Practices
 
 ```python
-from json_explorer import load_json, generate_from_analysis
+from json_explorer import load_json
+from json_explorer.codegen import generate_from_analysis
 from json_explorer.utils import JSONLoaderError
 from json_explorer.codegen import load_config
 

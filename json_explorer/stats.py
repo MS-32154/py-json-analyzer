@@ -4,7 +4,7 @@ This module provides detailed statistical analysis of JSON data structures,
 including type distribution, depth analysis, and data quality metrics.
 """
 
-from collections import Counter, defaultdict
+from collections import Counter
 from typing import Any
 
 from .logging_config import get_logger
@@ -33,7 +33,6 @@ class DataStatsAnalyzer:
             "key_frequency": Counter(),
             "max_depth": 0,
             "depth_histogram": Counter(),
-            "path_analysis": defaultdict(list),
             "value_patterns": {
                 "null_count": 0,
                 "empty_strings": 0,
@@ -49,7 +48,6 @@ class DataStatsAnalyzer:
         }
         self._string_lengths: list[int] = []
         self._numeric_values: list[int | float] = []
-        self._paths: list[tuple[str, int, str]] = []
 
     def generate_stats(self, data: Any) -> dict[str, Any]:
         """Generate comprehensive statistics for nested data structures.
@@ -68,7 +66,7 @@ class DataStatsAnalyzer:
         """
         logger.info("Starting statistics generation")
         self.reset()
-        self._traverse(data, depth=0, path="root")
+        self._traverse(data, depth=0)
         result = self._finalize_stats()
         logger.info(
             "Statistics generated: %s values, %s keys, max depth %s",
@@ -78,17 +76,15 @@ class DataStatsAnalyzer:
         )
         return result
 
-    def _traverse(self, obj: Any, depth: int = 0, path: str = "root") -> None:
+    def _traverse(self, obj: Any, depth: int = 0) -> None:
         """Recursively traverse and analyze the data structure.
 
         Args:
             obj: Current object to analyze.
             depth: Current depth in the structure.
-            path: Current path string.
         """
         self.stats["max_depth"] = max(self.stats["max_depth"], depth)
         self.stats["depth_histogram"][depth] += 1
-        self._paths.append((path, depth, type(obj).__name__))
 
         if obj is None:
             self.stats["value_patterns"]["null_count"] += 1
@@ -96,13 +92,17 @@ class DataStatsAnalyzer:
             self.stats["total_values"] += 1
 
         elif isinstance(obj, dict):
-            self._analyze_dict(obj, depth, path)
+            self._analyze_dict(obj, depth)
 
         elif isinstance(obj, (list, tuple)):
-            self._analyze_sequence(obj, depth, path)
+            self._analyze_sequence(obj, depth)
 
         elif isinstance(obj, str):
             self._analyze_string(obj)
+
+        elif isinstance(obj, bool):  # before int: bool is a subclass of int
+            self.stats["data_types"]["bool"] += 1
+            self.stats["total_values"] += 1
 
         elif isinstance(obj, (int, float)):
             self._analyze_numeric(obj)
@@ -111,13 +111,12 @@ class DataStatsAnalyzer:
             self.stats["data_types"][type(obj).__name__] += 1
             self.stats["total_values"] += 1
 
-    def _analyze_dict(self, obj: dict, depth: int, path: str) -> None:
+    def _analyze_dict(self, obj: dict, depth: int) -> None:
         """Analyze dictionary objects.
 
         Args:
             obj: Dictionary to analyze.
             depth: Current depth.
-            path: Current path.
         """
         if not obj:
             self.stats["value_patterns"]["empty_collections"] += 1
@@ -148,18 +147,15 @@ class DataStatsAnalyzer:
         self.stats["structure_insights"]["repeated_structures"][structure_sig] += 1
 
         # Recursively analyze values
-        for key, val in obj.items():
-            new_path = f"{path}.{key}" if path != "root" else key
-            self.stats["path_analysis"][new_path].append(type(val).__name__)
-            self._traverse(val, depth + 1, new_path)
+        for val in obj.values():
+            self._traverse(val, depth + 1)
 
-    def _analyze_sequence(self, obj: list | tuple, depth: int, path: str) -> None:
+    def _analyze_sequence(self, obj: list | tuple, depth: int) -> None:
         """Analyze list and tuple objects.
 
         Args:
             obj: Sequence to analyze.
             depth: Current depth.
-            path: Current path.
         """
         seq_type = "list" if isinstance(obj, list) else "tuple"
 
@@ -171,10 +167,8 @@ class DataStatsAnalyzer:
         self.stats["structure_insights"]["array_sizes"][len(obj)] += 1
 
         # Analyze sequence contents
-        for i, item in enumerate(obj):
-            new_path = f"{path}[{i}]"
-            self.stats["path_analysis"][new_path].append(type(item).__name__)
-            self._traverse(item, depth + 1, new_path)
+        for item in obj:
+            self._traverse(item, depth + 1)
 
     def _analyze_string(self, obj: str) -> None:
         """Analyze string values.

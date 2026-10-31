@@ -122,7 +122,8 @@ json_explorer data.json --plot --plot-format html
 ### Python Library
 
 ```python
-from json_explorer import analyze_json, JsonSearcher, quick_generate
+from json_explorer import analyze_json, JsonSearcher
+from json_explorer.codegen import quick_generate
 
 # Analyze structure
 data = {"users": [{"id": 1, "name": "Alice", "email": "alice@example.com"}]}
@@ -349,7 +350,7 @@ visualize_json(data, output="html", detailed=True)
 ### Tree Display
 
 ```python
-from json_explorer import print_json_analysis, print_compact_tree
+from json_explorer.tree_view import print_compact_tree, print_json_analysis
 
 # Full analysis with tree
 print_json_analysis(data, source="API Response", show_raw=False)
@@ -421,7 +422,7 @@ print(f"Python styles: {info.get('styles', [])}")
 ### Interactive Mode
 
 ```python
-from json_explorer import InteractiveHandler
+from json_explorer.interactive import InteractiveHandler
 
 handler = InteractiveHandler()
 handler.set_data(data, source="my_data.json")

@@ -62,6 +62,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `py.typed` marker: type information is now shipped with the package.
 
 ### Fixed
+- Statistics counted booleans as numbers (`numeric_ranges.min` could be `False`).
+- Docs: every Python example parses and every documented import and CLI flag exists.
 - `--generate` on a JSON document that is just `null` tried to re-read the input (passing a URL as a
   file path) and failed; it now generates a wrapper with one `value: Any` field.
 - Timestamp detection treated `"March"`, `"Monday"`, `"1 hour ago"` and `"10.5"` as timestamps (Go
@@ -108,6 +110,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   (snake_case fields for Python) and rejects unsupported languages.
 
 ### Removed
+- The undocumented `path_analysis` statistics key, which kept one entry per array index.
 - **Breaking:** the curses terminal view and the `windows-curses` dependency. `--plot-format terminal`
   prints text charts, which work in any terminal and on every platform.
 - **Breaking:** `--plot-format interactive` (it was the same as `html`). `html` is now the default; the
