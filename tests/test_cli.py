@@ -215,3 +215,11 @@ class TestTui:
     def test_needs_a_terminal(self, run, capsys):
         assert run(FLAT_SAMPLE) == 1  # pytest captures stdin/stdout: no TTY
         assert "needs a terminal" in capsys.readouterr().out
+
+
+@pytest.mark.parametrize("args", [["--generate", "go"], ["--json-schema"]])
+def test_output_files_use_lf_line_endings(run, tmp_path, args):
+    """gofmt, Prettier and rustfmt expect LF, also on Windows."""
+    target = tmp_path / "out"
+    assert run(FLAT_SAMPLE, *args, "--output", target) == 0
+    assert b"\r\n" not in target.read_bytes()

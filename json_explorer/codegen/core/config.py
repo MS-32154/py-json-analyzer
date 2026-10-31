@@ -264,7 +264,7 @@ def save_config(config: GeneratorConfig, output_path: str | Path) -> None:
     try:
         path.parent.mkdir(parents=True, exist_ok=True)
 
-        with path.open("w", encoding="utf-8") as f:
+        with path.open("w", encoding="utf-8", newline="\n") as f:
             json.dump(config.to_dict(), f, indent=2, ensure_ascii=False)
 
         logger.info("Saved config to: %s", path)

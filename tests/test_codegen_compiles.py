@@ -25,6 +25,12 @@ from pathlib import Path
 import pytest
 from json_explorer.codegen import quick_generate
 
+
+def write(path: Path, text: str) -> None:
+    """Write like the tools expect on every OS: UTF-8, LF line endings."""
+    path.write_text(text, encoding="utf-8", newline="\n")
+
+
 DATA_SAMPLES = Path(__file__).parent.parent / "data_samples"
 
 CASES: dict[str, typing.Any] = {
@@ -108,7 +114,7 @@ def check_python(code: str) -> None:
         ],
         input=code,
         capture_output=True,
-        text=True,
+        encoding="utf-8",
         check=False,
     )
     assert formatted.returncode == 0, "generated Python is not ruff-format clean"
@@ -131,10 +137,14 @@ def check_go(code: str, workdir: Path) -> None:
     go = _find_go()
     if go is None:
         pytest.skip("Go toolchain not found (set JSON_EXPLORER_GO or add go to PATH)")
-    (workdir / "go.mod").write_text("module example.com/generated\n\ngo 1.22\n")
-    (workdir / "models.go").write_text(code)
+    write(workdir / "go.mod", "module example.com/generated\n\ngo 1.22\n")
+    write(workdir / "models.go", code)
     result = subprocess.run(
-        [go, "vet", "./..."], cwd=workdir, capture_output=True, text=True, check=False
+        [go, "vet", "./..."],
+        cwd=workdir,
+        capture_output=True,
+        encoding="utf-8",
+        check=False,
     )
     assert result.returncode == 0, result.stderr
 
@@ -143,7 +153,7 @@ def check_go(code: str, workdir: Path) -> None:
         [gofmt, "-l", "models.go"],
         cwd=workdir,
         capture_output=True,
-        text=True,
+        encoding="utf-8",
         check=True,
     )
     assert unformatted.stdout == "", "generated Go is not gofmt-clean"
@@ -180,6 +190,8 @@ def test_typeddict_keeps_json_keys() -> None:
 GO_DECODE_MAIN = """package main
 
 import (
+
+
 	"encoding/json"
 	"os"
 )
@@ -211,13 +223,17 @@ def test_go_decodes_source_data(case: str, tmp_path: Path) -> None:
     if go is None:
         pytest.skip("Go toolchain not found (set JSON_EXPLORER_GO or add go to PATH)")
     data = CASES[case]
-    (tmp_path / "go.mod").write_text("module example.com/decode\n\ngo 1.22\n")
-    (tmp_path / "models.go").write_text(quick_generate(data, "go"))
+    write(tmp_path / "go.mod", "module example.com/decode\n\ngo 1.22\n")
+    write(tmp_path / "models.go", quick_generate(data, "go"))
     root = "[]Root" if isinstance(data, list) else "Root"
-    (tmp_path / "main.go").write_text(GO_DECODE_MAIN % root)
-    (tmp_path / "data.json").write_text(json.dumps(data))
+    write(tmp_path / "main.go", GO_DECODE_MAIN % root)
+    write(tmp_path / "data.json", json.dumps(data))
     result = subprocess.run(
-        [go, "run", "."], cwd=tmp_path, capture_output=True, text=True, check=False
+        [go, "run", "."],
+        cwd=tmp_path,
+        capture_output=True,
+        encoding="utf-8",
+        check=False,
     )
     assert result.returncode == 0, result.stderr
 
@@ -270,15 +286,15 @@ def _ts_workdir(workdir: Path, models: str) -> Path:
     if not all((modules / pkg).is_dir() for pkg in ("typescript", "zod", "prettier")):
         pytest.skip("JSON_EXPLORER_TS_TOOLS lacks typescript, zod or prettier")
     (workdir / "node_modules").symlink_to(modules, target_is_directory=True)
-    (workdir / "package.json").write_text('{"type": "module"}\n')
-    (workdir / "tsconfig.json").write_text(json.dumps(TSCONFIG))
-    (workdir / "models.ts").write_text(models)
+    write(workdir / "package.json", '{"type": "module"}\n')
+    write(workdir / "tsconfig.json", json.dumps(TSCONFIG))
+    write(workdir / "models.ts", models)
     return modules
 
 
 def _run(cmd: list[str], workdir: Path) -> None:
     result = subprocess.run(
-        cmd, cwd=workdir, capture_output=True, text=True, check=False
+        cmd, cwd=workdir, capture_output=True, encoding="utf-8", check=False
     )
     assert result.returncode == 0, result.stdout + result.stderr
 
@@ -300,9 +316,10 @@ def test_typescript_interfaces_accept_source_data(case: str, tmp_path: Path) -> 
     data = CASES[case]
     modules = _ts_workdir(tmp_path, quick_generate(data, "typescript"))
     root = "Root[]" if isinstance(data, list) else "Root"
-    (tmp_path / "data.ts").write_text(
+    write(
+        tmp_path / "data.ts",
         f'import type {{ Root }} from "./models.js";\n'
-        f"export const data: {root} = {json.dumps(data)};\n"
+        f"export const data: {root} = {json.dumps(data)};\n",
     )
     _run(["node", str(modules / "typescript/bin/tsc"), "--noEmit", "-p", "."], tmp_path)
 
@@ -311,14 +328,13 @@ def test_typescript_interfaces_accept_source_data(case: str, tmp_path: Path) -> 
 def test_zod_schemas_parse_source_data(case: str, tmp_path: Path) -> None:
     data = CASES[case]
     modules = _ts_workdir(tmp_path, quick_generate(data, "typescript", style="zod"))
-    (tmp_path / "data.ts").write_text(
-        f"export const data: unknown = {json.dumps(data)};\n"
-    )
-    (tmp_path / "decode.ts").write_text(
+    write(tmp_path / "data.ts", f"export const data: unknown = {json.dumps(data)};\n")
+    write(
+        tmp_path / "decode.ts",
         'import { z } from "zod";\n'
         'import { data } from "./data.js";\n'
         'import { Root } from "./models.js";\n'
-        "(Array.isArray(data) ? z.array(Root) : Root).parse(data);\n"
+        "(Array.isArray(data) ? z.array(Root) : Root).parse(data);\n",
     )
     _run(["node", str(modules / "typescript/bin/tsc"), "-p", "."], tmp_path)
     _run(["node", "out/decode.js"], tmp_path)
@@ -354,9 +370,9 @@ def _cargo() -> str:
 def _rust_crate(workdir: Path, models: str, main: str = "fn main() {}\n") -> str:
     cargo = _cargo()
     (workdir / "src").mkdir()
-    (workdir / "Cargo.toml").write_text(CARGO_TOML)
-    (workdir / "src/lib.rs").write_text(models)
-    (workdir / "src/main.rs").write_text(main)
+    write(workdir / "Cargo.toml", CARGO_TOML)
+    write(workdir / "src/lib.rs", models)
+    write(workdir / "src/main.rs", main)
     return cargo
 
 
@@ -370,7 +386,7 @@ def _run_cargo(cargo: str, args: list[str], workdir: Path) -> None:
         cwd=workdir,
         env=env,
         capture_output=True,
-        text=True,
+        encoding="utf-8",
         check=False,
     )
     assert result.returncode == 0, result.stderr
@@ -402,7 +418,7 @@ def test_rust_decodes_source_data(
     data = CASES[case]
     models = quick_generate(data, "rust", deny_unknown_fields=deny_unknown)
     root = "Vec<generated::Root>" if isinstance(data, list) else "generated::Root"
-    (tmp_path / "data.json").write_text(json.dumps(data))
+    write(tmp_path / "data.json", json.dumps(data))
     main = (
         "fn main() {\n"
         f"    let _decoded: {root} =\n"

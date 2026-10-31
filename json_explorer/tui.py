@@ -468,7 +468,7 @@ class ExplorerApp(App[None]):
         if path is None:
             return
         try:
-            path.write_text(self.code, encoding="utf-8")
+            path.write_text(self.code, encoding="utf-8", newline="\n")
         except OSError as e:
             self.notify(f"Could not save: {e}", severity="error")
         else:

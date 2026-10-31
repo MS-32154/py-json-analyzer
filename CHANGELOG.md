@@ -129,6 +129,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `py.typed` marker: type information is now shipped with the package.
 
 ### Fixed
+- Files written by `--output`, the terminal UI and config saving use LF line endings on Windows
+  too; CRLF made generated Go fail gofmt (Prettier and rustfmt also expect LF).
 - `null` elements inside arrays were ignored (`[1, null]` became `list[int]`, which Pydantic rejects).
   They are now `list[int | None]` / `[]*int64`.
 - TypedDicts typed a key that is present but sometimes `null` as `NotRequired[T]`, which rejects the

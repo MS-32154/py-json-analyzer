@@ -432,7 +432,7 @@ def _save_to_file(code: str, output_path: str, language: str) -> None:
     """Save generated code to file."""
     try:
         path = Path(output_path)
-        path.write_text(code, encoding="utf-8")
+        path.write_text(code, encoding="utf-8", newline="\n")
         err_console.print(
             f"[green]✓[/green] Generated {language} code saved to [cyan]{path}[/cyan]"
         )

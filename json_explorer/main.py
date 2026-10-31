@@ -107,7 +107,7 @@ class JSONExplorer:
             title = Path(args.file).stem
         text = json.dumps(json_schema(self.data, title), indent=2, ensure_ascii=False)
         if args.output:
-            Path(args.output).write_text(text + "\n", encoding="utf-8")
+            Path(args.output).write_text(text + "\n", encoding="utf-8", newline="\n")
             Console(stderr=True).print(
                 f"[green]✓[/green] JSON Schema saved to {args.output}"
             )
