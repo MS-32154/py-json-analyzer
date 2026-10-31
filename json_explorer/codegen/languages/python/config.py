@@ -258,9 +258,9 @@ class PythonConfig:
 
     def _extract_base_types(self, type_string: str) -> set[str]:
         """Extract base types from complex type strings like 'list[User]' or 'str | None'."""
-        # Find all capitalized identifiers (type names)
-        matches = re.findall(r"\b([A-Z][a-zA-Z0-9_]*)\b", type_string)
-        return set(matches)
+        # Any identifier: lowercase names like "datetime" need imports too
+        # (structural import tracking replaces this in Phase 3.4)
+        return set(re.findall(r"\b([A-Za-z_][A-Za-z0-9_]*)\b", type_string))
 
 
 # ============================================================================
