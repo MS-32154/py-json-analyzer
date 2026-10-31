@@ -154,5 +154,5 @@ def create_python_name_tracker() -> NameTracker:
     """
     reserved = PYTHON_RESERVED_WORDS | PYTHON_BUILTIN_TYPES
     tracker = NameTracker(reserved)
-    logger.debug(f"Created Python name tracker with {len(reserved)} reserved words")
+    logger.debug("Created Python name tracker with %s reserved words", len(reserved))
     return tracker

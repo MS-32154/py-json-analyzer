@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Changed
+- Logging follows library best practice: importing json_explorer no longer prints INFO logs to stderr.
+  The package logger only has a `NullHandler` and propagates to the root logger; the CLI calls
+  `configure_logging()`. Logger names are no longer doubled (`json_explorer.cli`, not
+  `json_explorer.json_explorer.cli`), and CLI errors are no longer printed twice.
 - Requires Python 3.15+ (3.14+ on Windows, where `windows-curses` has no 3.15 wheels yet).
 - Project managed with uv (`uv.lock`, `.python-version`); `requirements.txt` removed.
 - Development tools moved from the `dev`/`all` extras to a PEP 735 `dev` dependency group.

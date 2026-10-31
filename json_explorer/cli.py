@@ -48,7 +48,7 @@ class CLIHandler:
         """
         if not self.data:
             self.console.print("❌ [red]No data loaded[/red]")
-            logger.warning("No data loaded; aborting CLI run")
+            logger.debug("No data loaded; aborting CLI run")
             return 1
 
         self.console.print(f"📄 Loaded: {self.source}")
@@ -88,7 +88,7 @@ class CLIHandler:
         elif tree_type == "compact":
             print_compact_tree(self.data, self.source)
         else:
-            logger.warning("Unknown tree type requested: %s", tree_type)
+            logger.debug("Unknown tree type requested: %s", tree_type)
             self.console.print(f"❌ [red]Unknown tree type: {tree_type}[/red]")
 
     def _handle_search(self, args: Any) -> None:
@@ -104,7 +104,7 @@ class CLIHandler:
         valid, error = self.searcher.validate_query(query)
         if not valid:
             self.console.print(f"❌ [red]Invalid JMESPath query: {error}[/red]")
-            logger.error("Invalid JMESPath query: %s", error)
+            logger.debug("Invalid JMESPath query: %s", error)
             return
 
         # Execute search
@@ -160,4 +160,4 @@ class CLIHandler:
             )
         except Exception as e:
             self.console.print(f"❌ [red]Visualization error: {e}[/red]")
-            logger.error("Visualization error: %s", e)
+            logger.debug("Visualization error: %s", e)

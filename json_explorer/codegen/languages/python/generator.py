@@ -44,7 +44,7 @@ class PythonGenerator(CodeGenerator):
         super().__init__(config)
 
         logger.info(
-            f"PythonGenerator initialized (style: {self.python_config.style.value})"
+            "PythonGenerator initialized (style: %s)", self.python_config.style.value
         )
 
     # ========================================================================
@@ -75,7 +75,7 @@ class PythonGenerator(CodeGenerator):
         root_schema_name: str,
     ) -> str:
         """Generate complete Python code for all schemas."""
-        logger.info(f"Generating Python code for {len(schemas)} schemas")
+        logger.info("Generating Python code for %s schemas", len(schemas))
 
         # Reset state
         self.types_used.clear()
@@ -91,7 +91,7 @@ class PythonGenerator(CodeGenerator):
                 class_data = self._generate_class_data(schemas[schema_name])
                 classes.append(class_data)
 
-        logger.debug(f"Generated {len(classes)} classes")
+        logger.debug("Generated %s classes", len(classes))
 
         # Get required imports
         imports = self._get_imports()
@@ -130,7 +130,7 @@ class PythonGenerator(CodeGenerator):
             if field_data:
                 fields.append(field_data)
 
-        logger.debug(f"Generated class: {class_name} with {len(fields)} fields")
+        logger.debug("Generated class: %s with %s fields", class_name, len(fields))
 
         class_data = {
             "class_name": class_name,
@@ -286,7 +286,7 @@ class PythonGenerator(CodeGenerator):
             self.types_used,
             self.has_optional_fields,
         )
-        logger.debug(f"Generated {len(imports)} imports")
+        logger.debug("Generated %s imports", len(imports))
         return imports
 
     def _get_generation_order(
@@ -305,7 +305,7 @@ class PythonGenerator(CodeGenerator):
 
             if schema_name in visiting:
                 # Circular dependency detected
-                logger.warning(f"Circular dependency detected: {schema_name}")
+                logger.warning("Circular dependency detected: %s", schema_name)
                 return
 
             visiting.add(schema_name)
@@ -330,7 +330,7 @@ class PythonGenerator(CodeGenerator):
         for schema_name in schemas:
             visit(schema_name)
 
-        logger.debug(f"Generation order determined: {len(ordered)} schemas")
+        logger.debug("Generation order determined: %s schemas", len(ordered))
         return ordered
 
     # ========================================================================

@@ -227,7 +227,7 @@ def handle_codegen_command(
         if not hasattr(args, "generate") or not args.generate:
             return 0  # No generation requested
 
-        logger.info(f"Code generation requested: {args.generate}")
+        logger.info("Code generation requested: %s", args.generate)
 
         # Validate language
         language = args.generate.lower()
@@ -248,11 +248,11 @@ def handle_codegen_command(
 
     except CLIError as e:
         console.print(f"[red]✗ Error:[/red] {e}")
-        logger.error(f"CLI error: {e}")
+        logger.debug("CLI error: %s", e)
         return 1
     except Exception as e:
         console.print(f"[red]✗ Unexpected error:[/red] {e}")
-        logger.exception("Unexpected error in CLI handler")
+        logger.debug("Unexpected error in CLI handler", exc_info=True)
         return 1
 
 
@@ -309,12 +309,12 @@ def _list_languages() -> int:
             )
         )
 
-        logger.info(f"Listed {len(language_info)} available languages")
+        logger.info("Listed %s available languages", len(language_info))
         return 0
 
     except Exception as e:
         console.print(f"[red]✗ Error listing languages:[/red] {e}")
-        logger.error(f"Failed to list languages: {e}")
+        logger.debug("Failed to list languages: %s", e)
         return 1
 
 
@@ -353,12 +353,12 @@ def _show_language_info(language: str) -> int:
             case "go" | "golang":
                 _show_go_examples()
 
-        logger.info(f"Displayed info for language: {language}")
+        logger.info("Displayed info for language: %s", language)
         return 0
 
     except Exception as e:
         console.print(f"[red]✗ Error getting language info:[/red] {e}")
-        logger.error(f"Failed to get language info: {e}")
+        logger.debug("Failed to get language info: %s", e)
         return 1
 
 
@@ -428,22 +428,22 @@ def _get_input_data(args: argparse.Namespace) -> dict | list | None:
     try:
         if hasattr(args, "file") and args.file:
             _, data = load_json(args.file)
-            logger.info(f"Loaded JSON from file: {args.file}")
+            logger.info("Loaded JSON from file: %s", args.file)
             return data
         if hasattr(args, "url") and args.url:
             _, data = load_json(args.url)
-            logger.info(f"Loaded JSON from URL: {args.url}")
+            logger.info("Loaded JSON from URL: %s", args.url)
             return data
         # Try to read from stdin
         logger.debug("Reading JSON from stdin")
         return json.load(sys.stdin)
     except json.JSONDecodeError as e:
         console.print(f"[red]✗ Invalid JSON input:[/red] {e}")
-        logger.error(f"JSON decode error: {e}")
+        logger.debug("JSON decode error: %s", e)
         return None
     except Exception as e:
         console.print(f"[red]✗ Failed to load input:[/red] {e}")
-        logger.error(f"Failed to load input: {e}")
+        logger.debug("Failed to load input: %s", e)
         return None
 
 
@@ -470,7 +470,7 @@ def _build_config(args: argparse.Namespace, language: str) -> dict:
         try:
             file_config = _load_config_file(args.config)
             config_dict.update(file_config)
-            logger.info(f"Loaded config from file: {args.config}")
+            logger.info("Loaded config from file: %s", args.config)
         except Exception as e:
             raise CLIError(f"Configuration error: {e}") from e
 
@@ -494,7 +494,7 @@ def _build_config(args: argparse.Namespace, language: str) -> dict:
         case "python" | "py":
             _add_python_config(args, config_dict)
 
-    logger.debug(f"Built config with {len(config_dict)} options")
+    logger.debug("Built config with %s options", len(config_dict))
     return config_dict
 
 
@@ -569,7 +569,7 @@ def _generate_and_output(
 
         # Generate code
         root_name = getattr(args, "root_name", "Root")
-        logger.info(f"Generating {language} code (root: {root_name})...")
+        logger.info("Generating %s code (root: %s)...", language, root_name)
 
         result = generate_from_analysis(analysis, language, config, root_name)
 
@@ -579,7 +579,7 @@ def _generate_and_output(
             )
             if hasattr(result, "exception") and result.exception:
                 console.print(f"[dim]Details: {result.exception}[/dim]")
-            logger.error(f"Generation failed: {result.error_message}")
+            logger.debug("Generation failed: %s", result.error_message)
             return 1
 
         # Output code
@@ -604,11 +604,11 @@ def _generate_and_output(
 
     except GeneratorError as e:
         console.print(f"[red]✗[/red] {e}")
-        logger.error(f"Generator error: {e}")
+        logger.debug("Generator error: %s", e)
         return 1
     except Exception as e:
         console.print(f"[red]✗ Unexpected failure:[/red] {e}")
-        logger.exception("Unexpected failure during generation")
+        logger.debug("Unexpected failure during generation", exc_info=True)
         return 1
 
 
@@ -620,10 +620,10 @@ def _save_to_file(code: str, output_path: str, language: str) -> None:
         console.print(
             f"[green]✓[/green] Generated {language} code saved to [cyan]{path}[/cyan]"
         )
-        logger.info(f"Code saved to: {path}")
+        logger.info("Code saved to: %s", path)
     except OSError as e:
         console.print(f"[red]✗ Failed to write to {output_path}:[/red] {e}")
-        logger.error(f"Failed to write file: {e}")
+        logger.debug("Failed to write file: %s", e)
         raise
 
 

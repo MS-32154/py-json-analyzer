@@ -62,7 +62,7 @@ class GenerationResult:
         exception: Exception | None = None,
     ) -> GenerationResult:
         """Create a failed generation result."""
-        logger.error(f"Generation failed: {message}")
+        logger.debug("Generation failed: %s", message)
         return cls(
             success=False,
             code="",
@@ -74,14 +74,15 @@ class GenerationResult:
         """Log generation result summary."""
         if self.success:
             logger.info(
-                f"Generation succeeded: {len(self.code)} chars, "
-                f"{len(self.warnings)} warnings"
+                "Generation succeeded: %s chars, %s warnings",
+                len(self.code),
+                len(self.warnings),
             )
             for warning in self.warnings:
                 # Warnings printed out after generated code
-                logger.info(f"  - {warning}")
+                logger.info("  - %s", warning)
         else:
-            logger.error(f"Generation failed: {self.error_message}")
+            logger.error("Generation failed: %s", self.error_message)
 
 
 # ============================================================================
@@ -116,8 +117,9 @@ class CodeGenerator(ABC):
         self._template_manager: TemplateManager | None = None
 
         logger.info(
-            f"Initializing {self.language_name} generator "
-            f"(package: {config.package_name})"
+            "Initializing %s generator (package: %s)",
+            self.language_name,
+            config.package_name,
         )
 
         self._setup_templates()
@@ -130,7 +132,7 @@ class CodeGenerator(ABC):
             raise GeneratorError(f"Template directory not found: {template_dir}")
 
         self._template_manager = TemplateManager(template_dir)
-        logger.debug(f"Template engine initialized: {template_dir}")
+        logger.debug("Template engine initialized: %s", template_dir)
 
     # ========================================================================
     # Abstract Properties and Methods (Must Implement)
@@ -261,7 +263,7 @@ class CodeGenerator(ABC):
 
         if warnings:
             # Warnings printed out after generated code
-            logger.info(f"Schema validation found {len(warnings)} issues")
+            logger.info("Schema validation found %s issues", len(warnings))
 
         return warnings
 
@@ -297,7 +299,7 @@ class CodeGenerator(ABC):
                 formatted_lines.append(stripped)
 
         result = "\n".join(formatted_lines)
-        logger.debug(f"Code formatted: {len(code)} → {len(result)} chars")
+        logger.debug("Code formatted: %s → %s chars", len(code), len(result))
         return result
 
 
@@ -329,8 +331,10 @@ def generate_code(
         GenerationResult with code, warnings, and metadata
     """
     logger.info(
-        f"Starting code generation: {generator.language_name}, "
-        f"{len(schemas)} schemas, root={root_schema_name}"
+        "Starting code generation: %s, %s schemas, root=%s",
+        generator.language_name,
+        len(schemas),
+        root_schema_name,
     )
 
     try:
@@ -366,7 +370,7 @@ def generate_code(
         return result
 
     except Exception as e:
-        logger.exception("Generation failed with exception")
+        logger.debug("Generation failed with exception", exc_info=True)
         return GenerationResult.error(
             message=f"Code generation failed: {e}",
             exception=e,

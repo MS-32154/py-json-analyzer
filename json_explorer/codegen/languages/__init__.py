@@ -48,9 +48,9 @@ try:
     logger.debug("Go generator module loaded successfully")
 
 except ImportError as e:
-    logger.debug(f"Go generator not available: {e}")
+    logger.debug("Go generator not available: %s", e)
 except Exception as e:
-    logger.warning(f"Failed to import Go generator: {e}")
+    logger.warning("Failed to import Go generator: %s", e)
 
 
 # ============================================================================
@@ -95,9 +95,9 @@ try:
     logger.debug("Python generator module loaded successfully")
 
 except ImportError as e:
-    logger.debug(f"Python generator not available: {e}")
+    logger.debug("Python generator not available: %s", e)
 except Exception as e:
-    logger.warning(f"Failed to import Python generator: {e}")
+    logger.warning("Failed to import Python generator: %s", e)
 
 
 # ============================================================================
@@ -184,6 +184,6 @@ def get_available_languages() -> list[str]:
 # Log summary on module import
 _available = get_available_languages()
 if _available:
-    logger.info(f"Language generators loaded: {', '.join(_available)}")
+    logger.info("Language generators loaded: %s", ", ".join(_available))
 else:
     logger.warning("No language generators available")

@@ -145,8 +145,9 @@ class PythonConfig:
         object.__setattr__(self, "type_map", type_map)
 
         logger.debug(
-            f"PythonConfig initialized: style={self.style.value}, "
-            f"optional={self.use_optional}"
+            "PythonConfig initialized: style=%s, optional=%s",
+            self.style.value,
+            self.use_optional,
         )
 
     def to_dict(self) -> dict:
@@ -252,7 +253,7 @@ class PythonConfig:
             ),
         )
 
-        logger.debug(f"Required imports: {len(sorted_imports)}")
+        logger.debug("Required imports: %s", len(sorted_imports))
         return sorted_imports
 
     def _extract_base_types(self, type_string: str) -> set[str]:

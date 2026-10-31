@@ -160,7 +160,7 @@ class PythonInteractiveHandler:
             case "typeddict":
                 python_config.update(self._configure_typeddict(console))
 
-        logger.info(f"Python-specific config collected: style={style}")
+        logger.info("Python-specific config collected: style=%s", style)
         return python_config
 
     def _configure_dataclass(self, console: Console) -> dict[str, Any]:
@@ -337,7 +337,7 @@ class Root(TypedDict, total=False):
                     )
 
         if warnings:
-            logger.info(f"Config validation: {len(warnings)} warnings")
+            logger.info("Config validation: %s warnings", len(warnings))
 
         return warnings
 

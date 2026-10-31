@@ -186,7 +186,7 @@ class Schema:
     def add_field(self, field: Field) -> None:
         """Add a field to this schema."""
         self.fields.append(field)
-        logger.debug(f"Added field '{field.name}' to schema '{self.name}'")
+        logger.debug("Added field '%s' to schema '%s'", field.name, self.name)
 
     def get_field(self, name: str) -> Field | None:
         """Get field by name."""
@@ -275,7 +275,7 @@ def convert_analyzer_output(
     Returns:
         Root Schema object with nested structures
     """
-    logger.info(f"Converting analyzer output to schema: {root_name}")
+    logger.info("Converting analyzer output to schema: %s", root_name)
 
     root_type = analyzer_result["type"]
 
@@ -287,7 +287,7 @@ def convert_analyzer_output(
                 root_name,
                 add_attention,
             )
-            logger.debug(f"Created object schema: {root_name}")
+            logger.debug("Created object schema: %s", root_name)
             return schema
 
         case "list":
@@ -364,8 +364,10 @@ def _create_field_from_node(
                 field_obj.type = map_analyzer_type(concrete_types[0])
                 field_obj.optional = True
                 logger.debug(
-                    f"Resolved None conflict in {parent_schema_name}.{field_name}: "
-                    f"using {concrete_types[0]} as optional"
+                    "Resolved None conflict in %s.%s: using %s as optional",
+                    parent_schema_name,
+                    field_name,
+                    concrete_types[0],
                 )
 
             elif len(concrete_types) > 1:
@@ -376,9 +378,11 @@ def _create_field_from_node(
                     map_analyzer_type(t) for t in concrete_types
                 ]
                 field_obj.optional = True  # Can also be None
-                logger.warning(
-                    f"Type conflict in {parent_schema_name}.{field_name}: "
-                    f"{', '.join(concrete_types)} (plus None)"
+                logger.debug(
+                    "Type conflict in %s.%s: %s (plus None)",
+                    parent_schema_name,
+                    field_name,
+                    ", ".join(concrete_types),
                 )
 
             else:
@@ -386,16 +390,19 @@ def _create_field_from_node(
                 field_obj.type = FieldType.UNKNOWN
                 field_obj.optional = True
                 logger.debug(
-                    f"Unknown type in {parent_schema_name}.{field_name} "
-                    f"(only None values found)"
+                    "Unknown type in %s.%s (only None values found)",
+                    parent_schema_name,
+                    field_name,
                 )
         else:
             # Real conflict without None involved
             field_obj.type = FieldType.CONFLICT
             field_obj.conflicting_types = [map_analyzer_type(t) for t in conflict_types]
-            logger.warning(
-                f"Type conflict in {parent_schema_name}.{field_name}: "
-                f"{', '.join(conflict_types)}"
+            logger.debug(
+                "Type conflict in %s.%s: %s",
+                parent_schema_name,
+                field_name,
+                ", ".join(conflict_types),
             )
 
     # Handle specific field types
@@ -499,7 +506,7 @@ def _handle_root_array(
             )
 
         logger.info(
-            f"Root is array of objects, extracted element schema: {element_name}"
+            "Root is array of objects, extracted element schema: %s", element_name
         )
         return schema
 
@@ -527,7 +534,7 @@ def _handle_root_array(
         field_obj.description = f"📋 Array of {element_type.value} values"
 
     schema.add_field(field_obj)
-    logger.info(f"Root is array of primitives: {element_type.value}")
+    logger.info("Root is array of primitives: %s", element_type.value)
     return schema
 
 
@@ -549,7 +556,7 @@ def _handle_root_primitive(
         field_obj.description = f"📦 Single {root_type} value"
 
     schema.add_field(field_obj)
-    logger.info(f"Root is primitive: {root_type}")
+    logger.info("Root is primitive: %s", root_type)
     return schema
 
 
@@ -579,5 +586,5 @@ def extract_all_schemas(root_schema: Schema) -> dict[str, Schema]:
                 collect(fld.array_element_schema)
 
     collect(root_schema)
-    logger.info(f"Extracted {len(schemas)} schemas from root: {root_schema.name}")
+    logger.info("Extracted %s schemas from root: %s", len(schemas), root_schema.name)
     return schemas

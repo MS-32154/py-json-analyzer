@@ -48,7 +48,7 @@ def create_template_env(
     # Setup loader
     if template_dir and template_dir.exists():
         loader = jinja2.FileSystemLoader(str(template_dir))
-        logger.debug(f"Template environment created with directory: {template_dir}")
+        logger.debug("Template environment created with directory: %s", template_dir)
     else:
         loader = jinja2.DictLoader({})
         logger.warning(
@@ -71,7 +71,7 @@ def create_template_env(
     env.filters["indent"] = _indent_filter
     env.filters["comment"] = _comment_filter
 
-    logger.info(f"Template environment configured with {len(env.filters)} filters")
+    logger.info("Template environment configured with %s filters", len(env.filters))
     return env
 
 
@@ -97,7 +97,7 @@ def render_template(
     try:
         template = env.get_template(template_name)
         result = template.render(**context)
-        logger.debug(f"Rendered template: {template_name} ({len(result)} chars)")
+        logger.debug("Rendered template: %s (%s chars)", template_name, len(result))
         return result
     except jinja2.TemplateNotFound as e:
         raise TemplateError(f"Template not found: {template_name}") from e
@@ -129,7 +129,7 @@ def render_string(
     try:
         template = env.from_string(template_string)
         result = template.render(**context)
-        logger.debug(f"Rendered string template ({len(result)} chars)")
+        logger.debug("Rendered string template (%s chars)", len(result))
         return result
     except Exception as e:
         raise TemplateError(f"Failed to render string template: {e}") from e
@@ -165,10 +165,10 @@ def list_templates(env: Environment) -> list[str]:
     """
     try:
         templates = env.list_templates()
-        logger.debug(f"Found {len(templates)} templates")
+        logger.debug("Found %s templates", len(templates))
         return list(templates)
     except Exception as e:
-        logger.warning(f"Failed to list templates: {e}")
+        logger.warning("Failed to list templates: %s", e)
         return []
 
 
@@ -259,7 +259,7 @@ class TemplateManager:
         """
         self._template_dir = template_dir
         self._env = create_template_env(template_dir)
-        logger.info(f"TemplateManager initialized for: {template_dir}")
+        logger.info("TemplateManager initialized for: %s", template_dir)
 
     def render(self, template_name: str, context: dict[str, Any]) -> str:
         """Render a template by name."""

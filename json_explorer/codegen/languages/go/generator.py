@@ -72,7 +72,7 @@ class GoGenerator(CodeGenerator):
         root_schema_name: str,
     ) -> str:
         """Generate complete Go code for all schemas."""
-        logger.info(f"Generating Go code for {len(schemas)} schemas")
+        logger.info("Generating Go code for %s schemas", len(schemas))
 
         # Reset state
         self.types_used.clear()
@@ -87,7 +87,7 @@ class GoGenerator(CodeGenerator):
                 struct_data = self._generate_struct_data(schemas[schema_name])
                 structs.append(struct_data)
 
-        logger.debug(f"Generated {len(structs)} structs")
+        logger.debug("Generated %s structs", len(structs))
 
         # Get required imports
         imports = self._get_imports()
@@ -112,7 +112,7 @@ class GoGenerator(CodeGenerator):
             if field_data:
                 fields.append(field_data)
 
-        logger.debug(f"Generated struct: {struct_name} with {len(fields)} fields")
+        logger.debug("Generated struct: %s with %s fields", struct_name, len(fields))
 
         return {
             "struct_name": struct_name,
@@ -210,7 +210,7 @@ class GoGenerator(CodeGenerator):
     def _get_imports(self) -> list[str]:
         """Get required imports based on types used."""
         imports = self.go_config.get_required_imports(self.types_used)
-        logger.debug(f"Generated {len(imports)} imports")
+        logger.debug("Generated %s imports", len(imports))
         return imports
 
     def _get_generation_order(
@@ -234,7 +234,7 @@ class GoGenerator(CodeGenerator):
 
             if schema_name in visiting:
                 # Circular dependency detected - skip
-                logger.warning(f"Circular dependency detected: {schema_name}")
+                logger.warning("Circular dependency detected: %s", schema_name)
                 return
 
             visiting.add(schema_name)
@@ -259,7 +259,7 @@ class GoGenerator(CodeGenerator):
         for schema_name in schemas:
             visit(schema_name)
 
-        logger.debug(f"Generation order determined: {len(ordered)} schemas")
+        logger.debug("Generation order determined: %s schemas", len(ordered))
         return ordered
 
     # ========================================================================

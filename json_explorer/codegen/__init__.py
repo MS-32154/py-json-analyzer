@@ -77,13 +77,13 @@ def generate_from_analysis(
         >>> result = generate_from_analysis(analysis, "python")
         >>> print(result.code)
     """
-    logger.info(f"Generating {language} code from analyzer result")
+    logger.info("Generating %s code from analyzer result", language)
 
     # Convert analyzer result to schema
     root_schema = convert_analyzer_output(analyzer_result, root_name)
     all_schemas = extract_all_schemas(root_schema)
 
-    logger.debug(f"Converted to {len(all_schemas)} schemas")
+    logger.debug("Converted to %s schemas", len(all_schemas))
 
     # Get generator instance
     generator = get_generator(language, config)
@@ -126,7 +126,7 @@ def quick_generate(
 
     from json_explorer.analyzer import analyze_json
 
-    logger.info(f"Quick generate: {language}")
+    logger.info("Quick generate: %s", language)
 
     # Convert string to dict if needed
     if isinstance(json_data, str):

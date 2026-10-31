@@ -1,7 +1,12 @@
-"""Centralized logging configuration for json_explorer.
+"""Logging setup for json_explorer.
 
-This module provides a single point of configuration for all logging
-throughout the json_explorer package.
+As a library, json_explorer only attaches a ``NullHandler``: it never prints
+log records unless the application configures logging. Records propagate to
+the root logger, so ``logging.basicConfig(...)`` in an application works as
+usual.
+
+The CLI (and any application that wants json_explorer's own format) calls
+:func:`configure_logging`, which attaches handlers to the package logger.
 """
 
 import logging
@@ -9,13 +14,15 @@ import sys
 from pathlib import Path
 from typing import Literal
 
-# Module-level logger that can be used by other modules
-logger = logging.getLogger("json_explorer")
+PACKAGE_LOGGER_NAME = "json_explorer"
 
-# Prevent duplicate log messages
-logger.propagate = False
+type LogLevel = Literal["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"]
 
-LogLevel = Literal["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"]
+DEFAULT_FORMAT = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+
+# Package root logger: silent by default (library best practice).
+logger = logging.getLogger(PACKAGE_LOGGER_NAME)
+logger.addHandler(logging.NullHandler())
 
 
 def configure_logging(
@@ -23,50 +30,43 @@ def configure_logging(
     log_file: Path | None = None,
     format_string: str | None = None,
 ) -> None:
-    """Configure logging for the json_explorer package.
+    """Send json_explorer log records to stderr (and optionally a file).
+
+    Intended for the CLI and for applications that want json_explorer's own
+    log output. Calling it again replaces the previous configuration.
 
     Args:
-        level: Logging level (DEBUG, INFO, WARNING, ERROR, CRITICAL).
-        log_file: Optional file path to write logs to.
+        level: Minimum level to emit (DEBUG, INFO, WARNING, ERROR, CRITICAL).
+        log_file: Optional file to write logs to, in addition to stderr.
         format_string: Custom format string for log messages.
     """
-    # Clear existing handlers to prevent duplicates
-    logger.handlers.clear()
+    for handler in list(logger.handlers):
+        logger.removeHandler(handler)
+        if not isinstance(handler, logging.NullHandler):
+            handler.close()
 
-    # Set the logger level
-    logger.setLevel(getattr(logging, level))
+    logger.setLevel(level)
+    # These handlers own the output now; don't also pass records to root.
+    logger.propagate = False
 
-    # Default format if none provided
-    if format_string is None:
-        format_string = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+    formatter = logging.Formatter(format_string or DEFAULT_FORMAT)
 
-    formatter = logging.Formatter(format_string)
-
-    # Console handler
     console_handler = logging.StreamHandler(sys.stderr)
-    console_handler.setLevel(getattr(logging, level))
     console_handler.setFormatter(formatter)
     logger.addHandler(console_handler)
 
-    # File handler (optional)
     if log_file is not None:
-        file_handler = logging.FileHandler(log_file)
-        file_handler.setLevel(getattr(logging, level))
+        file_handler = logging.FileHandler(log_file, encoding="utf-8")
         file_handler.setFormatter(formatter)
         logger.addHandler(file_handler)
 
 
 def get_logger(name: str) -> logging.Logger:
-    """Get a logger instance for a specific module.
+    """Return a logger inside the json_explorer namespace.
 
-    Args:
-        name: Name of the module (typically __name__).
-
-    Returns:
-        Logger instance configured with the package settings.
+    Pass ``__name__``. Names that already belong to the package are used as
+    is; anything else is nested under ``json_explorer.``.
     """
-    return logging.getLogger(f"json_explorer.{name}")
-
-
-# Configure with defaults on import
-configure_logging()
+    if name == PACKAGE_LOGGER_NAME or name.startswith(f"{PACKAGE_LOGGER_NAME}."):
+        return logging.getLogger(name)
+    return logging.getLogger(f"{PACKAGE_LOGGER_NAME}.{name}")

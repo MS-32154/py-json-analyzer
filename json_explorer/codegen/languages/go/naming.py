@@ -100,5 +100,5 @@ def create_go_name_tracker() -> NameTracker:
     """
     reserved = GO_RESERVED_WORDS | GO_BUILTIN_TYPES
     tracker = NameTracker(reserved)
-    logger.debug(f"Created Go name tracker with {len(reserved)} reserved words")
+    logger.debug("Created Go name tracker with %s reserved words", len(reserved))
     return tracker

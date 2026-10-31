@@ -93,7 +93,7 @@ class JsonSearcher:
             ...     "users[?age > `30`].{name: name, email: email}"
             ... )
         """
-        logger.info(f"Executing JMESPath query: {query}")
+        logger.info("Executing JMESPath query: %s", query)
 
         try:
             if compile_query:
@@ -107,15 +107,15 @@ class JsonSearcher:
                 return None
 
             result = SearchResult(path=query, value=result_value, query=query)
-            logger.info(f"Query successful, result type: {result.data_type}")
+            logger.info("Query successful, result type: %s", result.data_type)
             return result
 
         except JMESPathError as e:
-            logger.error(f"JMESPath query error: {e}")
+            logger.debug("JMESPath query error: %s", e)
             self.console.print(f"[red]Query error: {e}[/red]")
             return None
         except Exception as e:
-            logger.error(f"Unexpected error during search: {e}", exc_info=True)
+            logger.debug("Unexpected error during search: %s", e, exc_info=True)
             self.console.print(f"[red]Unexpected error: {e}[/red]")
             return None
 
@@ -141,7 +141,7 @@ class JsonSearcher:
             ... ]
             >>> results = searcher.search_multiple(data, queries)
         """
-        logger.info(f"Executing {len(queries)} JMESPath queries")
+        logger.info("Executing %s JMESPath queries", len(queries))
         results = {}
 
         for query in queries:
@@ -149,7 +149,7 @@ class JsonSearcher:
             if result is not None:
                 results[query] = result
 
-        logger.info(f"Completed {len(results)}/{len(queries)} queries successfully")
+        logger.info("Completed %s/%s queries successfully", len(results), len(queries))
         return results
 
     def validate_query(self, query: str) -> tuple[bool, str | None]:

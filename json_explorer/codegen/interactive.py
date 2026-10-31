@@ -121,7 +121,7 @@ class CodegenInteractiveHandler:
             return False
         except Exception as e:
             self.console.print(f"[red]⚠️ Unexpected error: {e}[/red]")
-            logger.exception("Unexpected error in interactive handler")
+            logger.debug("Unexpected error in interactive handler", exc_info=True)
             return False
 
     # ========================================================================
@@ -188,7 +188,7 @@ class CodegenInteractiveHandler:
             if not language:
                 return
 
-            logger.info(f"User selected language: {language}")
+            logger.info("User selected language: %s", language)
 
             # Step 2: Configuration
             config = self._configure_generation(language)
@@ -208,10 +208,10 @@ class CodegenInteractiveHandler:
 
         except GeneratorError as e:
             self.console.print(f"[red]⚠️ Generation error:[/red] {e}")
-            logger.error(f"Generation error: {e}")
+            logger.debug("Generation error: %s", e)
         except Exception as e:
             self.console.print(f"[red]⚠️ Unexpected error:[/red] {e}")
-            logger.exception("Unexpected error during generation")
+            logger.debug("Unexpected error during generation", exc_info=True)
 
     def _select_language(self) -> str | None:
         """Interactive language selection."""
@@ -279,7 +279,7 @@ class CodegenInteractiveHandler:
             lang_defaults = lang_handler.get_default_config()
             config_dict.update(lang_defaults)
 
-        logger.debug(f"Quick config created: {len(config_dict)} options")
+        logger.debug("Quick config created: %s options", len(config_dict))
         return config_dict
 
     def _custom_configuration(self, language: str) -> dict:
@@ -315,7 +315,7 @@ class CodegenInteractiveHandler:
             lang_config = lang_handler.configure_language_specific(self.console)
             config_dict.update(lang_config)
 
-        logger.debug(f"Custom config created: {len(config_dict)} options")
+        logger.debug("Custom config created: %s options", len(config_dict))
         return config_dict
 
     def _template_configuration(self, language: str) -> dict | None:
@@ -399,7 +399,7 @@ class CodegenInteractiveHandler:
 
         except Exception as e:
             self.console.print(f"[red]⚠️ Error loading configuration: {e}[/red]")
-            logger.error(f"Failed to load config file: {e}")
+            logger.debug("Failed to load config file: %s", e)
             return None
 
     def _generate_code(
@@ -436,11 +436,11 @@ class CodegenInteractiveHandler:
 
         except GeneratorError as e:
             self.console.print(f"[red]⚠️ Generator error:[/red] {e}")
-            logger.error(f"Generator error: {e}")
+            logger.debug("Generator error: %s", e)
             return None
         except Exception as e:
             self.console.print(f"[red]⚠️ Unexpected error during generation:[/red] {e}")
-            logger.exception("Unexpected error during generation")
+            logger.debug("Unexpected error during generation", exc_info=True)
             return None
 
     # ========================================================================
@@ -544,11 +544,11 @@ class CodegenInteractiveHandler:
             self.console.print(
                 f"[green]✅ Code saved to:[/green] [cyan]{output_path}[/cyan]"
             )
-            logger.info(f"Code saved to: {output_path}")
+            logger.info("Code saved to: %s", output_path)
 
         except Exception as e:
             self.console.print(f"[red]⚠️ Error saving file:[/red] {e}")
-            logger.error(f"Failed to save file: {e}")
+            logger.debug("Failed to save file: %s", e)
 
     def _display_warnings(self, warnings: list[str]) -> None:
         """Display generation warnings."""
@@ -644,7 +644,7 @@ class CodegenInteractiveHandler:
 
         except Exception as e:
             self.console.print(f"[red]Error loading language info: {e}[/red]")
-            logger.error(f"Failed to load language info: {e}")
+            logger.debug("Failed to load language info: %s", e)
 
     def _show_specific_language_info(self) -> None:
         """Show information about a specific language."""
@@ -668,7 +668,7 @@ class CodegenInteractiveHandler:
             self._display_specific_language_info(language, info)
         except Exception as e:
             self.console.print(f"[red]Error getting language info: {e}[/red]")
-            logger.error(f"Failed to get language info: {e}")
+            logger.debug("Failed to get language info: %s", e)
 
     def _display_specific_language_info(
         self,
@@ -784,12 +784,12 @@ class CodegenInteractiveHandler:
                 handler_class = getattr(module, handler_class_name)
                 handler = handler_class()
                 self._language_handlers[language] = handler
-                logger.debug(f"Loaded interactive handler for {language}")
+                logger.debug("Loaded interactive handler for %s", language)
                 return handler
 
         except ImportError:
-            logger.debug(f"No interactive handler available for {language}")
+            logger.debug("No interactive handler available for %s", language)
         except Exception as e:
-            logger.warning(f"Failed to load handler for {language}: {e}")
+            logger.warning("Failed to load handler for %s: %s", language, e)
 
         return None

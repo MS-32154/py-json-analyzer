@@ -82,8 +82,10 @@ class GoConfig:
         object.__setattr__(self, "type_map", type_map)
 
         logger.debug(
-            f"GoConfig initialized: int={self.int_type}, "
-            f"float={self.float_type}, pointers={self.use_pointers_for_optional}"
+            "GoConfig initialized: int=%s, float=%s, pointers=%s",
+            self.int_type,
+            self.float_type,
+            self.use_pointers_for_optional,
         )
 
     def to_dict(self) -> dict:
@@ -164,7 +166,7 @@ class GoConfig:
                 imports.add(GO_IMPORTS[clean_type])
 
         result = sorted(imports)
-        logger.debug(f"Required imports: {len(result)}")
+        logger.debug("Required imports: %s", len(result))
         return result
 
 

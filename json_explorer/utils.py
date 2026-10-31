@@ -39,26 +39,26 @@ def load_json_from_file(file_path: str | Path) -> tuple[str, Any]:
         JSONLoaderError: If file cannot be read or JSON is invalid.
     """
     file_path = Path(file_path)
-    logger.debug(f"Attempting to load JSON from file: {file_path}")
+    logger.debug("Attempting to load JSON from file: %s", file_path)
 
     if not file_path.exists():
-        logger.error(f"File not found: {file_path}")
+        logger.debug("File not found: %s", file_path)
         raise FileNotFoundError(f"File not found: {file_path}")
 
     if file_path.suffix.lower() != ".json":
-        logger.warning(f"File does not have .json extension: {file_path}")
+        logger.warning("File does not have .json extension: %s", file_path)
         # Don't raise, just warn - might still be valid JSON
 
     try:
         with file_path.open("r", encoding="utf-8") as f:
             data = json.load(f)
-        logger.info(f"Successfully loaded JSON from {file_path}")
+        logger.info("Successfully loaded JSON from %s", file_path)
         return f"📄 {file_path}", data
     except json.JSONDecodeError as e:
-        logger.error(f"Invalid JSON in file {file_path}: {e}", exc_info=True)
+        logger.debug("Invalid JSON in file %s: %s", file_path, e, exc_info=True)
         raise JSONLoaderError(f"Invalid JSON in file {file_path}: {e}") from e
     except OSError as e:
-        logger.error(f"Error reading file {file_path}: {e}", exc_info=True)
+        logger.debug("Error reading file %s: %s", file_path, e, exc_info=True)
         raise JSONLoaderError(f"Error reading file {file_path}: {e}") from e
 
 
@@ -75,12 +75,12 @@ def load_json_from_url(url: str, timeout: int = 30) -> tuple[str, Any]:
     Raises:
         JSONLoaderError: If URL is invalid, request fails, or response isn't valid JSON.
     """
-    logger.debug(f"Attempting to load JSON from URL: {url}")
+    logger.debug("Attempting to load JSON from URL: %s", url)
 
     # Validate URL
     parsed_url = urlparse(url)
     if not all([parsed_url.scheme, parsed_url.netloc]):
-        logger.error(f"Invalid URL format: {url}")
+        logger.debug("Invalid URL format: %s", url)
         raise JSONLoaderError(f"Invalid URL: {url}")
 
     try:
@@ -90,28 +90,30 @@ def load_json_from_url(url: str, timeout: int = 30) -> tuple[str, Any]:
         # Check content type
         content_type = response.headers.get("content-type", "").lower()
         if "application/json" not in content_type and not url.endswith(".json"):
-            logger.warning(f"URL {url} does not have JSON content type: {content_type}")
+            logger.warning(
+                "URL %s does not have JSON content type: %s", url, content_type
+            )
 
         data = response.json()
-        logger.info(f"Successfully loaded JSON from {url}")
+        logger.info("Successfully loaded JSON from %s", url)
         return f"🌐 {url}", data
 
     except requests.exceptions.Timeout as e:
-        logger.error(f"Request timeout for URL: {url}")
+        logger.debug("Request timeout for URL: %s", url)
         raise JSONLoaderError(f"Request timeout for URL: {url}") from e
     except requests.exceptions.ConnectionError as e:
-        logger.error(f"Connection error for URL {url}: {e}")
+        logger.debug("Connection error for URL %s: %s", url, e)
         raise JSONLoaderError(f"Connection error for URL: {url}") from e
     except requests.exceptions.HTTPError as e:
-        logger.error(f"HTTP error {e.response.status_code} for URL: {url}")
+        logger.debug("HTTP error %s for URL: %s", e.response.status_code, url)
         raise JSONLoaderError(
             f"HTTP error {e.response.status_code} for URL: {url}"
         ) from e
     except requests.exceptions.RequestException as e:
-        logger.error(f"Request error for URL {url}: {e}", exc_info=True)
+        logger.debug("Request error for URL %s: %s", url, e, exc_info=True)
         raise JSONLoaderError(f"Request error for URL {url}: {e}") from e
     except json.JSONDecodeError as e:
-        logger.error(f"Invalid JSON response from URL {url}: {e}", exc_info=True)
+        logger.debug("Invalid JSON response from URL %s: %s", url, e, exc_info=True)
         raise JSONLoaderError(f"Invalid JSON response from URL {url}: {e}") from e
 
 
@@ -135,11 +137,11 @@ def load_json(
         FileNotFoundError: If file doesn't exist.
     """
     if not file_path and not url:
-        logger.error("Neither file_path nor url provided")
+        logger.debug("Neither file_path nor url provided")
         raise JSONLoaderError("Either file_path or url must be provided")
 
     if file_path and url:
-        logger.error("Both file_path and url provided")
+        logger.debug("Both file_path and url provided")
         raise JSONLoaderError("Cannot specify both file_path and url")
 
     if file_path:

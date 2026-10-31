@@ -181,7 +181,7 @@ class GoInteractiveHandler:
                 console=console,
             )
 
-        logger.info(f"Go-specific config collected: {len(go_config)} options")
+        logger.info("Go-specific config collected: %s options", len(go_config))
         return go_config
 
     def get_default_config(self) -> dict[str, Any]:
@@ -278,7 +278,7 @@ type Root struct {
                 )
 
         if warnings:
-            logger.info(f"Config validation: {len(warnings)} warnings")
+            logger.info("Config validation: %s warnings", len(warnings))
 
         return warnings
 

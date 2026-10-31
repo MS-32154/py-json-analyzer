@@ -71,8 +71,10 @@ class DataStatsAnalyzer:
         self._traverse(data, depth=0, path="root")
         result = self._finalize_stats()
         logger.info(
-            f"Statistics generated: {result['total_values']} values, "
-            f"{result['total_keys']} keys, max depth {result['max_depth']}"
+            "Statistics generated: %s values, %s keys, max depth %s",
+            result["total_values"],
+            result["total_keys"],
+            result["max_depth"],
         )
         return result
 

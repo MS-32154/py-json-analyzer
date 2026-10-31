@@ -205,7 +205,7 @@ def resolve_conflict(
     # Check reserved words and builtin types (case-insensitive)
     if name.lower() in {w.lower() for w in reserved_words}:
         name = f"{name}{suffix}"
-        logger.debug(f"Reserved word conflict: {original} → {name}")
+        logger.debug("Reserved word conflict: %s → %s", original, name)
 
     # Check for duplicates
     counter = 1
@@ -215,7 +215,7 @@ def resolve_conflict(
         )
         counter += 1
         if counter == 2:  # Log only on first conflict
-            logger.debug(f"Duplicate name conflict: {original} → {name}")
+            logger.debug("Duplicate name conflict: %s → %s", original, name)
 
     return name
 
@@ -262,7 +262,7 @@ def sanitize_name(
     final_name = resolve_conflict(cleaned, reserved_words, used_names, suffix)
 
     if final_name != name:
-        logger.debug(f"Name sanitization: {name} → {final_name}")
+        logger.debug("Name sanitization: %s → %s", name, final_name)
 
     return final_name
 
@@ -292,7 +292,7 @@ class NameTracker:
         self._used_names: set[str] = set()
         self._reserved_words = reserved_words or set()
         logger.debug(
-            f"NameTracker initialized with {len(self._reserved_words)} reserved words"
+            "NameTracker initialized with %s reserved words", len(self._reserved_words)
         )
 
     def sanitize(
@@ -324,13 +324,13 @@ class NameTracker:
 
     def reset(self) -> None:
         """Clear all tracked names."""
-        logger.debug(f"Clearing {len(self._used_names)} tracked names")
+        logger.debug("Clearing %s tracked names", len(self._used_names))
         self._used_names.clear()
 
     def add(self, name: str) -> None:
         """Manually add a name to the tracker."""
         self._used_names.add(name)
-        logger.debug(f"Manually added name: {name}")
+        logger.debug("Manually added name: %s", name)
 
     @property
     def used_names(self) -> frozenset[str]:

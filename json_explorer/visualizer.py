@@ -75,7 +75,7 @@ class JSONVisualizer:
         Raises:
             RuntimeError: If required dependencies are not available.
         """
-        logger.info(f"Creating {output} visualization (detailed={detailed})")
+        logger.info("Creating %s visualization (detailed=%s)", output, detailed)
 
         # Generate statistics
         analyzer = DataStatsAnalyzer()
@@ -123,7 +123,7 @@ class JSONVisualizer:
             open_browser: Whether to open in browser.
             mode: 'interactive' for auto-open, 'html' for static save.
         """
-        logger.info(f"Generating Plotly visualization (mode={mode})")
+        logger.info("Generating Plotly visualization (mode=%s)", mode)
 
         # Create subplots
         if detailed:
@@ -206,7 +206,7 @@ class JSONVisualizer:
             if output_path.suffix != ".html":
                 output_path = output_path.with_suffix(".html")
             fig.write_html(str(output_path))
-            logger.info(f"Plotly chart saved to: {output_path}")
+            logger.info("Plotly chart saved to: %s", output_path)
             print(f"📊 HTML report saved to: {output_path}")
 
             if open_browser and mode == "interactive":
@@ -214,7 +214,7 @@ class JSONVisualizer:
         else:
             temp_path = Path(tempfile.gettempdir()) / "json_analysis.html"
             fig.write_html(str(temp_path))
-            logger.info(f"Plotly chart saved to temporary file: {temp_path}")
+            logger.info("Plotly chart saved to temporary file: %s", temp_path)
 
             if open_browser:
                 webbrowser.open(f"file://{temp_path.absolute()}")
@@ -378,7 +378,7 @@ class JSONVisualizer:
         try:
             curses.wrapper(self._curses_main, detailed)
         except Exception as e:
-            logger.warning(f"Curses visualization failed: {e}")
+            logger.warning("Curses visualization failed: %s", e)
             self._terminal_fallback(detailed)
 
     def _curses_main(self, stdscr, detailed: bool) -> None:

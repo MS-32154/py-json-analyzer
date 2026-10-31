@@ -63,7 +63,7 @@ def _auto_register_generators() -> None:
         registered_count += 1
         logger.debug("Registered Go generator")
     except ImportError as e:
-        logger.debug(f"Go generator not available: {e}")
+        logger.debug("Go generator not available: %s", e)
 
     # Register Python generator
     try:
@@ -73,7 +73,7 @@ def _auto_register_generators() -> None:
         registered_count += 1
         logger.debug("Registered Python generator")
     except ImportError as e:
-        logger.debug(f"Python generator not available: {e}")
+        logger.debug("Python generator not available: %s", e)
 
     # Future generators can be added here:
     # try:
@@ -83,7 +83,7 @@ def _auto_register_generators() -> None:
     #     pass
 
     _AUTO_REGISTERED = True
-    logger.info(f"Auto-registration complete: {registered_count} generators available")
+    logger.info("Auto-registration complete: %s generators available", registered_count)
 
 
 def _ensure_registry_initialized() -> None:
@@ -124,12 +124,12 @@ def register(
 
     # Check if already registered
     if language_key in _GENERATORS and not replace:
-        logger.debug(f"Generator already registered for '{language}', skipping")
+        logger.debug("Generator already registered for '%s', skipping", language)
         return
 
     # Register primary name
     _GENERATORS[language_key] = generator_class
-    logger.info(f"Registered generator: {language} → {generator_class.__name__}")
+    logger.info("Registered generator: %s → %s", language, generator_class.__name__)
 
     # Register aliases
     if aliases:
@@ -151,7 +151,7 @@ def register(
                     )
 
             _ALIASES[alias_key] = language_key
-            logger.debug(f"Registered alias: {alias} → {language}")
+            logger.debug("Registered alias: %s → %s", alias, language)
 
 
 def unregister(language: str) -> None:
@@ -166,7 +166,7 @@ def unregister(language: str) -> None:
     # Remove from generators
     if language_key in _GENERATORS:
         del _GENERATORS[language_key]
-        logger.info(f"Unregistered generator: {language}")
+        logger.info("Unregistered generator: %s", language)
 
     # Remove all aliases pointing to this language
     aliases_to_remove = [
@@ -175,7 +175,7 @@ def unregister(language: str) -> None:
 
     for alias in aliases_to_remove:
         del _ALIASES[alias]
-        logger.debug(f"Removed alias: {alias}")
+        logger.debug("Removed alias: %s", alias)
 
 
 # ============================================================================
@@ -251,7 +251,7 @@ def create_generator(
 
         # Create generator
         generator = generator_class(final_config)
-        logger.info(f"Created {language} generator")
+        logger.info("Created %s generator", language)
         return generator
 
     except Exception as e:
@@ -354,7 +354,7 @@ def list_all_language_info() -> dict[str, dict[str, Any]]:
         try:
             result[language] = get_language_info(language)
         except Exception as e:
-            logger.warning(f"Failed to get info for {language}: {e}")
+            logger.warning("Failed to get info for %s: %s", language, e)
             continue
 
     return result

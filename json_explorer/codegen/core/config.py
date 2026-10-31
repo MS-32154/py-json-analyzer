@@ -93,7 +93,9 @@ class GeneratorConfig:
             )
 
         logger.debug(
-            f"Config validated: package={self.package_name}, comments={self.add_comments}"
+            "Config validated: package=%s, comments=%s",
+            self.package_name,
+            self.add_comments,
         )
 
     def merge(self, overrides: dict[str, Any]) -> GeneratorConfig:
@@ -141,7 +143,7 @@ class GeneratorConfig:
         # Apply all updates
         current.update(config_updates)
 
-        logger.debug(f"Config merged with {len(overrides)} overrides")
+        logger.debug("Config merged with %s overrides", len(overrides))
         return GeneratorConfig(**current)
 
     def to_dict(self) -> dict[str, Any]:
@@ -188,7 +190,7 @@ def load_config_file(path: str | Path) -> dict[str, Any]:
                 f"Configuration file must contain JSON object: {config_path}"
             )
 
-        logger.info(f"Loaded config from: {config_path}")
+        logger.info("Loaded config from: %s", config_path)
         return config_data
 
     except json.JSONDecodeError as e:
@@ -253,7 +255,7 @@ def save_config(config: GeneratorConfig, output_path: str | Path) -> None:
         with path.open("w", encoding="utf-8") as f:
             json.dump(config.to_dict(), f, indent=2, ensure_ascii=False)
 
-        logger.info(f"Saved config to: {path}")
+        logger.info("Saved config to: %s", path)
 
     except OSError as e:
         raise ConfigError(f"Failed to save configuration to {path}: {e}") from e
