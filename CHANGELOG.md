@@ -13,7 +13,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `json_explorer.json_explorer.cli`), and CLI errors are no longer printed twice.
 - Requires Python 3.15+ (3.14+ on Windows, where `windows-curses` has no 3.15 wheels yet).
 - Project managed with uv (`uv.lock`, `.python-version`); `requirements.txt` removed.
-- Development tools moved from the `dev`/`all` extras to a PEP 735 `dev` dependency group.
 - `__version__` is now read from package metadata (single source: `pyproject.toml`).
 - License metadata uses the SPDX expression `MIT` (PEP 639).
 - Lint and format with ruff (replaces black, isort and flake8).
@@ -27,6 +26,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Publish workflow: runs CI first, checks the tag matches the version, verifies and smoke-tests the built distributions.
 - `py.typed` marker: type information is now shipped with the package.
 
+### Removed
+- **Breaking:** the `dev` and `all` extras. `pip install py-json-analyzer[dev]` no longer works;
+  development tools are now a PEP 735 `dev` dependency group (`uv sync`, or `pip install --group dev`
+  with pip >= 25.1).
+
 ## [0.4.0] - 2025-12-05
 JMESPath integration and enhanced architecture: JMESPath-based search, Plotly visualizations, centralized logging.
 
@@ -37,8 +41,10 @@ Python generator (dataclasses, Pydantic v2, TypedDict) and smarter type resoluti
 Code generation from JSON data (Go).
 
 ## [0.1.3] - 2025-07-03
+Initial release series.
 
 ## [0.1.2] - 2025-06-28
+Initial release series.
 
 [Unreleased]: https://github.com/MS-32154/py-json-analyzer/compare/v0.4.0...HEAD
 [0.4.0]: https://github.com/MS-32154/py-json-analyzer/compare/v0.3.0...v0.4.0

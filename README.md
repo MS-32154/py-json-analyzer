@@ -94,7 +94,7 @@ uv sync              # or: pip install -e .
 For development with all optional dependencies:
 
 ```bash
-uv sync              # installs the dev group; or: pip install -e . --group dev
+uv sync              # installs the dev group; or (pip >= 25.1): pip install -e . --group dev
 ```
 
 ---

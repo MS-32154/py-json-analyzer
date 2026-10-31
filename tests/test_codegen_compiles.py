@@ -109,3 +109,13 @@ def test_generated_code_compiles(case: str, target: str, tmp_path: Path) -> None
         check_go(quick_generate(data, "go", package_name="models"), tmp_path)
     else:
         check_python(quick_generate(data, "python", style=target))
+
+
+@pytest.mark.xfail(reason="#19 TypedDict renames JSON keys", strict=True)
+def test_typeddict_keeps_json_keys() -> None:
+    """A TypedDict describes the dict as-is, so its keys must be the JSON keys."""
+    data = {"userID": 1, "first-name": "Ada", "type": "admin"}
+    namespace: dict[str, typing.Any] = {"__name__": "generated"}
+    exec(quick_generate(data, "python", style="typeddict"), namespace)
+    root = namespace["Root"]
+    assert set(typing.get_type_hints(root)) == set(data)

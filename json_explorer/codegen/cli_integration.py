@@ -253,7 +253,7 @@ def handle_codegen_command(
         return 1
     except Exception as e:
         console.print(f"[red]✗ Unexpected error:[/red] {e}")
-        logger.debug("Unexpected error in CLI handler", exc_info=True)
+        logger.exception("Unexpected error in CLI handler")
         return 1
 
 
@@ -609,7 +609,7 @@ def _generate_and_output(
         return 1
     except Exception as e:
         console.print(f"[red]✗ Unexpected failure:[/red] {e}")
-        logger.debug("Unexpected failure during generation", exc_info=True)
+        logger.exception("Unexpected failure during generation")
         return 1
 
 

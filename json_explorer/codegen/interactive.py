@@ -121,7 +121,7 @@ class CodegenInteractiveHandler:
             return False
         except Exception as e:
             self.console.print(f"[red]⚠️ Unexpected error: {e}[/red]")
-            logger.debug("Unexpected error in interactive handler", exc_info=True)
+            logger.exception("Unexpected error in interactive handler")
             return False
 
     # ========================================================================
@@ -211,7 +211,7 @@ class CodegenInteractiveHandler:
             logger.debug("Generation error: %s", e)
         except Exception as e:
             self.console.print(f"[red]⚠️ Unexpected error:[/red] {e}")
-            logger.debug("Unexpected error during generation", exc_info=True)
+            logger.exception("Unexpected error during generation")
 
     def _select_language(self) -> str | None:
         """Interactive language selection."""
@@ -440,7 +440,7 @@ class CodegenInteractiveHandler:
             return None
         except Exception as e:
             self.console.print(f"[red]⚠️ Unexpected error during generation:[/red] {e}")
-            logger.debug("Unexpected error during generation", exc_info=True)
+            logger.exception("Unexpected error during generation")
             return None
 
     # ========================================================================
