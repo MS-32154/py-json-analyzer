@@ -56,7 +56,7 @@ rich>=13.0.0             # Rich terminal formatting
 windows-curses>=2.4.0    # Terminal UI on Windows (auto-installed on Python 3.14)
 ```
 
-### Optional Dependencies
+### Development Dependencies (`dev` dependency group)
 
 ```
 pytest>=7.0.0
@@ -94,7 +94,7 @@ uv sync              # or: pip install -e .
 For development with all optional dependencies:
 
 ```bash
-uv sync --extra dev  # or: pip install -e ".[dev]"
+uv sync              # installs the dev group; or: pip install -e . --group dev
 ```
 
 ---
@@ -660,7 +660,7 @@ Contributions are welcome! Here's how to get started:
 # Clone and setup
 git clone https://github.com/MS-32154/py-json-analyzer
 cd py-json-analyzer
-uv sync --extra dev
+uv sync
 
 # Run tests
 uv run pytest

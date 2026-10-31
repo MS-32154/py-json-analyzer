@@ -1,5 +1,7 @@
 """JSON Explorer - Comprehensive JSON analysis and code generation tool."""
 
+from importlib import metadata as _metadata
+
 from .analyzer import analyze_json
 from .logging_config import configure_logging, get_logger
 from .search import JsonSearcher, SearchResult
@@ -7,7 +9,10 @@ from .stats import DataStatsAnalyzer, generate_stats
 from .utils import JSONLoaderError, load_json
 from .visualizer import JSONVisualizer, visualize_json
 
-__version__ = "0.4.0"
+try:
+    __version__ = _metadata.version("py-json-analyzer")
+except _metadata.PackageNotFoundError:  # running from a source tree without install
+    __version__ = "0+unknown"
 
 __all__ = [
     # Statistics

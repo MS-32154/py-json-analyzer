@@ -24,14 +24,14 @@ jobs:
 
       - uses: astral-sh/setup-uv@v10
 
+      # __version__ is read from package metadata, so pyproject.toml is the only source
       - name: Check release tag matches package version
         shell: bash
         run: |
           tag="${GITHUB_REF_NAME#v}"
           pkg="$(uv version --short)"
-          lib="$(grep -Po '^__version__ = "\K[^"]+' json_explorer/__init__.py)"
-          echo "tag=$tag pyproject=$pkg __init__=$lib"
-          [[ "$tag" == "$pkg" && "$pkg" == "$lib" ]]
+          echo "tag=$tag pyproject=$pkg"
+          [[ "$tag" == "$pkg" ]]
 
       - name: Build sdist and wheel
         run: uv build

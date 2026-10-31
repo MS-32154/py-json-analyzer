@@ -609,15 +609,7 @@ dependencies = [
     { name = "windows-curses", marker = "python_full_version < '3.15' and sys_platform == 'win32'" },
 ]
 
-[package.optional-dependencies]
-all = [
-    { name = "mypy" },
-    { name = "pytest" },
-    { name = "pytest-cov" },
-    { name = "ruff" },
-    { name = "types-dateparser" },
-    { name = "types-requests" },
-]
+[package.dev-dependencies]
 dev = [
     { name = "mypy" },
     { name = "pytest" },
@@ -632,20 +624,22 @@ requires-dist = [
     { name = "dateparser", specifier = ">=1.2.0" },
     { name = "jinja2", specifier = ">=3.0.0" },
     { name = "jmespath", specifier = ">=1.0.1" },
-    { name = "mypy", marker = "extra == 'dev'", specifier = ">=1.0.0" },
     { name = "plotly", specifier = ">=5.0.0" },
     { name = "prompt-toolkit", specifier = ">=3.0.0" },
-    { name = "py-json-analyzer", extras = ["dev"], marker = "extra == 'all'" },
-    { name = "pytest", marker = "extra == 'dev'", specifier = ">=7.0.0" },
-    { name = "pytest-cov", marker = "extra == 'dev'", specifier = ">=4.0.0" },
     { name = "requests", specifier = ">=2.32.0" },
     { name = "rich", specifier = ">=13.0.0" },
-    { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.17.0" },
-    { name = "types-dateparser", marker = "extra == 'dev'", specifier = ">=1.1.0" },
-    { name = "types-requests", marker = "extra == 'dev'", specifier = ">=2.31.0" },
     { name = "windows-curses", marker = "python_full_version < '3.15' and sys_platform == 'win32'" },
 ]
-provides-extras = ["dev", "all"]
+
+[package.metadata.requires-dev]
+dev = [
+    { name = "mypy", specifier = ">=1.0.0" },
+    { name = "pytest", specifier = ">=7.0.0" },
+    { name = "pytest-cov", specifier = ">=4.0.0" },
+    { name = "ruff", specifier = ">=0.17.0" },
+    { name = "types-dateparser", specifier = ">=1.1.0" },
+    { name = "types-requests", specifier = ">=2.31.0" },
+]
 
 [[package]]
 name = "pygments"

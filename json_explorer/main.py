@@ -1,16 +1,6 @@
 #!/usr/bin/env python3
 
-"""
-main.py
-
-Entry point for the JSON Explorer CLI tool.
-
-Author: MS-32154
-email: msttoffg@gmail.com
-Version: 0.4.0
-License: MIT
-Date: 2025-01-01
-"""
+"""Entry point for the JSON Explorer CLI tool."""
 
 import argparse
 import sys
