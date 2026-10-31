@@ -4,6 +4,7 @@ Tests for Python generator.
 
 import pytest
 from json_explorer.codegen import create_generator, quick_generate
+from json_explorer.codegen.core import FieldType
 from json_explorer.codegen.languages.python import PythonConfig, PythonStyle
 
 
@@ -14,7 +15,10 @@ class TestPythonConfig:
         config = PythonConfig()
 
         assert config.style == PythonStyle.DATACLASS
-        assert config.datetime_type == "datetime"
+        assert config.type_map[FieldType.TIMESTAMP] == "str"
+        assert (
+            PythonConfig(style="pydantic").type_map[FieldType.TIMESTAMP] == "datetime"
+        )
 
     def test_dataclass_config(self):
         config = PythonConfig(

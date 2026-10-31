@@ -88,6 +88,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   (snake_case fields for Python) and rejects unsupported languages.
 
 ### Removed
+- **Breaking:** the Python `datetime_type` option. Timestamps are `datetime` in Pydantic models (which
+  parse them) and `str` in dataclasses and TypedDicts (which hold the JSON string as-is).
+- The progress spinner shown by `analyze_json()`: a library function no longer draws terminal UI.
 - **Breaking:** options that could only produce broken or never-varying output:
   - `generate_json_tags` / `--no-json-tags` (Go structs without tags mis-map keys such as `first_name`)
   - Go `string_type`, `bool_type`, `unknown_type` (unknown values are now always `any`, Go 1.18+),

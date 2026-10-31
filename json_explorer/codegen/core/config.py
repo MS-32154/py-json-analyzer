@@ -36,6 +36,7 @@ REMOVED_OPTIONS: dict[str, str] = {
     "pydantic_use_field": "Field() is used whenever a field needs an alias or default",
     "pydantic_use_alias": "aliases are always generated for renamed fields",
     "typeddict_total": "required keys are required; optional keys use NotRequired",
+    "datetime_type": "timestamps are datetime in Pydantic models, str otherwise",
 }
 
 

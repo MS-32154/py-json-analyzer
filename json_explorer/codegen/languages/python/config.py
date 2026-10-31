@@ -2,7 +2,6 @@
 
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Literal
 
 from ...core.schema import FieldType
 
@@ -36,8 +35,6 @@ class PythonConfig:
 
     Attributes:
         style: dataclass, pydantic or typeddict.
-        datetime_type: Annotation for timestamps (``str`` keeps them as text;
-            dataclasses and TypedDicts don't parse values).
         dataclass_frozen: Make dataclasses immutable.
         dataclass_slots: Use ``__slots__``.
         dataclass_kw_only: Keyword-only constructor arguments.
@@ -46,7 +43,6 @@ class PythonConfig:
     """
 
     style: PythonStyle = PythonStyle.DATACLASS
-    datetime_type: Literal["datetime", "str"] = "datetime"
 
     dataclass_frozen: bool = False
     dataclass_slots: bool = True
@@ -65,7 +61,11 @@ class PythonConfig:
             FieldType.INTEGER: "int",
             FieldType.FLOAT: "float",
             FieldType.BOOLEAN: "bool",
-            FieldType.TIMESTAMP: self.datetime_type,
+            # Only Pydantic parses values; dataclasses and TypedDicts hold the
+            # JSON string as-is, so annotating it as datetime would be wrong.
+            FieldType.TIMESTAMP: (
+                "datetime" if self.style == PythonStyle.PYDANTIC else "str"
+            ),
             FieldType.UNKNOWN: "Any",
             FieldType.CONFLICT: "Any",
         }
@@ -73,7 +73,6 @@ class PythonConfig:
     def to_dict(self) -> dict:
         return {
             "style": self.style.value,
-            "datetime_type": self.datetime_type,
             "dataclass_frozen": self.dataclass_frozen,
             "dataclass_slots": self.dataclass_slots,
             "dataclass_kw_only": self.dataclass_kw_only,
