@@ -5,6 +5,8 @@ proper error handling and validation.
 """
 
 import json
+import os
+import sys
 from pathlib import Path
 from typing import Any
 from urllib.parse import urlparse
@@ -12,7 +14,7 @@ from urllib.parse import urlparse
 import requests
 from prompt_toolkit import prompt
 from prompt_toolkit.completion import FuzzyCompleter, PathCompleter, WordCompleter
-from prompt_toolkit.history import FileHistory
+from prompt_toolkit.history import FileHistory, History, InMemoryHistory
 from rich.console import Console
 from rich.prompt import Prompt
 
@@ -151,6 +153,38 @@ def load_json(
     return load_json_from_url(url, timeout)
 
 
+def user_state_dir() -> Path:
+    """Per-user directory for json_explorer state (prompt history).
+
+    - Linux/BSD: ``$XDG_STATE_HOME/json_explorer`` (default ``~/.local/state``)
+    - macOS: ``~/Library/Application Support/json_explorer``
+    - Windows: ``%LOCALAPPDATA%\\json_explorer``
+    """
+    if sys.platform == "win32":
+        base = Path(os.environ.get("LOCALAPPDATA") or Path.home() / "AppData" / "Local")
+    elif sys.platform == "darwin":
+        base = Path.home() / "Library" / "Application Support"
+    else:
+        base = Path(
+            os.environ.get("XDG_STATE_HOME") or Path.home() / ".local" / "state"
+        )
+    return base / "json_explorer"
+
+
+def _history(name: str) -> History:
+    """Prompt history stored in the user state directory, not the current one.
+
+    Falls back to in-memory history if the directory can't be created.
+    """
+    try:
+        state_dir = user_state_dir()
+        state_dir.mkdir(parents=True, exist_ok=True)
+        return FileHistory(str(state_dir / name))
+    except OSError as e:
+        logger.debug("Prompt history not persisted: %s", e)
+        return InMemoryHistory()
+
+
 def prompt_input(message: str, default: str | None = None, **kwargs) -> str:
     """
     User friendly input with optional choices and autocompletion.
@@ -169,7 +203,7 @@ def prompt_input(message: str, default: str | None = None, **kwargs) -> str:
     choices = kwargs.get("choices")
     console = kwargs.get("console") or Console()
     try:
-        history = FileHistory(".json_explorer_input_history")
+        history = _history("input_history")
 
         if choices:
             str_choices = [str(c) for c in choices]
@@ -219,7 +253,7 @@ def prompt_input_path(message: str, **kwargs) -> str:
     """
     default = kwargs.get("default") or ""
     try:
-        history = FileHistory(".json_explorer_path_history")
+        history = _history("path_history")
         completer = PathCompleter(expanduser=True)
 
         return prompt(

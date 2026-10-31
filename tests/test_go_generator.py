@@ -183,3 +183,22 @@ class TestGoGenerator:
         config = GoConfig(time_type="time.Time")
         imports = config.get_required_imports({"time.Time"})
         assert '"time"' in imports
+
+
+class TestGoImports:
+    @pytest.mark.parametrize(
+        "go_type",
+        [
+            "time.Time",
+            "*time.Time",
+            "[]time.Time",
+            "[]*time.Time",
+            "*[]time.Time",
+            "[][]time.Time",
+        ],
+    )
+    def test_time_import_for_any_pointer_slice_combination(self, go_type):
+        assert GoConfig().get_required_imports({go_type}) == ['"time"']
+
+    def test_no_import_for_builtin_types(self):
+        assert GoConfig().get_required_imports({"string", "*int64", "[]bool"}) == []

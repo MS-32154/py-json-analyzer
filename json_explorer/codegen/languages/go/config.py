@@ -159,8 +159,10 @@ class GoConfig:
         imports = set()
 
         for go_type in types_used:
-            # Remove pointer and array prefixes
-            clean_type = go_type.lstrip("*").lstrip("[]")
+            # Strip pointer/slice prefixes in any combination (*T, []T, []*T, *[]T)
+            clean_type = go_type
+            while clean_type.startswith(("*", "[]")):
+                clean_type = clean_type.removeprefix("*").removeprefix("[]")
 
             if clean_type in GO_IMPORTS:
                 imports.add(GO_IMPORTS[clean_type])

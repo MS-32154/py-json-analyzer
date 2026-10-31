@@ -535,3 +535,28 @@ class TestUrlParsing:
         """Test invalid URL without netloc."""
         with pytest.raises(JSONLoaderError, match="Invalid URL"):
             load_json_from_url("http:///data.json")
+
+
+class TestPromptHistory:
+    def test_history_lives_in_user_state_dir(self, tmp_path, monkeypatch):
+        from json_explorer.utils import _history, user_state_dir
+        from prompt_toolkit.history import FileHistory
+
+        monkeypatch.setenv("XDG_STATE_HOME", str(tmp_path))
+        monkeypatch.setenv("LOCALAPPDATA", str(tmp_path))
+        monkeypatch.setattr(Path, "home", lambda: tmp_path)
+        history = _history("input_history")
+        assert isinstance(history, FileHistory)
+        assert user_state_dir().is_relative_to(tmp_path)
+        history.append_string("users[*].name")
+        assert (user_state_dir() / "input_history").exists()
+
+    def test_falls_back_to_memory_when_dir_unusable(self, monkeypatch):
+        import json_explorer.utils as utils
+        from prompt_toolkit.history import InMemoryHistory
+
+        def unusable():
+            raise PermissionError("read-only home")
+
+        monkeypatch.setattr(utils, "user_state_dir", unusable)
+        assert isinstance(utils._history("input_history"), InMemoryHistory)

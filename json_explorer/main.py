@@ -132,7 +132,12 @@ Code Generation:
     # Logging arguments
     logging_group = parser.add_argument_group("logging options")
     logging_group.add_argument(
-        "--verbose_logging", "-vl", action="store_true", help="Enable verbose logging"
+        "--verbose-logging",
+        "--verbose_logging",  # old spelling, kept for compatibility
+        "-vl",
+        dest="verbose_logging",
+        action="store_true",
+        help="Enable verbose (DEBUG) logging",
     )
     logging_group.add_argument("--log-file", type=Path, help="Write logs to file")
     logging_group.add_argument(
@@ -242,20 +247,12 @@ def main() -> int:
         searcher.print_examples()
         return 0
 
-    # For codegen, we need either file or url
-    if hasattr(args, "generate") and args.generate and not (args.file or args.url):
-        print("❌ Error: Code generation requires a file path or --url")
-        parser.print_help()
-        return 1
-
-    # For other operations, file or url is required
-    if (
-        not hasattr(args, "generate")
-        and not hasattr(args, "list_languages")
-        and not hasattr(args, "language_info")
-    ) and not (args.file or args.url):
-        print("❌ Error: You must provide a file path or --url")
-        parser.print_help()
+    # Everything below works on loaded data: a file or a URL is required.
+    # (--list-languages, --language-info and --show-examples returned above.)
+    if not (args.file or args.url):
+        what = "Code generation requires" if args.generate else "You must provide"
+        print(f"❌ Error: {what} a file path or --url", file=sys.stderr)
+        parser.print_help(sys.stderr)
         return 1
 
     explorer = JSONExplorer()

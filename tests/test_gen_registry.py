@@ -106,3 +106,29 @@ class TestRegistry:
 
         # Cleanup
         unregister("mock")
+
+
+class TestCreateConfig:
+    """#18: create_config(language) applies the language's defaults."""
+
+    def test_python_defaults_to_snake_case_fields(self):
+        from json_explorer.codegen import create_config
+
+        assert create_config("python").field_case == "snake"
+        assert create_config("py").field_case == "snake"
+
+    def test_explicit_options_win(self):
+        from json_explorer.codegen import create_config
+
+        assert create_config("python", field_case="camel").field_case == "camel"
+
+    def test_go_keeps_pascal_case(self):
+        from json_explorer.codegen import create_config
+
+        assert create_config("go").field_case == "pascal"
+
+    def test_unknown_language_raises(self):
+        from json_explorer.codegen import RegistryError, create_config
+
+        with pytest.raises(RegistryError):
+            create_config("cobol")

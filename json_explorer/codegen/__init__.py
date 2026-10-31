@@ -33,6 +33,7 @@ from .core import (
 
 # Import registry functions
 from .registry import (
+    RegistryError,
     create_generator,
     get_aliases,
     get_generator,
@@ -142,9 +143,7 @@ def quick_generate(
         raise GeneratorError(f"JSON analysis failed: {e}") from e
 
     # Apply language-specific defaults
-    # Python uses snake_case for fields by default
-    if language.lower() in ("python", "py") and "field_case" not in options:
-        options["field_case"] = "snake"
+    options = _with_language_defaults(language, options)
 
     # Generate code
     result = generate_from_analysis(analysis, language, options)
@@ -172,8 +171,23 @@ def create_config(language: str = "go", **kwargs) -> GeneratorConfig:
         ...     package_name="models",
         ...     style="pydantic",
         ... )
+
+    Raises:
+        RegistryError: If the language is not supported
     """
-    return load_config(custom_config=kwargs)
+    get_generator_class(language)  # raises RegistryError for unknown languages
+    return load_config(custom_config=_with_language_defaults(language, kwargs))
+
+
+def _with_language_defaults(language: str, options: dict) -> dict:
+    """Return options with the language's conventional defaults filled in.
+
+    Explicit options always win. (Moves into each language's plugin in Phase 3.)
+    """
+    defaults: dict[str, str] = {}
+    if language.lower() in ("python", "py"):
+        defaults["field_case"] = "snake"  # PEP 8
+    return defaults | options
 
 
 # ============================================================================
@@ -189,6 +203,7 @@ __all__ = [
     "GeneratorConfig",
     "GeneratorError",
     "NameTracker",
+    "RegistryError",
     "Schema",
     "TemplateError",
     "TemplateManager",
