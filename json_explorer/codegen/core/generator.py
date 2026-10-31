@@ -7,7 +7,7 @@ Defines the contract that all language generators must implement.
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any
+from typing import Any, ClassVar
 
 from json_explorer.errors import JsonExplorerError
 from json_explorer.logging_config import get_logger
@@ -92,194 +92,81 @@ class GenerationResult:
 
 
 class CodeGenerator(ABC):
-    """
-    Abstract base class for all code generators.
+    """Base class for language generators.
 
-    Subclasses must implement:
-    - language_name: Language identifier
-    - file_extension: Output file extension
-    - get_template_directory: Path to templates
-    - generate: Core generation logic
+    Subclasses set ``language_name``, ``file_extension`` and ``template_dir``
+    and implement ``generate``. Per-run state (names, imports) belongs in
+    ``generate``'s locals, so one generator instance can be reused.
     """
 
-    __slots__ = ("_template_manager", "config")
+    language_name: ClassVar[str]
+    file_extension: ClassVar[str]
+    template_dir: ClassVar[Path]
+
+    __slots__ = ("_templates", "config")
 
     def __init__(self, config: GeneratorConfig):
-        """
-        Initialize generator with configuration.
-
-        Args:
-            config: Generator configuration
-
-        Raises:
-            GeneratorError: If template setup fails
-        """
         self.config = config
-        self._template_manager: TemplateManager | None = None
-
-        logger.info(
-            "Initializing %s generator (package: %s)",
-            self.language_name,
-            config.package_name,
-        )
-
-        self._setup_templates()
-
-    def _setup_templates(self) -> None:
-        """Setup template engine for this generator."""
-        template_dir = self.get_template_directory()
-
-        if not template_dir or not template_dir.exists():
-            raise GeneratorError(f"Template directory not found: {template_dir}")
-
-        self._template_manager = TemplateManager(template_dir)
-        logger.debug("Template engine initialized: %s", template_dir)
-
-    # ========================================================================
-    # Abstract Properties and Methods (Must Implement)
-    # ========================================================================
-
-    @property
-    @abstractmethod
-    def language_name(self) -> str:
-        """Return language name (e.g., 'go', 'python')."""
-
-    @property
-    @abstractmethod
-    def file_extension(self) -> str:
-        """Return file extension (e.g., '.go', '.py')."""
+        if not self.template_dir.is_dir():
+            raise GeneratorError(f"Template directory not found: {self.template_dir}")
+        self._templates = TemplateManager(self.template_dir)
 
     @abstractmethod
-    def get_template_directory(self) -> Path:
-        """Return directory containing templates for this generator."""
+    def generate(self, schemas: dict[str, Schema], root_schema_name: str) -> str:
+        """Generate the source code for all schemas."""
 
-    @abstractmethod
-    def generate(
-        self,
-        schemas: dict[str, Schema],
-        root_schema_name: str,
-    ) -> str:
+    def render_template(self, template_name: str, context: dict[str, Any]) -> str:
+        return self._templates.render(template_name, context)
+
+    @staticmethod
+    def dependency_order(schemas: dict[str, Schema]) -> list[Schema]:
+        """Schemas with nested types before the types that use them.
+
+        JSON data is a tree, so there are no cycles: a post-order walk works.
         """
-        Generate code for all schemas.
+        ordered: list[Schema] = []
+        seen: set[int] = set()
 
-        Args:
-            schemas: Dictionary mapping schema names to Schema objects
-            root_schema_name: Name of the main/root schema
-
-        Returns:
-            Generated code as string
-
-        Raises:
-            GeneratorError: If generation fails
-        """
-
-    # ========================================================================
-    # Template Methods (Can Override)
-    # ========================================================================
-
-    @property
-    def template_manager(self) -> TemplateManager:
-        """Get the template manager for this generator."""
-        if self._template_manager is None:
-            raise GeneratorError("Template manager not initialized")
-        return self._template_manager
-
-    def render_template(
-        self,
-        template_name: str,
-        context: dict[str, Any],
-    ) -> str:
-        """
-        Render a template with context.
-
-        Args:
-            template_name: Template file name
-            context: Variables for template
-
-        Returns:
-            Rendered template content
-        """
-        return self.template_manager.render(template_name, context)
-
-    def validate_schemas(
-        self,
-        schemas: dict[str, Schema],
-    ) -> list[str]:
-        """
-        Validate schemas for structural issues.
-
-        Default implementation checks for basic issues.
-        Override to add language-specific validations.
-
-        Args:
-            schemas: Schemas to validate
-
-        Returns:
-            List of warning messages (empty if no issues)
-        """
-        warnings = []
+        def visit(schema: Schema) -> None:
+            if id(schema) in seen:
+                return
+            seen.add(id(schema))
+            for fld in schema.fields:
+                for child in (fld.nested_schema, fld.array_element_schema):
+                    if child is not None:
+                        visit(child)
+            ordered.append(schema)
 
         for schema in schemas.values():
-            # Empty schemas
+            visit(schema)
+        return ordered
+
+    def validate_schemas(self, schemas: dict[str, Schema]) -> list[str]:
+        """Warnings about schemas whose types can't be fully determined."""
+        warnings = []
+        for schema in schemas.values():
             if not schema.fields:
                 warnings.append(f"Schema '{schema.name}' has no fields")
-
-            # Field-level issues
             for fld in schema.fields:
                 if fld.type == FieldType.CONFLICT:
-                    type_names = (
-                        [t.value for t in fld.conflicting_types]
-                        if fld.conflicting_types
-                        else ["unknown"]
-                    )
+                    types = [t.value for t in fld.conflicting_types] or ["unknown"]
                     warnings.append(
-                        f"Type conflict in {schema.name}.{fld.name}: "
-                        f"{', '.join(type_names)}"
+                        f"Type conflict in {schema.name}.{fld.name}: {', '.join(types)}"
                     )
-
                 elif fld.type == FieldType.UNKNOWN:
                     warnings.append(f"Unknown type in {schema.name}.{fld.name}")
-
-        if warnings:
-            # Warnings printed out after generated code
-            logger.info("Schema validation found %s issues", len(warnings))
-
         return warnings
 
     def format_code(self, code: str) -> str:
-        """
-        Apply basic formatting to generated code.
-
-        Default implementation:
-        - Removes excessive blank lines (max 2 consecutive)
-        - Strips trailing whitespace
-
-        Override for language-specific formatting.
-
-        Args:
-            code: Raw generated code
-
-        Returns:
-            Formatted code
-        """
-        lines = code.split("\n")
-        formatted_lines = []
-        blank_count = 0
-
-        for line in lines:
-            stripped = line.rstrip()
-
-            if not stripped:
-                blank_count += 1
-                if blank_count <= 2:  # Max 2 consecutive blank lines
-                    formatted_lines.append("")
-            else:
-                blank_count = 0
-                formatted_lines.append(stripped)
-
-        result = "\n".join(formatted_lines)
-        logger.debug("Code formatted: %s → %s chars", len(code), len(result))
-        return result
+        """Strip trailing whitespace and collapse runs of blank lines (max 2)."""
+        lines: list[str] = []
+        blank = 0
+        for line in code.split("\n"):
+            line = line.rstrip()
+            blank = blank + 1 if not line else 0
+            if blank <= 2:
+                lines.append(line)
+        return "\n".join(lines)
 
 
 # ============================================================================

@@ -304,14 +304,10 @@ def get_language_info(language: str) -> dict[str, Any]:
     if language_key in _ALIASES:
         language_key = _ALIASES[language_key]
 
-    # Create temporary instance to get info
-    temp_config = load_config()
-    temp_generator = generator_class(temp_config)
-
     return {
-        "name": temp_generator.language_name,
+        "name": generator_class.language_name,
         "class": generator_class.__name__,
-        "file_extension": temp_generator.file_extension,
+        "file_extension": generator_class.file_extension,
         "aliases": get_aliases(language_key),
         "module": generator_class.__module__,
     }

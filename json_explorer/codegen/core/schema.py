@@ -87,6 +87,8 @@ class Field:
 
     # Array information
     array_element_type: FieldType | None = None
+    # Nesting depth: 1 for list[T], 2 for list[list[T]], ...
+    array_dimensions: int = 1
     array_element_schema: Schema | None = None
 
     # Type conflicts
@@ -386,20 +388,18 @@ def _handle_array_field(
                 field_obj.array_element_type = FieldType.OBJECT
 
             case "list":
-                # Nested arrays
-                field_obj.array_element_type = FieldType.ARRAY
-                # Recursively handle nested arrays
+                # Nested arrays: describe the innermost element and count the
+                # levels, so [[1, 2]] stays list[list[int]] (not list[int])
                 nested_field = _create_field_from_node(
                     child_node,
-                    f"{field_name}_item",
+                    field_name,
                     parent_schema_name,
                     {},
                     add_attention,
                 )
-                if nested_field.array_element_schema:
-                    field_obj.array_element_schema = nested_field.array_element_schema
-                else:
-                    field_obj.array_element_type = nested_field.array_element_type
+                field_obj.array_dimensions = nested_field.array_dimensions + 1
+                field_obj.array_element_schema = nested_field.array_element_schema
+                field_obj.array_element_type = nested_field.array_element_type
 
             case _:
                 # Other types

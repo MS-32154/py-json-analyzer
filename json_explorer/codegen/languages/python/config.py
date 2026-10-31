@@ -1,6 +1,5 @@
 """Python-specific configuration and type mapping."""
 
-import re
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import Literal
@@ -25,7 +24,7 @@ PYTHON_IMPORTS: dict[str, str] = {
 
 # Imports every file of a style needs
 STYLE_IMPORTS: dict[PythonStyle, list[str]] = {
-    PythonStyle.DATACLASS: ["from dataclasses import dataclass, field"],
+    PythonStyle.DATACLASS: ["from dataclasses import dataclass"],
     PythonStyle.PYDANTIC: ["from pydantic import BaseModel, Field, ConfigDict"],
     PythonStyle.TYPEDDICT: ["from typing import TypedDict"],
 }
@@ -87,29 +86,3 @@ class PythonConfig:
         if self.style == PythonStyle.TYPEDDICT:
             return f"NotRequired[{python_type}]"
         return f"{python_type} | None"
-
-    def get_python_type(
-        self, field_type: FieldType, *, is_optional: bool = False
-    ) -> str:
-        """Annotation for a primitive field, e.g. ``str`` or ``int | None``."""
-        python_type = self.type_map.get(field_type, "Any")
-        return self.optional(python_type) if is_optional else python_type
-
-    def get_required_imports(self, types_used: set[str]) -> list[str]:
-        """Import statements for the style and the annotations used."""
-        imports = set(STYLE_IMPORTS[self.style])
-        for python_type in types_used:
-            for name in self._extract_base_types(python_type):
-                if name in PYTHON_IMPORTS:
-                    imports.add(PYTHON_IMPORTS[name])
-        # Standard library before third party
-        return sorted(
-            imports,
-            key=lambda s: (not s.startswith(("from typing", "from datetime")), s),
-        )
-
-    def _extract_base_types(self, type_string: str) -> set[str]:
-        """Identifiers in an annotation like 'list[User] | None'."""
-        # Any identifier: lowercase names like "datetime" need imports too
-        # (structural import tracking replaces this in Phase 3.4)
-        return set(re.findall(r"\b([A-Za-z_][A-Za-z0-9_]*)\b", type_string))

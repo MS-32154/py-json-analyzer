@@ -153,26 +153,46 @@ class TestGoGenerator:
         assert len(warnings) > 0
         assert "no fields" in warnings[0].lower()
 
-    def test_imports(self):
-        config = GoConfig(time_type="time.Time")
-        imports = config.get_required_imports({"time.Time"})
-        assert '"time"' in imports
+
+TS = "2024-01-01T10:00:00Z"
 
 
 class TestGoImports:
-    @pytest.mark.parametrize(
-        "go_type",
-        [
-            "time.Time",
-            "*time.Time",
-            "[]time.Time",
-            "[]*time.Time",
-            "*[]time.Time",
-            "[][]time.Time",
-        ],
-    )
-    def test_time_import_for_any_pointer_slice_combination(self, go_type):
-        assert GoConfig().get_required_imports({go_type}) == ['"time"']
+    """Imports are recorded while types are chosen (no type-string parsing)."""
 
-    def test_no_import_for_builtin_types(self):
-        assert GoConfig().get_required_imports({"string", "*int64", "[]bool"}) == []
+    @pytest.mark.parametrize(
+        "data",
+        [
+            {"at": TS},  # time.Time
+            [{"at": TS}, {}],  # *time.Time (optional)
+            {"at": [TS]},  # []time.Time
+            {"at": [[TS]]},  # [][]time.Time
+        ],
+        ids=["value", "pointer", "slice", "nested-slice"],
+    )
+    def test_time_imported_once_when_used(self, data):
+        code = quick_generate(data, "go")
+        assert code.count('import "time"') == 1
+
+    def test_no_import_without_timestamps(self):
+        assert "import" not in quick_generate({"a": "x", "b": [1]}, "go")
+
+    def test_no_import_when_timestamps_are_strings(self):
+        code = quick_generate({"at": TS}, "go", time_type="string")
+        assert "import" not in code
+        assert "At string" in code
+
+
+class TestNestedArrays:
+    """#21: every nesting level is kept."""
+
+    def test_go(self):
+        code = quick_generate({"m": [[1]], "g": [[{"id": 1}]], "c": [[[1.5]]]}, "go")
+        assert "M [][]int64" in code
+        assert "G [][]GItem" in code
+        assert "C [][][]float64" in code
+
+    def test_python(self):
+        code = quick_generate({"m": [[1]], "c": [[[1.5]]]}, "python")
+        assert "m: list[list[int]]" in code
+        assert "c: list[list[list[float]]]" in code

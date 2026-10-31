@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Changed
+- Go output uses `any` for unknown and mixed values (Go 1.18+) instead of `interface{}`.
+- Generated imports are exactly the ones used (no unused `field` import in dataclass output;
+  `NotRequired` only when a TypedDict has optional keys).
+- Generators keep no per-run state on the instance, so one generator can be reused across calls.
 - **Generated type names** come from the JSON key instead of the full path:
   `RootProjectsItemTeamTeamlead` is now `TeamLead`; array items use the singular (`projects` ->
   `Project`, `data` -> `DataItem`); a root array of objects is named after `--root-name`.
@@ -37,6 +41,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `py.typed` marker: type information is now shipped with the package.
 
 ### Fixed
+- Nested arrays lost a dimension: `[[1, 2]]` was generated as `[]int64` / `list[int]`. All levels are
+  kept now (`[][]int64`, `list[list[int]]`), and their element types are named after the key.
 - Generated code for nested data referenced types that didn't exist (`RootAddress_1`) and renamed
   fields across structs (`Name_1`, `Name_2`). Every type and field is now named once, before
   rendering, so declarations and references always agree.

@@ -29,6 +29,8 @@ CASES: dict[str, typing.Any] = {
     "optional_before_required": [{"a": 1, "b": "x"}, {"b": "y"}],
     "digit_key": {"123abc": 1},
     "quote_key": {'q"k': 1},
+    "nested_arrays": {"matrix": [[1, 2]], "groups": [[{"id": 1}]], "cube": [[[1.5]]]},
+    "timestamps": [{"at": "2024-01-01T10:00:00Z", "tags": ["2024-01-02"]}, {}],
 } | {p.stem: json.loads(p.read_text()) for p in sorted(DATA_SAMPLES.glob("*.json"))}
 
 TARGETS = ("dataclass", "pydantic", "typeddict", "go")

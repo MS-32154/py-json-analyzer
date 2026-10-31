@@ -5,11 +5,6 @@ from typing import Literal
 
 from ...core.schema import FieldType
 
-# Types that need an import, by package path.
-GO_IMPORTS: dict[str, str] = {
-    "time.Time": '"time"',
-}
-
 # Unknown and conflicting values (Go 1.18+).
 UNKNOWN_TYPE = "any"
 
@@ -59,15 +54,3 @@ class GoConfig:
         if is_optional and self.use_pointers_for_optional and go_type != UNKNOWN_TYPE:
             return f"*{go_type}"
         return go_type
-
-    def get_required_imports(self, types_used: set[str]) -> list[str]:
-        """Sorted import paths for the Go types used."""
-        imports = set()
-        for go_type in types_used:
-            # Strip pointer/slice prefixes in any combination (*T, []T, []*T, *[]T)
-            clean_type = go_type
-            while clean_type.startswith(("*", "[]")):
-                clean_type = clean_type.removeprefix("*").removeprefix("[]")
-            if clean_type in GO_IMPORTS:
-                imports.add(GO_IMPORTS[clean_type])
-        return sorted(imports)
