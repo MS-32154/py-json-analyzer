@@ -70,6 +70,14 @@ class TestStructs:
         assert "use serde_json::Value;" in code
         assert "    pub v: Value," in code
 
+    def test_missing_value_fields_get_a_default(self):
+        code = rust([{"v": 1, "u": None}, {"v": "x"}, {}])
+        assert (
+            '    #[serde(default, skip_serializing_if = "Value::is_null")]\n'
+            "    pub v: Value," in code
+        )  # never null: skip null so a missing key stays missing
+        assert "    #[serde(default)]\n    pub u: Value," in code  # null was seen
+
     def test_value_import_only_when_used(self):
         assert "serde_json" not in rust({"a": 1})
 

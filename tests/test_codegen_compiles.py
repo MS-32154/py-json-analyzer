@@ -39,6 +39,8 @@ CASES: dict[str, typing.Any] = {
         "grid": [[1, None]],
         "objs": [{"a": 1}, None],
     },
+    # mixed / null-only values whose keys are sometimes missing
+    "mixed_missing": [{"v": 1, "u": None, "meta": {}}, {"v": "x"}, {}],
     "odd_keys": {
         "__proto__": "x",
         "名前": "n",

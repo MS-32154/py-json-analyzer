@@ -106,16 +106,25 @@ class RustGenerator(CodeGenerator):
         if note and self.config.add_comments:
             lines.append(f"    /// {note}")
         name = run.names.field_name(fld)
+        rust_type = self._type(fld, run)
         attrs = []
         if name.removeprefix("r#") != fld.original_name:
             attrs.append(f"rename = {rust_string(fld.original_name)}")
-        if fld.missing:
-            attrs.append('skip_serializing_if = "Option::is_none"')
+        if rust_type == VALUE:
+            # Value holds null itself (no Option). A missing key needs a
+            # default; if null was never seen, skip null when serializing so
+            # the key stays absent.
+            if fld.missing:
+                attrs.append("default")
+                if not fld.nullable:
+                    attrs.append('skip_serializing_if = "Value::is_null"')
+        else:
+            if fld.optional:
+                rust_type = f"Option<{rust_type}>"
+            if fld.missing:
+                attrs.append('skip_serializing_if = "Option::is_none"')
         if attrs:
             lines.append(f"    #[serde({', '.join(attrs)})]")
-        rust_type = self._type(fld, run)
-        if fld.optional and rust_type != VALUE:  # Value already holds null
-            rust_type = f"Option<{rust_type}>"
         lines.append(f"    pub {name}: {rust_type},")
         return lines
 
