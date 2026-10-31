@@ -21,7 +21,7 @@ from .generator import (
     GeneratorError,
     generate_code,
 )
-from .naming import NameTracker, sanitize_name, to_pascal_case, to_snake_case
+from .naming import NamePlan, plan_names, split_words, to_pascal_case, to_snake_case
 from .schema import (
     Field,
     FieldType,
@@ -40,7 +40,7 @@ __all__ = [
     "GenerationResult",
     "GeneratorConfig",
     "GeneratorError",
-    "NameTracker",
+    "NamePlan",
     "Schema",
     "TemplateError",
     "TemplateManager",
@@ -53,8 +53,9 @@ __all__ = [
     "load_config",
     "load_config_file",
     "map_analyzer_type",
-    "sanitize_name",
+    "plan_names",
     "save_config",
+    "split_words",
     "to_pascal_case",
     "to_snake_case",
     "validate_language_config",

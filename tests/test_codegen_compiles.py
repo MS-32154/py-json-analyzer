@@ -7,9 +7,8 @@ let broken code through. These tests feed the output to the language itself:
   class's annotations are resolved with ``typing.get_type_hints``.
 - Go: the file is type-checked with ``go vet`` (skipped when Go is missing).
 
-Cases marked ``xfail`` are known bugs from the code review (numbers refer to
-section A of notes/code_review_2026-10-31.md). They are strict: when a fix
-makes one pass, the run fails until the mark is removed.
+Known bugs used to be tracked here as strict xfails; Phase 2 fixed the last
+of them (#1, #6, #7, #19), so every case must now pass.
 """
 
 import json
@@ -34,37 +33,11 @@ CASES: dict[str, typing.Any] = {
 
 TARGETS = ("dataclass", "pydantic", "typeddict", "go")
 
-BUG_1 = "#1 nested type referenced by a suffixed name that doesn't exist"
-BUG_6 = "#6 digit-leading key becomes an _underscore name"
-BUG_7 = "#7 JSON key not escaped in generated code"
-
-KNOWN_BUGS: dict[tuple[str, str], str] = {
-    ("nested", "dataclass"): BUG_1,
-    ("nested", "pydantic"): BUG_1,
-    ("nested", "typeddict"): BUG_1,
-    ("nested", "go"): BUG_1,
-    ("digit_key", "pydantic"): BUG_6,
-    ("digit_key", "go"): BUG_6,
-    ("quote_key", "pydantic"): BUG_7,
-    ("quote_key", "go"): BUG_7,
-    ("001_sample_project", "dataclass"): BUG_1,
-    ("001_sample_project", "pydantic"): BUG_1,
-    ("001_sample_project", "typeddict"): BUG_1,
-    ("001_sample_project", "go"): BUG_1,
-    ("002_sample_project", "dataclass"): BUG_1,
-    ("002_sample_project", "pydantic"): BUG_1,
-    ("002_sample_project", "typeddict"): BUG_1,
-    ("002_sample_project", "go"): BUG_1,
-}
-
 
 def _params():
     for case in CASES:
         for target in TARGETS:
-            marks = []
-            if reason := KNOWN_BUGS.get((case, target)):
-                marks.append(pytest.mark.xfail(reason=reason, strict=True))
-            yield pytest.param(case, target, marks=marks, id=f"{case}-{target}")
+            yield pytest.param(case, target, id=f"{case}-{target}")
 
 
 def _find_go() -> str | None:
@@ -109,7 +82,6 @@ def test_generated_code_compiles(case: str, target: str, tmp_path: Path) -> None
         check_python(quick_generate(data, "python", style=target))
 
 
-@pytest.mark.xfail(reason="#19 TypedDict renames JSON keys", strict=True)
 def test_typeddict_keeps_json_keys() -> None:
     """A TypedDict describes the dict as-is, so its keys must be the JSON keys."""
     data = {"userID": 1, "first-name": "Ada", "type": "admin"}

@@ -19,7 +19,7 @@ from .core import (
     GenerationResult,
     GeneratorConfig,
     GeneratorError,
-    NameTracker,
+    NamePlan,
     Schema,
     TemplateError,
     TemplateManager,
@@ -27,7 +27,7 @@ from .core import (
     extract_all_schemas,
     generate_code,
     load_config,
-    sanitize_name,
+    plan_names,
 )
 
 # Import registry functions
@@ -189,7 +189,7 @@ __all__ = [
     "GenerationResult",
     "GeneratorConfig",
     "GeneratorError",
-    "NameTracker",
+    "NamePlan",
     "RegistryError",
     "Schema",
     "TemplateError",
@@ -210,7 +210,7 @@ __all__ = [
     "list_languages",
     "list_supported_languages",
     "load_config",
+    "plan_names",
     "quick_generate",
     "register",
-    "sanitize_name",
 ]

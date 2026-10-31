@@ -11,6 +11,8 @@ from typing import Any
 
 from json_explorer.logging_config import get_logger
 
+from .naming import to_pascal_case, unique_name
+
 logger = get_logger(__name__)
 
 
@@ -141,6 +143,46 @@ class Schema:
     def get_field(self, name: str) -> Field | None:
         """Get field by name."""
         return next((f for f in self.fields if f.name == name), None)
+
+
+# ============================================================================
+# Type names
+# ============================================================================
+
+# Words whose plural form is the same or that only look plural.
+_NOT_PLURAL = frozenset({"data", "news", "series", "species", "status", "info"})
+
+
+def singularize(word: str) -> str:
+    """Conservative English singular for naming array item types.
+
+    ``users`` -> ``user``, ``categories`` -> ``category``,
+    ``addresses`` -> ``address``, ``boxes`` -> ``box``; anything unclear
+    is returned unchanged.
+    """
+    lower = word.lower()
+    if lower in _NOT_PLURAL or len(word) < 4:
+        return word
+    if lower.endswith("ies"):
+        return word[:-3] + "y"
+    if lower.endswith(("sses", "xes", "ches", "shes", "zes")):
+        return word[:-2]
+    if lower.endswith("s") and not lower.endswith(("ss", "us", "is")):
+        return word[:-1]
+    return word
+
+
+def type_name_for_key(key: str, *, item: bool = False) -> str:
+    """Suggested type name for an object under ``key`` (or its array items).
+
+    ``team_lead`` -> ``TeamLead``; items of ``projects`` -> ``Project``;
+    items of ``data`` -> ``DataItem``. Uniqueness is handled later.
+    """
+    base = to_pascal_case(key) or "Object"
+    if not item:
+        return base
+    singular = to_pascal_case(singularize(key))
+    return singular if singular and singular != base else base + "Item"
 
 
 # ============================================================================
@@ -290,7 +332,7 @@ def _create_field_from_node(
 
     # Handle specific field types
     elif field_type == FieldType.OBJECT:
-        nested_name = f"{parent_schema_name}{field_name.title()}"
+        nested_name = type_name_for_key(field_name)
         field_obj.nested_schema = _create_schema_from_object(
             field_node,
             nested_name,
@@ -335,7 +377,7 @@ def _handle_array_field(
         match child_type:
             case "object":
                 # Array of objects
-                element_name = f"{parent_schema_name}{field_name.title()}Item"
+                element_name = type_name_for_key(field_name, item=True)
                 field_obj.array_element_schema = _create_schema_from_object(
                     child_node,
                     element_name,
@@ -377,9 +419,7 @@ def _handle_root_array(
     if "child" in analyzer_result and analyzer_result["child"]["type"] == "object":
         # Array of objects - use element schema as root
         child_node = analyzer_result["child"]
-        element_name = (
-            root_name.rstrip("s") if root_name.endswith("s") else f"{root_name}Item"
-        )
+        element_name = to_pascal_case(singularize(root_name)) or root_name
         schema = _create_schema_from_object(child_node, element_name, add_attention)
 
         logger.info(
@@ -447,8 +487,15 @@ def extract_all_schemas(root_schema: Schema) -> dict[str, Schema]:
         Dictionary mapping schema names to Schema objects
     """
     schemas: dict[str, Schema] = {}
+    seen: set[int] = set()
 
     def collect(schema: Schema) -> None:
+        if id(schema) in seen:
+            return
+        seen.add(id(schema))
+        # Different objects can suggest the same name (two "address" keys at
+        # different paths): number them instead of dropping one.
+        schema.name = unique_name(schema.name, set(schemas))
         schemas[schema.name] = schema
         for fld in schema.fields:
             if fld.nested_schema:

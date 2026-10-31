@@ -1,158 +1,90 @@
+"""Python identifier rules for generated classes and fields.
+
+Builtins such as ``id`` or ``type`` are fine as attribute names and are kept.
+Only names that would break the generated module are changed (with a
+trailing underscore): keywords, names used in the generated annotations and
+imports, and attributes Pydantic reserves on ``BaseModel``.
 """
-Python-specific naming utilities.
 
-Provides Python reserved words, builtin types, and pre-configured name tracker.
-"""
+import keyword
 
-from json_explorer.logging_config import get_logger
+from ...core.naming import to_pascal_case, to_snake_case
 
-from ...core.naming import NameTracker
-
-logger = get_logger(__name__)
-
-
-# ============================================================================
-# Python Language Keywords and Builtins
-# ============================================================================
-
-
-PYTHON_RESERVED_WORDS: frozenset[str] = frozenset(
+# Names the generated code imports or uses in annotations. A class or a
+# field with a default named like one of them would shadow it in the class
+# namespace (annotations are evaluated there).
+GENERATED_NAMES = frozenset(
     {
-        # Keywords
-        "False",
-        "None",
-        "True",
-        "and",
-        "as",
-        "assert",
-        "async",
-        "await",
-        "break",
-        "class",
-        "continue",
-        "def",
-        "del",
-        "elif",
-        "else",
-        "except",
-        "finally",
-        "for",
-        "from",
-        "global",
-        "if",
-        "import",
-        "in",
-        "is",
-        "lambda",
-        "nonlocal",
-        "not",
-        "or",
-        "pass",
-        "raise",
-        "return",
-        "try",
-        "while",
-        "with",
-        "yield",
-        # Soft keywords (context-dependent, but safer to avoid)
-        "match",
-        "case",
-        "_",
-    }
-)
-
-
-PYTHON_BUILTIN_TYPES: frozenset[str] = frozenset(
-    {
-        # Basic types
-        "int",
-        "float",
-        "str",
+        "Any",
+        "BaseModel",
+        "ConfigDict",
+        "Field",
+        "NotRequired",
+        "TypedDict",
         "bool",
-        "list",
-        "dict",
-        "set",
-        "tuple",
-        "bytes",
-        "bytearray",
-        "complex",
-        "frozenset",
-        "range",
-        "object",
-        "type",
-        # Special
-        "super",
-        "property",
-        "staticmethod",
-        "classmethod",
-        # Builtin functions
-        "abs",
-        "all",
-        "any",
-        "ascii",
-        "bin",
-        "breakpoint",
-        "callable",
-        "chr",
-        "compile",
-        "delattr",
-        "dir",
-        "divmod",
-        "enumerate",
-        "eval",
-        "exec",
-        "filter",
-        "format",
-        "getattr",
-        "globals",
-        "hasattr",
-        "hash",
-        "help",
-        "hex",
-        "id",
-        "input",
-        "isinstance",
-        "issubclass",
-        "iter",
-        "len",
-        "locals",
-        "map",
-        "max",
-        "memoryview",
-        "min",
-        "next",
-        "oct",
-        "open",
-        "ord",
-        "pow",
-        "print",
-        "repr",
-        "reversed",
-        "round",
-        "setattr",
-        "slice",
-        "sorted",
-        "sum",
-        "vars",
-        "zip",
-        # Common module names to avoid
+        "dataclass",
         "datetime",
+        "dict",
+        "field",
+        "float",
+        "int",
+        "list",
+        "str",
+    }
+)
+
+# BaseModel attributes a field must not shadow (Pydantic v2).
+PYDANTIC_RESERVED = frozenset(
+    {
+        "construct",
+        "copy",
+        "dict",
+        "from_orm",
         "json",
-        "typing",
-        "dataclasses",
-        "pydantic",
+        "parse_file",
+        "parse_obj",
+        "parse_raw",
+        "schema",
+        "schema_json",
+        "update_forward_refs",
+        "validate",
     }
 )
 
 
-def create_python_name_tracker() -> NameTracker:
-    """
-    Create a name tracker configured for Python.
+def _avoid_reserved(ident: str, reserved: frozenset[str]) -> str:
+    if keyword.iskeyword(ident) or ident in reserved:
+        return ident + "_"
+    return ident
 
-    Returns:
-        NameTracker with Python reserved words and builtins
+
+def _valid_chars(ident: str) -> str:
+    # str.isalnum() accepts some characters identifiers don't (e.g. "²").
+    return "".join(c if ("a" + c).isidentifier() else "_" for c in ident)
+
+
+def python_class_name(name: str) -> str:
+    """``user_address`` -> ``UserAddress``; ``123`` -> ``Model123``."""
+    ident = _valid_chars(to_pascal_case(name)) or "Model"
+    if not ident[0].isalpha():
+        ident = "Model" + ident
+    return _avoid_reserved(ident, GENERATED_NAMES)
+
+
+def python_field_name(key: str, *, pydantic: bool = False) -> str:
+    """``userName`` -> ``user_name``; ``123abc`` -> ``field_123abc``; ``class`` -> ``class_``.
+
+    Never starts with an underscore: Pydantic treats such names as private.
     """
-    reserved = PYTHON_RESERVED_WORDS | PYTHON_BUILTIN_TYPES
-    tracker = NameTracker(reserved)
-    logger.debug("Created Python name tracker with %s reserved words", len(reserved))
-    return tracker
+    ident = _valid_chars(to_snake_case(key)).strip("_") or "field"
+    if not ident[0].isalpha():
+        ident = "field_" + ident
+    reserved = GENERATED_NAMES | PYDANTIC_RESERVED if pydantic else GENERATED_NAMES
+    if pydantic and ident.startswith("model_"):
+        ident = "field_" + ident  # Pydantic's protected namespace
+    return _avoid_reserved(ident, reserved)
+
+
+def is_plain_key(key: str) -> bool:
+    """Whether a JSON key can be a field name in class-syntax TypedDict."""
+    return key.isidentifier() and not keyword.iskeyword(key)

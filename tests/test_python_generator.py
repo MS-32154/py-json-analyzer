@@ -98,7 +98,7 @@ class TestPythonGenerator:
 
         code = quick_generate(data, language="python", style="dataclass")
 
-        assert "class RootUser:" in code
+        assert "class User:" in code
         assert "class Root:" in code
         assert "name: str" in code
         assert "age: int" in code
@@ -183,7 +183,8 @@ class TestPythonGenerator:
 
         # Should have Field() with alias
         assert "Field(" in code
-        assert 'alias="userId"' in code or 'alias="userName"' in code
+        assert "alias='userId'" in code
+        assert "alias='userName'" in code
 
         # Test 2: Optional field (should generate Field with default)
         data = [
@@ -225,8 +226,8 @@ class TestPythonStyles:
 
         assert code  # Should generate something
         assert "class Root" in code
-        assert "id_:" in code or "id :" in code
-        assert "name:" in code or "name :" in code
+        assert "    id: int" in code  # builtins are fine as field names
+        assert "    name: str" in code
 
 
 # a and c are optional (missing from the second item); b is required

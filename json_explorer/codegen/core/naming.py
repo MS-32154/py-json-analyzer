@@ -1,244 +1,136 @@
-"""
-Naming utilities for code generation.
+"""Identifier naming for code generation.
 
-Handles name sanitization, case conversions, and conflict resolution
-for generating valid identifiers across different programming languages.
+Two parts:
+
+- Word splitting and case conversion that understand acronyms
+  (``HTTPServer`` -> ``http_server``) and fold accents (``café`` -> ``cafe``).
+- A *name plan*: every generated type and field gets its identifier once,
+  before rendering, so a declaration and all references to it always agree.
+  Each language supplies the function that turns a raw name into a valid
+  identifier for it.
 """
 
-import re
+import unicodedata
+from collections.abc import Callable, Iterable
+from dataclasses import dataclass
 from functools import cache
-from typing import Literal
+from typing import TYPE_CHECKING
 
-from json_explorer.logging_config import get_logger
-
-logger = get_logger(__name__)
-
-# Type aliases for better readability
-type CaseStyle = Literal["snake", "pascal"]
+if TYPE_CHECKING:
+    from .schema import Field, Schema
 
 
-# ============================================================================
-# Pure Functions: Case Conversion (Cached)
-# ============================================================================
+def fold_accents(text: str) -> str:
+    """Remove combining marks: ``café`` -> ``cafe``, ``naïve`` -> ``naive``."""
+    decomposed = unicodedata.normalize("NFKD", text)
+    return "".join(c for c in decomposed if not unicodedata.combining(c))
 
 
 @cache
+def split_words(name: str) -> tuple[str, ...]:
+    """Split a key into words at separators and case boundaries.
+
+    Acronyms stay together and digits stick to the preceding word::
+
+        userID          -> ('user', 'ID')
+        HTTPServer      -> ('HTTP', 'Server')
+        XMLHttpRequest  -> ('XML', 'Http', 'Request')
+        user2FA         -> ('user2', 'FA')
+        first-name      -> ('first', 'name')
+    """
+    text = fold_accents(name)
+    words: list[str] = []
+    current = ""
+    for i, char in enumerate(text):
+        if not char.isalnum():
+            if current:
+                words.append(current)
+                current = ""
+            continue
+        if current:
+            prev = current[-1]
+            nxt = text[i + 1] if i + 1 < len(text) else ""
+            starts_word = char.isupper() and (
+                prev.islower()
+                or prev.isdigit()
+                or (prev.isupper() and nxt.islower())  # end of an acronym: HTTPServer
+            )
+            if starts_word:
+                words.append(current)
+                current = ""
+        current += char
+    if current:
+        words.append(current)
+    return tuple(words)
+
+
 def to_snake_case(name: str) -> str:
-    """
-    Convert name to snake_case.
-
-    Examples:
-        >>> to_snake_case("UserName")
-        'user_name'
-        >>> to_snake_case("user-name")
-        'user_name'
-    """
-    # Replace hyphens with underscores
-    name = name.replace("-", "_")
-
-    # Insert underscore before uppercase letters
-    name = re.sub(r"([a-z0-9])([A-Z])", r"\1_\2", name)
-
-    # Convert to lowercase and clean up multiple underscores
-    name = name.lower()
-    name = re.sub(r"_+", "_", name)
-
-    return name.strip("_")
+    """``userName`` / ``UserName`` / ``user-name`` -> ``user_name``."""
+    return "_".join(word.lower() for word in split_words(name))
 
 
-@cache
 def to_pascal_case(name: str) -> str:
-    """
-    Convert name to PascalCase.
-
-    Examples:
-        >>> to_pascal_case("user_name")
-        'UserName'
-        >>> to_pascal_case("user-name")
-        'UserName'
-    """
-    # First convert to snake case for consistency
-    snake = to_snake_case(name)
-    parts = snake.split("_")
-
-    # All parts title case
-    return "".join(p.capitalize() for p in parts if p)
+    """``user_name`` / ``userName`` / ``user-name`` -> ``UserName``."""
+    return "".join(word[:1].upper() + word[1:].lower() for word in split_words(name))
 
 
-def clean_identifier(name: str) -> str:
-    """
-    Clean name to be a valid identifier.
-
-    - Removes non-alphanumeric characters (except _ and -)
-    - Ensures doesn't start with digit
-    - Returns "field" if result is empty
-
-    Args:
-        name: Original name
-
-    Returns:
-        Cleaned name that can be an identifier
-    """
-    # Remove non-alphanumeric chars except underscore and hyphen
-    cleaned = re.sub(r"[^a-zA-Z0-9_-]", "_", name)
-
-    # Remove leading/trailing underscores and hyphens
-    cleaned = cleaned.strip("_-")
-
-    # Ensure doesn't start with number
-    if cleaned and cleaned[0].isdigit():
-        cleaned = f"_{cleaned}"
-
-    # Ensure not empty
-    return cleaned or "field"
+# ============================================================================
+# Name plan
+# ============================================================================
 
 
-def resolve_conflict(
-    name: str,
-    reserved_words: set[str],
-    used_names: set[str],
-    suffix: str = "_",
-) -> str:
-    """
-    Resolve naming conflicts with reserved words and existing names.
+@dataclass(slots=True, frozen=True)
+class NamePlan:
+    """Final identifiers for every type and field of one generation run."""
 
-    Args:
-        name: Proposed name
-        reserved_words: Language reserved words to avoid
-        used_names: Already used names to avoid
-        suffix: Suffix to add for conflicts (default: "_")
+    _types: dict[int, str]
+    _fields: dict[int, str]
 
-    Returns:
-        Name with conflicts resolved
-    """
-    original = name
+    def type_name(self, schema: Schema) -> str:
+        return self._types[id(schema)]
 
-    # Check reserved words and builtin types (case-insensitive)
-    if name.lower() in {w.lower() for w in reserved_words}:
-        name = f"{name}{suffix}"
-        logger.debug("Reserved word conflict: %s → %s", original, name)
+    def field_name(self, field: Field) -> str:
+        return self._fields[id(field)]
 
-    # Check for duplicates
-    counter = 1
-    while name in used_names:
-        name = (
-            f"{original}{suffix}{counter}" if suffix == "_" else f"{original}{counter}"
-        )
-        counter += 1
-        if counter == 2:  # Log only on first conflict
-            logger.debug("Duplicate name conflict: %s → %s", original, name)
 
+def unique_name(base: str, used: set[str], separator: str = "") -> str:
+    """Return ``base``, or ``base2``, ``base3``... (with ``separator``) if taken."""
+    name, n = base, 2
+    while name in used:
+        name = f"{base}{separator}{n}"
+        n += 1
+    used.add(name)
     return name
 
 
-def sanitize_name(
-    name: str,
-    target_case: CaseStyle,
-    reserved_words: set[str] | None = None,
-    used_names: set[str] | None = None,
-    suffix: str = "_",
-) -> str:
-    """
-    Sanitize and convert a name for safe use in code generation.
-
-    This is the main entry point for name processing. It:
-    1. Cleans the name to be a valid identifier
-    2. Converts to target case style
-    3. Resolves conflicts with reserved words and used names
+def plan_names(
+    schemas: Iterable[Schema],
+    *,
+    type_identifier: Callable[[str], str],
+    field_identifier: Callable[[str], str],
+    field_separator: str = "",
+) -> NamePlan:
+    """Assign unique identifiers to all types (globally) and fields (per type).
 
     Args:
-        name: Original name to sanitize
-        target_case: Desired case style
-        reserved_words: Set of reserved words to avoid
-        used_names: Set of already used names to avoid
-        suffix: Suffix for conflict resolution
-
-    Returns:
-        Sanitized and converted name
-
-    Example:
-        >>> sanitize_name("user-name", "pascal", {"class"}, {"User"})
-        'UserName'
+        schemas: All schemas of the run, in a deterministic order (the first
+            one keeps its name when two would collide).
+        type_identifier: Turns a schema name into a valid type identifier.
+        field_identifier: Turns a JSON key into a valid field identifier.
+        field_separator: Put between a field name and its number when two
+            keys map to the same identifier (``name_2`` vs ``Name2``).
     """
-    reserved_words = reserved_words or set()
-    used_names = used_names or set()
-
-    # Step 1: Convert case
-    converted = to_pascal_case(name) if target_case == "pascal" else to_snake_case(name)
-
-    # Step 2: Clean
-    cleaned = clean_identifier(converted)
-
-    # Step 3: Resolve conflicts
-    final_name = resolve_conflict(cleaned, reserved_words, used_names, suffix)
-
-    if final_name != name:
-        logger.debug("Name sanitization: %s → %s", name, final_name)
-
-    return final_name
-
-
-# ============================================================================
-# Stateful Name Tracker (for tracking names across generation)
-# ============================================================================
-
-
-class NameTracker:
-    """
-    Tracks used names during code generation.
-
-    This is a simple stateful wrapper around the sanitize_name function
-    that maintains a set of used names across multiple calls.
-    """
-
-    __slots__ = ("_reserved_words", "_used_names")
-
-    def __init__(self, reserved_words: set[str] | None = None):
-        """
-        Initialize name tracker.
-
-        Args:
-            reserved_words: Set of language reserved words
-        """
-        self._used_names: set[str] = set()
-        self._reserved_words = reserved_words or set()
-        logger.debug(
-            "NameTracker initialized with %s reserved words", len(self._reserved_words)
-        )
-
-    def sanitize(
-        self,
-        name: str,
-        target_case: CaseStyle,
-        suffix: str = "_",
-    ) -> str:
-        """
-        Sanitize name and track it.
-
-        Args:
-            name: Original name
-            target_case: Desired case style
-            suffix: Conflict resolution suffix
-
-        Returns:
-            Sanitized name (automatically tracked)
-        """
-        result = sanitize_name(
-            name,
-            target_case,
-            self._reserved_words,
-            self._used_names,
-            suffix,
-        )
-        self._used_names.add(result)
-        return result
-
-    def reset(self) -> None:
-        """Clear all tracked names."""
-        logger.debug("Clearing %s tracked names", len(self._used_names))
-        self._used_names.clear()
-
-    @property
-    def used_names(self) -> frozenset[str]:
-        """Get immutable view of used names."""
-        return frozenset(self._used_names)
+    schemas = list(schemas)
+    used_types: set[str] = set()
+    types = {
+        id(schema): unique_name(type_identifier(schema.name), used_types)
+        for schema in schemas
+    }
+    fields: dict[int, str] = {}
+    for schema in schemas:
+        used_fields: set[str] = set()
+        for field in schema.fields:
+            fields[id(field)] = unique_name(
+                field_identifier(field.original_name), used_fields, field_separator
+            )
+    return NamePlan(types, fields)

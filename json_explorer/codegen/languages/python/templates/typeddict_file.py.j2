@@ -8,6 +8,22 @@
 
 {%- for class in classes %}
 
+{% if class.functional %}
+{{ class.class_name }} = TypedDict(
+    "{{ class.class_name }}",
+    {
+{%- for field in class.fields %}
+{%- if field.comment %}
+        # {{ field.comment }}
+{%- endif %}
+        {{ field.key }}: {{ field.type }},
+{%- endfor %}
+    },
+{%- if not class.total %}
+    total=False,
+{%- endif %}
+)
+{%- else %}
 
 class {{ class.class_name }}(TypedDict
 {%- if not class.total %}, total=False{% endif %}):
@@ -22,5 +38,6 @@ class {{ class.class_name }}(TypedDict
 {%- endfor %}
 {%- if not class.fields %}
     pass
+{%- endif %}
 {%- endif %}
 {%- endfor %}

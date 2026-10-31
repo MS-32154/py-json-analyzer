@@ -4,6 +4,7 @@ Go code generator implementation.
 Generates Go structs with JSON tags using templates.
 """
 
+import json
 from pathlib import Path
 from typing import Any
 
@@ -11,9 +12,10 @@ from json_explorer.logging_config import get_logger
 
 from ...core.config import GeneratorConfig
 from ...core.generator import CodeGenerator
+from ...core.naming import NamePlan, plan_names
 from ...core.schema import Field, FieldType, Schema
 from .config import GoConfig
-from .naming import create_go_name_tracker
+from .naming import go_identifier, go_json_tag, is_valid_json_tag_name
 
 logger = get_logger(__name__)
 
@@ -26,15 +28,15 @@ logger = get_logger(__name__)
 class GoGenerator(CodeGenerator):
     """Code generator for Go structs with JSON tags."""
 
-    __slots__ = ("go_config", "name_tracker", "types_used")
+    __slots__ = ("_names", "go_config", "types_used")
 
     def __init__(self, config: GeneratorConfig):
         """Initialize Go generator with configuration."""
         # Initialize Go-specific config from language_config
         self.go_config = GoConfig(**config.language_config)
 
-        # Initialize naming
-        self.name_tracker = create_go_name_tracker()
+        # Identifiers for the current run (see generate())
+        self._names: NamePlan | None = None
 
         # Track types for imports
         self.types_used: set[str] = set()
@@ -74,9 +76,13 @@ class GoGenerator(CodeGenerator):
         """Generate complete Go code for all schemas."""
         logger.info("Generating Go code for %s schemas", len(schemas))
 
-        # Reset state
+        # Reset state; name every type and field once, before rendering
         self.types_used.clear()
-        self.name_tracker.reset()
+        self._names = plan_names(
+            schemas.values(),
+            type_identifier=lambda name: go_identifier(name, fallback="Type"),
+            field_identifier=go_identifier,
+        )
 
         # Generate structs in dependency order
         generation_order = self._get_generation_order(schemas, root_schema_name)
@@ -103,7 +109,7 @@ class GoGenerator(CodeGenerator):
 
     def _generate_struct_data(self, schema: Schema) -> dict[str, Any]:
         """Generate struct data for template."""
-        struct_name = self.name_tracker.sanitize(schema.name, "pascal")
+        struct_name = self.names.type_name(schema)
 
         fields = []
         for field in schema.fields:
@@ -121,8 +127,19 @@ class GoGenerator(CodeGenerator):
 
     def _generate_field_data(self, field: Field) -> dict[str, Any]:
         """Generate field data for template."""
-        # Sanitize field name to PascalCase for Go
-        field_name = self.name_tracker.sanitize(field.name, "pascal")  # exported
+        field_name = self.names.field_name(field)
+
+        # encoding/json can't map keys like `a,b` or `q"k` with a tag: leave
+        # the field out (with a note) rather than map it to the wrong key.
+        if self.config.generate_json_tags and not is_valid_json_tag_name(
+            field.original_name
+        ):
+            return {
+                "skipped": (
+                    f"JSON key {json.dumps(field.original_name, ensure_ascii=False)}"
+                    " can't be expressed as a Go struct tag; field omitted"
+                )
+            }
 
         # Determine Go type
         go_type = self._get_field_type(field)
@@ -161,11 +178,7 @@ class GoGenerator(CodeGenerator):
         """Get Go type for array fields."""
         if field.array_element_schema:
             # Array of objects
-            element_name = self.name_tracker.sanitize(
-                field.array_element_schema.name,
-                "pascal",
-            )
-            element_type = element_name
+            element_type = self.names.type_name(field.array_element_schema)
         elif field.array_element_type and field.array_element_type != FieldType.UNKNOWN:
             # Array of primitives
             element_type = self.go_config.type_map.get(
@@ -181,10 +194,7 @@ class GoGenerator(CodeGenerator):
     def _get_object_type(self, field: Field) -> str:
         """Get Go type for object fields."""
         if field.nested_schema:
-            struct_name = self.name_tracker.sanitize(
-                field.nested_schema.name,
-                "pascal",
-            )
+            struct_name = self.names.type_name(field.nested_schema)
 
             # Add pointer for optional nested structs if configured
             if field.optional and self.go_config.use_pointers_for_optional:
@@ -195,15 +205,17 @@ class GoGenerator(CodeGenerator):
         return self.go_config.unknown_type
 
     def _generate_json_tag(self, field: Field) -> str:
-        """Generate JSON tag for field."""
-        context = {
-            "original_name": field.original_name,
-            "optional": field.optional,
-            "omitempty": self.config.json_tag_omitempty,
-            "custom_options": None,
-        }
+        """Struct tag mapping the field to its JSON key."""
+        return go_json_tag(
+            field.original_name,
+            omitempty=field.optional and self.config.json_tag_omitempty,
+        )
 
-        return self.render_template("json_tag.go.j2", context)
+    @property
+    def names(self) -> NamePlan:
+        if self._names is None:
+            raise RuntimeError("names are planned at the start of generate()")
+        return self._names
 
     def _get_imports(self) -> list[str]:
         """Get required imports based on types used."""

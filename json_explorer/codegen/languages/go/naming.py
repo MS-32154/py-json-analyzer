@@ -1,104 +1,54 @@
+"""Go identifier and struct-tag rules.
+
+Generated fields must be exported (start with an uppercase letter) or
+encoding/json ignores them. Exported names can never clash with Go keywords
+or predeclared identifiers, which are all lowercase, so no reserved-word list
+is needed.
 """
-Go-specific naming utilities.
 
-Provides Go reserved words, builtin types, and pre-configured name tracker.
-"""
+import json
+import unicodedata
 
-from json_explorer.logging_config import get_logger
+from ...core.naming import to_pascal_case
 
-from ...core.naming import NameTracker
-
-logger = get_logger(__name__)
-
-
-# ============================================================================
-# Go Language Keywords and Builtins
-# ============================================================================
+# Punctuation encoding/json accepts in a tag name (see isValidTag in
+# encoding/json/encode.go); letters and digits are always accepted.
+_TAG_PUNCTUATION = frozenset("!#$%&()*+-./:;<=>?@[]^_{|}~ ")
 
 
-GO_RESERVED_WORDS: frozenset[str] = frozenset(
-    {
-        # Keywords
-        "break",
-        "case",
-        "chan",
-        "const",
-        "continue",
-        "default",
-        "defer",
-        "else",
-        "fallthrough",
-        "for",
-        "func",
-        "go",
-        "goto",
-        "if",
-        "import",
-        "interface",
-        "map",
-        "package",
-        "range",
-        "return",
-        "select",
-        "struct",
-        "switch",
-        "type",
-        "var",
-    }
-)
+def go_identifier(name: str, fallback: str = "Field") -> str:
+    """Exported ASCII identifier for a key or type name.
 
-
-GO_BUILTIN_TYPES: frozenset[str] = frozenset(
-    {
-        # Basic types
-        "bool",
-        "byte",
-        "rune",
-        "string",
-        "int",
-        "int8",
-        "int16",
-        "int32",
-        "int64",
-        "uint",
-        "uint8",
-        "uint16",
-        "uint32",
-        "uint64",
-        "uintptr",
-        "float32",
-        "float64",
-        "complex64",
-        "complex128",
-        "error",
-        # Builtin functions
-        "append",
-        "cap",
-        "close",
-        "complex",
-        "copy",
-        "delete",
-        "imag",
-        "len",
-        "make",
-        "new",
-        "panic",
-        "print",
-        "println",
-        "real",
-        "recover",
-    }
-)
-
-
-def create_go_name_tracker() -> NameTracker:
+    ``user_id`` -> ``UserId``, ``123abc`` -> ``Field123abc``,
+    ``名前`` -> ``Field`` (no ASCII letters to keep; the tag keeps the key).
     """
-    Create a name tracker configured for Go.
+    ident = "".join(c for c in to_pascal_case(name) if c.isascii())
+    if not ident:
+        return fallback
+    if not ident[0].isalpha():
+        ident = fallback + ident
+    return ident[0].upper() + ident[1:]
 
-    Returns:
-        NameTracker with Go reserved words and builtins
+
+def is_valid_json_tag_name(key: str) -> bool:
+    """Whether encoding/json can use ``key`` as a struct-tag name.
+
+    Commas end the name, and quotes and backslashes are rejected. For such
+    keys encoding/json silently falls back to the Go field name.
     """
-    reserved = GO_RESERVED_WORDS | GO_BUILTIN_TYPES
-    tracker = NameTracker(reserved)
-    logger.debug("Created Go name tracker with %s reserved words", len(reserved))
-    return tracker
+    if not key:
+        return False
+    for char in key:
+        if char in _TAG_PUNCTUATION:
+            continue
+        category = unicodedata.category(char)
+        if not (category.startswith("L") or category == "Nd"):
+            return False
+    return True
+
+
+def go_json_tag(key: str, *, omitempty: bool) -> str:
+    """Struct tag for a JSON key, as a Go raw string literal."""
+    value = key + (",omitempty" if omitempty else "")
+    # The tag value is itself a quoted Go string; JSON escaping is compatible.
+    return "`json:" + json.dumps(value, ensure_ascii=False) + "`"

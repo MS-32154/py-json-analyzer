@@ -95,7 +95,7 @@ class TestGoGenerator:
         code = quick_generate(data, language="go")
 
         assert "type Root struct" in code
-        assert "type RootUser struct" in code
+        assert "type User struct" in code
         assert "Name" in code
         assert "Age" in code
 

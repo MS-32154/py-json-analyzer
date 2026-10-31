@@ -11,9 +11,10 @@ from json_explorer.logging_config import get_logger
 
 from ...core.config import GeneratorConfig
 from ...core.generator import CodeGenerator
+from ...core.naming import NamePlan, plan_names
 from ...core.schema import Field, FieldType, Schema
 from .config import PythonConfig, PythonStyle, get_python_generator_config
-from .naming import create_python_name_tracker
+from .naming import is_plain_key, python_class_name, python_field_name
 
 logger = get_logger(__name__)
 
@@ -26,15 +27,15 @@ logger = get_logger(__name__)
 class PythonGenerator(CodeGenerator):
     """Code generator for Python dataclasses, Pydantic models, and TypedDict."""
 
-    __slots__ = ("has_optional_fields", "name_tracker", "python_config", "types_used")
+    __slots__ = ("_names", "has_optional_fields", "python_config", "types_used")
 
     def __init__(self, config: GeneratorConfig):
         """Initialize Python generator with configuration."""
         # Initialize Python-specific config
         self.python_config = PythonConfig(**config.language_config)
 
-        # Initialize naming
-        self.name_tracker = create_python_name_tracker()
+        # Identifiers for the current run (see generate())
+        self._names: NamePlan | None = None
 
         # Track types and optional fields for imports
         self.types_used: set[str] = set()
@@ -80,7 +81,12 @@ class PythonGenerator(CodeGenerator):
         # Reset state
         self.types_used.clear()
         self.has_optional_fields = False
-        self.name_tracker.reset()
+        self._names = plan_names(
+            schemas.values(),
+            type_identifier=python_class_name,
+            field_identifier=self._field_identifier,
+            field_separator="_",
+        )
 
         # Generate classes in dependency order
         generation_order = self._get_generation_order(schemas, root_schema_name)
@@ -121,7 +127,7 @@ class PythonGenerator(CodeGenerator):
 
     def _generate_class_data(self, schema: Schema) -> dict[str, Any]:
         """Generate class data for template."""
-        class_name = self.name_tracker.sanitize(schema.name, "pascal")
+        class_name = self.names.type_name(schema)
 
         fields = []
         for field in schema.fields:
@@ -160,13 +166,33 @@ class PythonGenerator(CodeGenerator):
 
             case PythonStyle.TYPEDDICT:
                 class_data["total"] = self.python_config.typeddict_total
+                # Keys that aren't identifiers need TypedDict("Name", {...})
+                class_data["functional"] = not all(
+                    is_plain_key(f.original_name) for f in schema.fields
+                )
 
         return class_data
 
+    def _field_identifier(self, key: str) -> str:
+        """Field name for a JSON key in the configured style."""
+        match self.python_config.style:
+            case PythonStyle.TYPEDDICT:
+                # A TypedDict describes the dict as-is: keys stay unchanged
+                return key
+            case PythonStyle.PYDANTIC:
+                return python_field_name(key, pydantic=True)
+            case _:
+                return python_field_name(key)
+
+    @property
+    def names(self) -> NamePlan:
+        if self._names is None:
+            raise RuntimeError("names are planned at the start of generate()")
+        return self._names
+
     def _generate_field_data(self, field: Field) -> dict[str, Any]:
         """Generate field data for template."""
-        # Sanitize field name to snake_case for Python
-        field_name = self.name_tracker.sanitize(field.name, "snake")  # PEP 8
+        field_name = self.names.field_name(field)
 
         # Determine Python type
         python_type = self._get_field_type(field)
@@ -180,6 +206,7 @@ class PythonGenerator(CodeGenerator):
             "name": field_name,
             "type": python_type,
             "original_name": field.original_name,
+            "key": repr(field.original_name),  # as a Python string literal
             "optional": field.optional,
         }
 
@@ -204,12 +231,11 @@ class PythonGenerator(CodeGenerator):
                         self.python_config.pydantic_use_alias
                         and field.original_name != field_name
                     ):
-                        field_config.append(f'alias="{field.original_name}"')
+                        field_config.append(f"alias={field.original_name!r}")
 
                     # Description
                     if field.description and self.config.add_comments:
-                        desc = field.description.replace('"', '\\"')
-                        field_config.append(f'description="{desc}"')
+                        field_config.append(f"description={field.description!r}")
 
                     # Default for optional
                     if field.optional:
@@ -237,11 +263,7 @@ class PythonGenerator(CodeGenerator):
         """Get Python type for array fields."""
         if field.array_element_schema:
             # Array of objects
-            element_name = self.name_tracker.sanitize(
-                field.array_element_schema.name,
-                "pascal",
-            )
-            element_type = element_name
+            element_type = self.names.type_name(field.array_element_schema)
         elif field.array_element_type and field.array_element_type != FieldType.UNKNOWN:
             # Array of primitives
             element_type = self.python_config.type_map.get(
@@ -267,10 +289,7 @@ class PythonGenerator(CodeGenerator):
     def _get_object_type(self, field: Field) -> str:
         """Get Python type for object fields."""
         if field.nested_schema:
-            class_name = self.name_tracker.sanitize(
-                field.nested_schema.name,
-                "pascal",
-            )
+            class_name = self.names.type_name(field.nested_schema)
 
             # Add optional wrapper if needed
             if field.optional and self.python_config.use_optional:

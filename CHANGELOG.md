@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Changed
+- **Generated type names** come from the JSON key instead of the full path:
+  `RootProjectsItemTeamTeamlead` is now `TeamLead`; array items use the singular (`projects` ->
+  `Project`, `data` -> `DataItem`); a root array of objects is named after `--root-name`.
+- Word splitting understands acronyms and accents: `XMLHttpRequest` -> `xml_http_request`,
+  `café` -> `cafe`. Python field names may contain Unicode letters; Go names are ASCII.
 - Prompt history is stored in the user state directory (`$XDG_STATE_HOME/json_explorer`,
   `~/Library/Application Support/json_explorer`, or `%LOCALAPPDATA%\json_explorer`) instead of
   the current directory.
@@ -32,6 +37,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `py.typed` marker: type information is now shipped with the package.
 
 ### Fixed
+- Generated code for nested data referenced types that didn't exist (`RootAddress_1`) and renamed
+  fields across structs (`Name_1`, `Name_2`). Every type and field is now named once, before
+  rendering, so declarations and references always agree.
+- Keys starting with a digit became `_123abc`: unexported in Go (silently never (un)marshalled) and
+  rejected by Pydantic. They are now `Field123abc` / `field_123abc`.
+- JSON keys are escaped in Go struct tags and Pydantic aliases/descriptions. Keys Go's encoding/json
+  can't express as a tag name (containing `"`, `,`, `\\`, ...) are left out with a comment instead of
+  producing an invalid tag.
+- Reserved-word handling was case-insensitive (Go `Type_`, `String_`; Python `Id_`). Go exported
+  names can't clash with keywords; Python now only renames keywords and names that would break the
+  generated module (`class` -> `class_`; builtins like `id` and `type` are kept).
+- TypedDict output renamed keys (`userID` -> `user_id`), so it didn't describe the actual dict. Keys
+  are kept; keys that aren't identifiers use the functional form `TypedDict("Root", {...})`.
+- Generated Python never imported `datetime`, so any JSON with timestamps produced a module that
+  failed on import.
+- Two objects suggesting the same type name (e.g. `billing.address` and `shipping.address`) no
+  longer overwrite each other; the second becomes `Address2`.
 - `--plot` failed with "Unknown output format: interactive" unless `--plot-format` was given.
 - `--generate` without `--output` wrapped the code in a Rich header and padding, so redirecting
   it to a file produced invalid code. Piped output is now the raw code; status messages, warnings
@@ -45,6 +67,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   (snake_case fields for Python) and rejects unsupported languages.
 
 ### Removed
+- `NameTracker`, `sanitize_name`, `create_go_name_tracker` and `create_python_name_tracker`,
+  replaced by `plan_names()` / `NamePlan` and the per-language `go_identifier`,
+  `python_class_name` and `python_field_name`. The Go and Python builtin/keyword lists went with
+  them (they only produced unnecessary renames).
 - **Breaking:** the `struct_case`, `field_case` and `json_tag_case` options and the `--struct-case`,
   `--field-case` and `--json-tag-case` flags. They could only produce broken code (non-PascalCase
   Go fields are unexported and never (un)marshalled; renamed JSON tags no longer match the JSON).

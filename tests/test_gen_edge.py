@@ -300,8 +300,8 @@ class TestPythonTypedDictGenerator:
         # Should import TypedDict
         assert "from typing import TypedDict" in result
 
-    def test_typeddict_field_case_snake(self):
-        """Test TypedDict uses snake_case for fields (Python convention)."""
+    def test_typeddict_keeps_json_keys(self):
+        """A TypedDict describes the dict as-is: keys are not renamed (#19)."""
         data = {"userId": 1, "userName": "Alice", "emailAddress": "alice@example.com"}
 
         analysis = analyze_json(data)
@@ -312,10 +312,9 @@ class TestPythonTypedDictGenerator:
 
         result = generator.generate(all_schemas, "User")
 
-        # Should convert to snake_case
-        assert "user_id:" in result
-        assert "user_name:" in result
-        assert "email_address:" in result
+        assert "userId: int" in result
+        assert "userName: str" in result
+        assert "emailAddress: str" in result
 
     def test_typeddict_vs_dataclass_comparison(self):
         """Compare TypedDict vs dataclass output."""

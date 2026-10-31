@@ -17,17 +17,18 @@ from .generator import (
     create_web_api_generator,
 )
 from .interactive import GoInteractiveHandler
-from .naming import create_go_name_tracker
+from .naming import go_identifier, go_json_tag
 
 __all__ = [
     "GoConfig",
     "GoGenerator",
     "GoInteractiveHandler",
     "create_go_generator",
-    "create_go_name_tracker",
     "create_strict_generator",
     "create_web_api_generator",
     "get_modern_config",
     "get_strict_config",
     "get_web_api_config",
+    "go_identifier",
+    "go_json_tag",
 ]

@@ -22,12 +22,12 @@ try:
         GoGenerator,
         GoInteractiveHandler,
         create_go_generator,
-        create_go_name_tracker,
         create_strict_generator,
         create_web_api_generator,
         get_modern_config,
         get_strict_config,
         get_web_api_config,
+        go_identifier,
     )
 
     __all__.extend(
@@ -36,12 +36,12 @@ try:
             "GoGenerator",
             "GoInteractiveHandler",
             "create_go_generator",
-            "create_go_name_tracker",
             "create_strict_generator",
             "create_web_api_generator",
             "get_modern_config",
             "get_strict_config",
             "get_web_api_config",
+            "go_identifier",
         ]
     )
 
@@ -66,12 +66,13 @@ try:
         create_dataclass_generator,
         create_pydantic_generator,
         create_python_generator,
-        create_python_name_tracker,
         create_typeddict_generator,
         get_dataclass_config,
         get_pydantic_config,
         get_strict_dataclass_config,
         get_typeddict_config,
+        python_class_name,
+        python_field_name,
     )
 
     __all__.extend(
@@ -83,12 +84,13 @@ try:
             "create_dataclass_generator",
             "create_pydantic_generator",
             "create_python_generator",
-            "create_python_name_tracker",
             "create_typeddict_generator",
             "get_dataclass_config",
             "get_pydantic_config",
             "get_strict_dataclass_config",
             "get_typeddict_config",
+            "python_class_name",
+            "python_field_name",
         ]
     )
 

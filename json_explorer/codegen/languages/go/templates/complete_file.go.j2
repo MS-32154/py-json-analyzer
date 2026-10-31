@@ -18,11 +18,15 @@ import (
 {%- endif %}
 type {{ struct.struct_name }} struct {
 {%- for field in struct.fields %}
+{%- if field.skipped %}
+	// {{ field.skipped }}
+{%- else %}
 {%- if field.comment %}
 	// {{ field.comment }}
 {%- endif %}
 	{{ field.name }} {{ field.type }}
 {%- if field.json_tag %} {{ field.json_tag }}{%- endif %}
+{%- endif %}
 {%- endfor %}
 }
 {# #}

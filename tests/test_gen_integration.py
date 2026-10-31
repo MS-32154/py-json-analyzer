@@ -88,8 +88,9 @@ class TestComplexDataStructures:
         code = quick_generate(data, "go")
 
         assert "type Root struct" in code
-        assert "type RootUser" in code
-        assert "type RootUserProfile" in code
+        assert "type User struct" in code
+        assert "type Profile struct" in code
+        assert "type Settings struct" in code
 
     def test_array_of_objects(self):
         data = {
