@@ -105,7 +105,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `JsonExplorerError` base class (exported from `json_explorer`): all package errors (`JSONLoaderError`,
   `GeneratorError`, `RegistryError`, `ConfigError`, `TemplateError`, `CLIError`) now derive from it.
 - CI workflow: tests on Ubuntu, macOS and Windows; ruff lint job.
-- Publish workflow: runs CI first, checks the tag matches the version, verifies and smoke-tests the built distributions.
+- Publish workflow: runs CI first, checks the tag matches the version, verifies and smoke-tests the built
+  distributions, and publishes with PyPI Trusted Publishing (no API token).
 - `py.typed` marker: type information is now shipped with the package.
 
 ### Fixed
