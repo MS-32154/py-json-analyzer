@@ -188,10 +188,6 @@ class TestPythonTypedDictGenerator:
         # Check package name (corrected expectation)
         assert generator.config.package_name == "models"
 
-        # Check case conventions (Python defaults)
-        assert generator.config.struct_case == "pascal"
-        assert generator.config.field_case == "snake"
-
         # Check comments
         assert generator.config.add_comments is True
 

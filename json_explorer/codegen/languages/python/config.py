@@ -269,15 +269,9 @@ class PythonConfig:
 def get_python_generator_config(**overrides) -> dict:
     """
     Get GeneratorConfig dict with Python-friendly defaults.
-
-    Python conventions:
-    - Classes: PascalCase (struct_case="pascal")
-    - Fields: snake_case (field_case="snake")
     """
     defaults = {
         "package_name": "models",
-        "struct_case": "pascal",
-        "field_case": "snake",  # Python convention
         "add_comments": True,
     }
     defaults.update(overrides)

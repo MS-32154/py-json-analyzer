@@ -14,7 +14,7 @@ from json_explorer.logging_config import get_logger
 logger = get_logger(__name__)
 
 # Type aliases for better readability
-CaseStyle = Literal["snake", "camel", "pascal", "kebab", "screaming_snake"]
+type CaseStyle = Literal["snake", "pascal"]
 
 
 # ============================================================================
@@ -47,28 +47,6 @@ def to_snake_case(name: str) -> str:
 
 
 @cache
-def to_camel_case(name: str) -> str:
-    """
-    Convert name to camelCase.
-
-    Examples:
-        >>> to_camel_case("user_name")
-        'userName'
-        >>> to_camel_case("user-name")
-        'userName'
-    """
-    # First convert to snake case for consistency
-    snake = to_snake_case(name)
-    parts = snake.split("_")
-
-    if not parts:
-        return name
-
-    # First part lowercase, rest title case
-    return parts[0].lower() + "".join(p.capitalize() for p in parts[1:])
-
-
-@cache
 def to_pascal_case(name: str) -> str:
     """
     Convert name to PascalCase.
@@ -85,73 +63,6 @@ def to_pascal_case(name: str) -> str:
 
     # All parts title case
     return "".join(p.capitalize() for p in parts if p)
-
-
-@cache
-def to_kebab_case(name: str) -> str:
-    """
-    Convert name to kebab-case.
-
-    Examples:
-        >>> to_kebab_case("UserName")
-        'user-name'
-        >>> to_kebab_case("user_name")
-        'user-name'
-    """
-    return to_snake_case(name).replace("_", "-")
-
-
-@cache
-def to_screaming_snake_case(name: str) -> str:
-    """
-    Convert name to SCREAMING_SNAKE_CASE.
-
-    Examples:
-        >>> to_screaming_snake_case("userName")
-        'USER_NAME'
-    """
-    return to_snake_case(name).upper()
-
-
-# ============================================================================
-# Case Converter Registry
-# ============================================================================
-
-CASE_CONVERTERS: dict[CaseStyle, callable] = {
-    "snake": to_snake_case,
-    "camel": to_camel_case,
-    "pascal": to_pascal_case,
-    "kebab": to_kebab_case,
-    "screaming_snake": to_screaming_snake_case,
-}
-
-
-def convert_case(name: str, target_case: CaseStyle) -> str:
-    """
-    Convert name to target case style.
-
-    Args:
-        name: Original name to convert
-        target_case: Desired case style
-
-    Returns:
-        Converted name
-
-    Raises:
-        ValueError: If target_case is not supported
-    """
-    if target_case not in CASE_CONVERTERS:
-        raise ValueError(
-            f"Unknown case style: {target_case}. "
-            f"Must be one of: {', '.join(CASE_CONVERTERS.keys())}"
-        )
-
-    return CASE_CONVERTERS[target_case](name)
-
-
-# ============================================================================
-# Name Sanitization
-# ============================================================================
 
 
 def clean_identifier(name: str) -> str:
@@ -253,7 +164,7 @@ def sanitize_name(
     used_names = used_names or set()
 
     # Step 1: Convert case
-    converted = convert_case(name, target_case)
+    converted = to_pascal_case(name) if target_case == "pascal" else to_snake_case(name)
 
     # Step 2: Clean
     cleaned = clean_identifier(converted)
@@ -326,11 +237,6 @@ class NameTracker:
         """Clear all tracked names."""
         logger.debug("Clearing %s tracked names", len(self._used_names))
         self._used_names.clear()
-
-    def add(self, name: str) -> None:
-        """Manually add a name to the tracker."""
-        self._used_names.add(name)
-        logger.debug("Manually added name: %s", name)
 
     @property
     def used_names(self) -> frozenset[str]:

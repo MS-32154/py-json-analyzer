@@ -109,26 +109,27 @@ class TestRegistry:
 
 
 class TestCreateConfig:
-    """#18: create_config(language) applies the language's defaults."""
-
-    def test_python_defaults_to_snake_case_fields(self):
+    def test_returns_config_with_options(self):
         from json_explorer.codegen import create_config
 
-        assert create_config("python").field_case == "snake"
-        assert create_config("py").field_case == "snake"
-
-    def test_explicit_options_win(self):
-        from json_explorer.codegen import create_config
-
-        assert create_config("python", field_case="camel").field_case == "camel"
-
-    def test_go_keeps_pascal_case(self):
-        from json_explorer.codegen import create_config
-
-        assert create_config("go").field_case == "pascal"
+        assert create_config("python", package_name="models").package_name == "models"
 
     def test_unknown_language_raises(self):
         from json_explorer.codegen import RegistryError, create_config
 
         with pytest.raises(RegistryError):
             create_config("cobol")
+
+
+class TestLanguageNamingConventions:
+    """Field/type case is fixed by the target language (options removed in 0.5.0)."""
+
+    def test_python_fields_are_snake_case(self):
+        from json_explorer.codegen import quick_generate
+
+        assert "user_name: str" in quick_generate({"userName": "x"}, "python")
+
+    def test_go_fields_are_exported(self):
+        from json_explorer.codegen import quick_generate
+
+        assert "UserName string" in quick_generate({"user_name": "x"}, "go")

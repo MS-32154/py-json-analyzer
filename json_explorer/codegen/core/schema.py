@@ -90,80 +90,30 @@ class Field:
     # Type conflicts
     conflicting_types: list[FieldType] = field(default_factory=list)
 
-    def is_complex(self) -> bool:
-        """Check if field contains complex nested structures."""
-        if self.type == FieldType.OBJECT:
-            return self.nested_schema is not None
-        if self.type == FieldType.ARRAY:
-            return self.array_element_schema is not None
-        return False
-
     def generate_attention_description(
         self,
         add_attention: bool = True,
     ) -> str | None:
-        """
-        Generate warning description for special cases.
+        """Explain fields whose type falls back to interface{}/Any.
 
-        Returns None for normal fields, description string for problematic ones.
+        Returns the custom description if set, otherwise a short plain-text
+        note for conflicting or unknown types, or None.
         """
         if not add_attention or self.description:
             return self.description
 
-        # Pattern match on field type
         match self.type:
             case FieldType.CONFLICT:
-                types = (
-                    [t.value for t in self.conflicting_types]
-                    if self.conflicting_types
-                    else ["unknown"]
-                )
-                return f"⚠️ Mixed types: {', '.join(types)}"
-
+                types = [t.value for t in self.conflicting_types] or ["unknown"]
+                return f"Mixed types: {', '.join(types)}"
             case FieldType.UNKNOWN:
-                return "❓ Type unknown"
-
+                return "Type unknown (only null values seen)"
             case FieldType.ARRAY if self.array_element_type == FieldType.CONFLICT:
-                return "📋 Array with mixed types"
-
+                return "Array elements have mixed types"
             case FieldType.ARRAY if self.array_element_type == FieldType.UNKNOWN:
-                return "📋 Array with unknown element type"
-
-            case FieldType.ARRAY if (
-                self.array_element_schema and self._is_complex_array()
-            ):
-                return "📋 Array of complex objects"
-
-            case FieldType.OBJECT if (
-                self.optional and self.nested_schema and self._is_complex_nested()
-            ):
-                return "🔗 Optional complex structure"
-
+                return "Array element type unknown (empty or null-only arrays seen)"
             case _:
                 return None
-
-    def _is_complex_array(self) -> bool:
-        """Check if array contains complex nested structures."""
-        return bool(
-            self.array_element_schema and len(self.array_element_schema.fields) > 5
-        )
-
-    def _is_complex_nested(self) -> bool:
-        """Check if nested object is complex."""
-        if not self.nested_schema:
-            return False
-        return len(self.nested_schema.fields) > 3 or self._has_deep_nesting()
-
-    def _has_deep_nesting(self) -> bool:
-        """Check if nested structure has deep nesting."""
-        if not self.nested_schema:
-            return False
-
-        return any(
-            fld.type in (FieldType.OBJECT, FieldType.ARRAY)
-            and (fld.nested_schema or fld.array_element_schema)
-            for fld in self.nested_schema.fields
-        )
 
 
 @dataclass(slots=True)
@@ -191,67 +141,6 @@ class Schema:
     def get_field(self, name: str) -> Field | None:
         """Get field by name."""
         return next((f for f in self.fields if f.name == name), None)
-
-    def get_max_depth(self, current_depth: int = 1) -> int:
-        """Calculate maximum nesting depth."""
-        max_depth = current_depth
-
-        for fld in self.fields:
-            if fld.nested_schema:
-                depth = fld.nested_schema.get_max_depth(current_depth + 1)
-                max_depth = max(max_depth, depth)
-            elif fld.array_element_schema:
-                depth = fld.array_element_schema.get_max_depth(current_depth + 1)
-                max_depth = max(max_depth, depth)
-
-        return max_depth
-
-    def generate_attention_description(
-        self,
-        add_attention: bool = True,
-    ) -> str | None:
-        """Generate warning description for special schema cases."""
-        if not add_attention or self.description:
-            return self.description
-
-        # Empty schemas
-        if not self.fields:
-            return "⚠️ No fields detected"
-
-        # Count issues
-        conflicts = sum(1 for f in self.fields if f.type == FieldType.CONFLICT)
-        unknowns = sum(1 for f in self.fields if f.type == FieldType.UNKNOWN)
-
-        # Multiple issues
-        if conflicts >= 3:
-            return f"⚠️ Multiple type conflicts ({conflicts} fields)"
-        if unknowns >= 3:
-            return f"❓ Multiple unknown types ({unknowns} fields)"
-        if conflicts > 0 and unknowns > 0:
-            return f"⚠️ Mixed issues: {conflicts} conflicts, {unknowns} unknowns"
-
-        # Large or deeply nested
-        if len(self.fields) >= 15:
-            return f"📊 Large structure ({len(self.fields)} fields)"
-        if self.get_max_depth() >= 3:
-            return "🗂️ Deeply nested structure"
-
-        return None
-
-    def get_statistics(self) -> dict[str, int]:
-        """Get schema statistics."""
-        return {
-            "total_fields": len(self.fields),
-            "conflicts": sum(1 for f in self.fields if f.type == FieldType.CONFLICT),
-            "unknowns": sum(1 for f in self.fields if f.type == FieldType.UNKNOWN),
-            "optional_fields": sum(1 for f in self.fields if f.optional),
-            "complex_arrays": sum(
-                1
-                for f in self.fields
-                if f.type == FieldType.ARRAY and f.array_element_schema
-            ),
-            "max_depth": self.get_max_depth(),
-        }
 
 
 # ============================================================================
@@ -321,12 +210,6 @@ def _create_schema_from_object(
             add_attention,
         )
         schema.add_field(field_obj)
-
-    # Generate attention description
-    if add_attention:
-        desc = schema.generate_attention_description(True)
-        if desc:
-            schema.description = desc
 
     return schema
 
@@ -499,12 +382,6 @@ def _handle_root_array(
         )
         schema = _create_schema_from_object(child_node, element_name, add_attention)
 
-        if add_attention:
-            prefix = "◉ Generated from array of objects"
-            schema.description = (
-                f"{prefix}\n{schema.description}" if schema.description else prefix
-            )
-
         logger.info(
             "Root is array of objects, extracted element schema: %s", element_name
         )
@@ -530,9 +407,6 @@ def _handle_root_array(
         array_element_type=element_type,
     )
 
-    if add_attention:
-        field_obj.description = f"📋 Array of {element_type.value} values"
-
     schema.add_field(field_obj)
     logger.info("Root is array of primitives: %s", element_type.value)
     return schema
@@ -551,9 +425,6 @@ def _handle_root_primitive(
         original_name="value",
         type=map_analyzer_type(root_type),
     )
-
-    if add_attention:
-        field_obj.description = f"📦 Single {root_type} value"
 
     schema.add_field(field_obj)
     logger.info("Root is primitive: %s", root_type)

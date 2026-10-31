@@ -114,18 +114,6 @@ def add_codegen_args(parser: argparse.ArgumentParser) -> None:
     )
 
     common_group.add_argument(
-        "--struct-case",
-        choices=["pascal", "camel", "snake"],
-        help="Case style for struct/class names",
-    )
-
-    common_group.add_argument(
-        "--field-case",
-        choices=["pascal", "camel", "snake"],
-        help="Case style for field names",
-    )
-
-    common_group.add_argument(
         "--verbose",
         action="store_true",
         help="Show generation result metadata",
@@ -150,12 +138,6 @@ def add_codegen_args(parser: argparse.ArgumentParser) -> None:
         "--no-omitempty",
         action="store_true",
         help="Don't add omitempty to JSON tags in Go",
-    )
-
-    go_group.add_argument(
-        "--json-tag-case",
-        choices=["original", "snake", "camel"],
-        help="Case style for JSON tag names in Go",
     )
 
     # Python-specific options
@@ -485,12 +467,6 @@ def _build_config(args: argparse.Namespace, language: str) -> dict:
     if hasattr(args, "no_comments") and args.no_comments:
         config_dict["add_comments"] = False
 
-    if hasattr(args, "struct_case") and args.struct_case:
-        config_dict["struct_case"] = args.struct_case
-
-    if hasattr(args, "field_case") and args.field_case:
-        config_dict["field_case"] = args.field_case
-
     # Language-specific options
     match language.lower():
         case "go" | "golang":
@@ -512,9 +488,6 @@ def _add_go_config(args: argparse.Namespace, config_dict: dict) -> None:
 
     if hasattr(args, "no_omitempty") and args.no_omitempty:
         config_dict["json_tag_omitempty"] = False
-
-    if hasattr(args, "json_tag_case") and args.json_tag_case:
-        config_dict["json_tag_case"] = args.json_tag_case
 
 
 def _add_python_config(args: argparse.Namespace, config_dict: dict) -> None:

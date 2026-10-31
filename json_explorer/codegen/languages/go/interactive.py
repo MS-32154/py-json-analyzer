@@ -138,12 +138,6 @@ class GoInteractiveHandler:
                 "Add 'omitempty' to JSON tags?",
                 default=True,
             )
-            go_config["json_tag_case"] = self._input(
-                "JSON tag case style",
-                choices=["original", "snake", "camel"],
-                default="original",
-                console=console,
-            )
 
         # Optional fields
         go_config["use_pointers_for_optional"] = Confirm.ask(

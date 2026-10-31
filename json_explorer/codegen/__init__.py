@@ -24,7 +24,6 @@ from .core import (
     TemplateError,
     TemplateManager,
     convert_analyzer_output,
-    create_template_env,
     extract_all_schemas,
     generate_code,
     load_config,
@@ -143,7 +142,6 @@ def quick_generate(
         raise GeneratorError(f"JSON analysis failed: {e}") from e
 
     # Apply language-specific defaults
-    options = _with_language_defaults(language, options)
 
     # Generate code
     result = generate_from_analysis(analysis, language, options)
@@ -176,18 +174,7 @@ def create_config(language: str = "go", **kwargs) -> GeneratorConfig:
         RegistryError: If the language is not supported
     """
     get_generator_class(language)  # raises RegistryError for unknown languages
-    return load_config(custom_config=_with_language_defaults(language, kwargs))
-
-
-def _with_language_defaults(language: str, options: dict) -> dict:
-    """Return options with the language's conventional defaults filled in.
-
-    Explicit options always win. (Moves into each language's plugin in Phase 3.)
-    """
-    defaults: dict[str, str] = {}
-    if language.lower() in ("python", "py"):
-        defaults["field_case"] = "snake"  # PEP 8
-    return defaults | options
+    return load_config(custom_config=kwargs)
 
 
 # ============================================================================
@@ -210,7 +197,6 @@ __all__ = [
     "convert_analyzer_output",
     "create_config",
     "create_generator",
-    "create_template_env",
     "extract_all_schemas",
     "generate_code",
     "generate_from_analysis",

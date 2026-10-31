@@ -1,6 +1,5 @@
 import pytest
 from json_explorer.codegen import quick_generate
-from json_explorer.codegen.core import GeneratorConfig
 from json_explorer.codegen.registry import get_generator_class
 
 
@@ -18,9 +17,3 @@ class TestErrorHandling:
 
         with pytest.raises(GeneratorError):
             quick_generate("invalid json string", "go")
-
-    def test_invalid_config_values(self):
-        from json_explorer.codegen.core.config import ConfigError
-
-        with pytest.raises(ConfigError):
-            GeneratorConfig(indent_size=-1)

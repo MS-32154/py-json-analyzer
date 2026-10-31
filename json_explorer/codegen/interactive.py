@@ -296,19 +296,6 @@ class CodegenInteractiveHandler:
             default=True,
         )
 
-        # Naming conventions
-        if Confirm.ask("Configure naming conventions?", default=False):
-            config_dict["struct_case"] = self._input(
-                "Struct/class name case",
-                choices=["pascal", "camel", "snake"],
-                default="pascal",
-            )
-            config_dict["field_case"] = self._input(
-                "Field name case",
-                choices=["pascal", "camel", "snake"],
-                default="pascal",
-            )
-
         # Language-specific configuration
         lang_handler = self._get_language_handler(language)
         if lang_handler:

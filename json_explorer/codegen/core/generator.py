@@ -201,28 +201,6 @@ class CodeGenerator(ABC):
         """
         return self.template_manager.render(template_name, context)
 
-    def template_exists(self, template_name: str) -> bool:
-        """Check if template exists."""
-        return self.template_manager.exists(template_name)
-
-    def get_import_statements(
-        self,
-        schemas: dict[str, Schema],
-    ) -> list[str]:
-        """
-        Get required import statements.
-
-        Default implementation returns empty list.
-        Override to provide language-specific imports.
-
-        Args:
-            schemas: All schemas being generated
-
-        Returns:
-            List of import statements
-        """
-        return []
-
     def validate_schemas(
         self,
         schemas: dict[str, Schema],

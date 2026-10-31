@@ -1042,10 +1042,7 @@ config = GeneratorConfig(
     package_name="models",
     generate_json_tags=True,
     json_tag_omitempty=True,
-    json_tag_case="snake",  # "original", "snake", "camel"
     add_comments=True,
-    struct_case="pascal",
-    field_case="pascal",
     language_config={
         "use_pointers_for_optional": True,
         "int_type": "int64",      # "int", "int64", "int32"
@@ -1133,8 +1130,6 @@ from json_explorer.codegen import GeneratorConfig
 dataclass_config = GeneratorConfig(
     package_name="models",
     add_comments=True,
-    struct_case="pascal",
-    field_case="snake",  # Python convention
     language_config={
         "style": "dataclass",
         "dataclass_slots": True,
@@ -1148,8 +1143,6 @@ dataclass_config = GeneratorConfig(
 pydantic_config = GeneratorConfig(
     package_name="models",
     add_comments=True,
-    struct_case="pascal",
-    field_case="snake",
     language_config={
         "style": "pydantic",
         "pydantic_use_field": True,
@@ -1164,8 +1157,6 @@ pydantic_config = GeneratorConfig(
 typeddict_config = GeneratorConfig(
     package_name="types",
     add_comments=True,
-    struct_case="pascal",
-    field_case="snake",
     language_config={
         "style": "typeddict",
         "typeddict_total": False,
@@ -1197,8 +1188,8 @@ td_generator = create_typeddict_generator(total=False)
 
 Python generator defaults to Python conventions:
 
-- **Class names**: PascalCase (`struct_case="pascal"`)
-- **Field names**: snake_case (`field_case="snake"`)
+- **Class names**: PascalCase
+- **Field names**: snake_case
 
 ```python
 # Input: {"userId": 1, "userName": "Alice"}
@@ -1671,14 +1662,12 @@ python_code = quick_generate(data, language="python")
 
 **Go:**
 
-- `struct_case`: "pascal"
-- `field_case`: "pascal"
+- Type and field names: PascalCase (fields must be exported)
 - `use_pointers_for_optional`: true
 
 **Python:**
 
-- `struct_case`: "pascal"
-- `field_case`: "snake"
+- Class names: PascalCase; field names: snake_case
 - `dataclass_slots`: true
 
 ### Recommended Configurations
@@ -1701,7 +1690,6 @@ python_code = quick_generate(data, language="python")
 ```json
 {
   "package_name": "models",
-  "field_case": "snake",
   "language_config": {
     "style": "pydantic",
     "pydantic_use_field": true,

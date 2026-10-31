@@ -103,8 +103,7 @@ class GoGenerator(CodeGenerator):
 
     def _generate_struct_data(self, schema: Schema) -> dict[str, Any]:
         """Generate struct data for template."""
-        case_style = self.config.struct_case
-        struct_name = self.name_tracker.sanitize(schema.name, case_style)
+        struct_name = self.name_tracker.sanitize(schema.name, "pascal")
 
         fields = []
         for field in schema.fields:
@@ -123,8 +122,7 @@ class GoGenerator(CodeGenerator):
     def _generate_field_data(self, field: Field) -> dict[str, Any]:
         """Generate field data for template."""
         # Sanitize field name to PascalCase for Go
-        case_style = self.config.field_case
-        field_name = self.name_tracker.sanitize(field.name, case_style)
+        field_name = self.name_tracker.sanitize(field.name, "pascal")  # exported
 
         # Determine Go type
         go_type = self._get_field_type(field)
@@ -261,23 +259,6 @@ class GoGenerator(CodeGenerator):
 
         logger.debug("Generation order determined: %s schemas", len(ordered))
         return ordered
-
-    # ========================================================================
-    # Validation
-    # ========================================================================
-
-    def validate_schemas(self, schemas: dict[str, Schema]) -> list[str]:
-        """Validate schemas for Go generation."""
-        warnings = super().validate_schemas(schemas)
-
-        # Add Go-specific validations
-        for schema in schemas.values():
-            if not schema.fields:
-                warnings.append(
-                    f"Schema '{schema.name}' has no fields - will generate empty struct"
-                )
-
-        return warnings
 
 
 # ============================================================================

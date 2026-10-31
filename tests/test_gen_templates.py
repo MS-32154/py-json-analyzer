@@ -21,12 +21,3 @@ class TestTemplates:
         manager = TemplateManager(template_dir)
         result = manager.render("test.j2", {"name": "World"})
         assert result == "Hello World!"
-
-    def test_template_exists(self, tmp_path):
-        template_dir = tmp_path / "templates"
-        template_dir.mkdir()
-        (template_dir / "exists.j2").write_text("test")
-
-        manager = TemplateManager(template_dir)
-        assert manager.exists("exists.j2")
-        assert not manager.exists("missing.j2")

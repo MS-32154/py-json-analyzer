@@ -45,6 +45,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   (snake_case fields for Python) and rejects unsupported languages.
 
 ### Removed
+- **Breaking:** the `struct_case`, `field_case` and `json_tag_case` options and the `--struct-case`,
+  `--field-case` and `--json-tag-case` flags. They could only produce broken code (non-PascalCase
+  Go fields are unexported and never (un)marshalled; renamed JSON tags no longer match the JSON).
+  Naming now follows the target language: Go types and fields are PascalCase; Python classes are
+  PascalCase and fields snake_case.
+- **Breaking:** the `indent_size`, `use_tabs` and `line_ending` options, which were never applied.
+  Config files that still contain any of these six options load with a warning.
+- Decorative comments in generated code (`🗂️ Deeply nested structure`, `📊 Large structure`,
+  `◉ Generated from array of objects`, …), which Pydantic also copied into JSON Schema
+  descriptions. Plain-text notes remain for fields typed `interface{}`/`Any` (mixed or unknown types).
+- The duplicated "has no fields" warning and the "TypedDict classes are type hints only" warning
+  that was shown on every TypedDict run.
+- Unused API: custom Jinja filters, `render_string`, `template_exists`, `list_templates`,
+  `create_template_env`, `to_camel_case`, `to_kebab_case`, `to_screaming_snake_case`,
+  `convert_case`, `resolve_conflict` and `clean_identifier` exports, `NameTracker.add`,
+  `CodeGenerator.get_import_statements`.
 - **Breaking:** the `dev` and `all` extras. `pip install py-json-analyzer[dev]` no longer works;
   development tools are now a PEP 735 `dev` dependency group (`uv sync`, or `pip install --group dev`
   with pip >= 25.1).

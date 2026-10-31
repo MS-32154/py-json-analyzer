@@ -8,7 +8,7 @@ Handles loading, validation, and merging of configuration from multiple sources:
 """
 
 import json
-from dataclasses import asdict, dataclass, field
+from dataclasses import asdict, dataclass, field, fields
 from pathlib import Path
 from typing import Any
 
@@ -16,6 +16,17 @@ from json_explorer.errors import JsonExplorerError
 from json_explorer.logging_config import get_logger
 
 logger = get_logger(__name__)
+
+
+# Options removed in 0.5.0, ignored with a warning so old config files still load.
+REMOVED_OPTIONS: dict[str, str] = {
+    "struct_case": "type names always follow the target language (PascalCase)",
+    "field_case": "field names always follow the target language",
+    "json_tag_case": "JSON tags must match the JSON keys exactly",
+    "indent_size": "was never applied",
+    "use_tabs": "was never applied",
+    "line_ending": "was never applied",
+}
 
 
 class ConfigError(JsonExplorerError):
@@ -34,14 +45,8 @@ class GeneratorConfig:
 
     Attributes:
         package_name: Package/namespace name for generated code
-        indent_size: Number of spaces per indent level
-        use_tabs: Use tabs instead of spaces
-        line_ending: Line ending style (\\n or \\r\\n)
-        struct_case: Case style for struct/class names
-        field_case: Case style for field names
         generate_json_tags: Whether to generate JSON tags/annotations
         json_tag_omitempty: Add omitempty to JSON tags
-        json_tag_case: Case style for JSON tag names
         add_comments: Include comments/documentation in output
         language_config: Language-specific configuration options
     """
@@ -49,55 +54,15 @@ class GeneratorConfig:
     # Output settings
     package_name: str = "main"
 
-    # Code style
-    indent_size: int = 4
-    use_tabs: bool = False
-    line_ending: str = "\n"
-
-    # Naming conventions
-    struct_case: str = "pascal"  # pascal, camel, snake
-    field_case: str = "pascal"  # pascal, camel, snake
-
     # JSON serialization
     generate_json_tags: bool = True
     json_tag_omitempty: bool = True
-    json_tag_case: str = "original"  # original, snake, camel
 
     # Documentation
     add_comments: bool = True
 
     # Language-specific settings (extensible)
     language_config: dict[str, Any] = field(default_factory=dict)
-
-    def __post_init__(self) -> None:
-        """Validate configuration after initialization."""
-        self._validate()
-
-    def _validate(self) -> None:
-        """Validate configuration values."""
-        if self.indent_size < 1:
-            raise ConfigError("indent_size must be at least 1")
-
-        if self.struct_case not in {"pascal", "camel", "snake"}:
-            raise ConfigError(
-                f"struct_case must be pascal, camel, or snake (got: {self.struct_case})"
-            )
-
-        if self.field_case not in {"pascal", "camel", "snake"}:
-            raise ConfigError(
-                f"field_case must be pascal, camel, or snake (got: {self.field_case})"
-            )
-
-        if self.json_tag_case not in {"original", "snake", "camel"}:
-            raise ConfigError(
-                f"json_tag_case must be original, snake, or camel (got: {self.json_tag_case})"
-            )
-
-        logger.debug(
-            "Config validated: package=%s, comments=%s",
-            self.package_name,
-            self.add_comments,
-        )
 
     def merge(self, overrides: dict[str, Any]) -> GeneratorConfig:
         """
@@ -112,25 +77,17 @@ class GeneratorConfig:
         current = asdict(self)
 
         # Separate known fields from language_config
-        known_fields = {
-            "package_name",
-            "indent_size",
-            "use_tabs",
-            "line_ending",
-            "struct_case",
-            "field_case",
-            "generate_json_tags",
-            "json_tag_omitempty",
-            "json_tag_case",
-            "add_comments",
-            "language_config",
-        }
+        known_fields = {f.name for f in fields(self)}
 
         config_updates = {}
         lang_config_updates = {}
 
         for key, value in overrides.items():
-            if key in known_fields:
+            if key in REMOVED_OPTIONS:
+                logger.warning(
+                    "Ignoring removed option %r: %s", key, REMOVED_OPTIONS[key]
+                )
+            elif key in known_fields:
                 config_updates[key] = value
             else:
                 # Unknown fields go to language_config

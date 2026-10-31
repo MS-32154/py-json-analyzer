@@ -5,7 +5,6 @@ Tests for core naming utilities.
 from json_explorer.codegen.core.naming import (
     NameTracker,
     sanitize_name,
-    to_camel_case,
     to_pascal_case,
     to_snake_case,
 )
@@ -18,11 +17,6 @@ class TestCaseConversion:
         assert to_snake_case("UserName") == "user_name"
         assert to_snake_case("user-name") == "user_name"
         assert to_snake_case("userName") == "user_name"
-
-    def test_to_camel_case(self):
-        assert to_camel_case("user_name") == "userName"
-        assert to_camel_case("UserName") == "userName"
-        assert to_camel_case("user-name") == "userName"
 
     def test_to_pascal_case(self):
         assert to_pascal_case("user_name") == "UserName"

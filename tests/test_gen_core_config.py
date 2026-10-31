@@ -22,25 +22,27 @@ class TestGeneratorConfig:
         config = GeneratorConfig()
         assert config.package_name == "main"
         assert config.add_comments is True
-        assert config.indent_size == 4
 
     def test_custom_config(self):
         config = GeneratorConfig(
             package_name="models",
             add_comments=False,
-            indent_size=2,
         )
         assert config.package_name == "models"
         assert config.add_comments is False
-        assert config.indent_size == 2
 
     def test_config_language_specific(self):
         config = GeneratorConfig(language_config={"custom_option": "value"})
         assert config.language_config["custom_option"] == "value"
 
-    def test_validation_fails(self):
-        with pytest.raises(ConfigError):
-            GeneratorConfig(indent_size=0)
+    def test_removed_options_are_ignored(self):
+        """Old config files with options removed in 0.5.0 still load."""
+        merged = GeneratorConfig().merge(
+            {"field_case": "camel", "indent_size": 2, "package_name": "models"}
+        )
+        assert merged.package_name == "models"
+        assert "field_case" not in merged.language_config
+        assert "indent_size" not in merged.language_config
 
     def test_merge_config(self):
         config = GeneratorConfig(package_name="main")

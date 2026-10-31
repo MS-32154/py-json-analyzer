@@ -121,8 +121,7 @@ class PythonGenerator(CodeGenerator):
 
     def _generate_class_data(self, schema: Schema) -> dict[str, Any]:
         """Generate class data for template."""
-        case_style = self.config.struct_case
-        class_name = self.name_tracker.sanitize(schema.name, case_style)
+        class_name = self.name_tracker.sanitize(schema.name, "pascal")
 
         fields = []
         for field in schema.fields:
@@ -167,8 +166,7 @@ class PythonGenerator(CodeGenerator):
     def _generate_field_data(self, field: Field) -> dict[str, Any]:
         """Generate field data for template."""
         # Sanitize field name to snake_case for Python
-        case_style = self.config.field_case
-        field_name = self.name_tracker.sanitize(field.name, case_style)
+        field_name = self.name_tracker.sanitize(field.name, "snake")  # PEP 8
 
         # Determine Python type
         python_type = self._get_field_type(field)
@@ -341,30 +339,6 @@ class PythonGenerator(CodeGenerator):
 
         logger.debug("Generation order determined: %s schemas", len(ordered))
         return ordered
-
-    # ========================================================================
-    # Validation
-    # ========================================================================
-
-    def validate_schemas(self, schemas: dict[str, Schema]) -> list[str]:
-        """Validate schemas for Python generation."""
-        warnings = super().validate_schemas(schemas)
-
-        # Add Python-specific validations
-        for schema in schemas.values():
-            if not schema.fields:
-                warnings.append(
-                    f"Schema '{schema.name}' has no fields - will generate empty class"
-                )
-
-        # Style-specific warnings
-        match self.python_config.style:
-            case PythonStyle.TYPEDDICT:
-                warnings.append(
-                    "TypedDict classes are type hints only - no runtime validation"
-                )
-
-        return warnings
 
 
 # ============================================================================

@@ -219,7 +219,6 @@ json_explorer data.json --generate go \
 # Go-specific options
 --no-pointers                        # Don't use pointers for optional fields
 --no-json-tags                       # Don't generate JSON tags
---json-tag-case {original,snake,camel}
 
 # Generate Python code
 json_explorer data.json --generate python \
@@ -234,8 +233,6 @@ json_explorer data.json --generate python \
 
 # Common options
 --config config.json                 # Load configuration from file
---struct-case {pascal,camel,snake}   # Class/struct name convention
---field-case {pascal,camel,snake}    # Field name convention
 --no-comments                        # Don't generate comments
 --verbose                            # Show detailed generation info
 ```
@@ -454,8 +451,6 @@ JSON Explorer uses JSON configuration files for code generation:
 {
   "package_name": "models",
   "add_comments": true,
-  "struct_case": "pascal",
-  "field_case": "snake",
   "generate_json_tags": true,
   "json_tag_omitempty": true,
   "language_config": {
@@ -476,9 +471,6 @@ JSON Explorer uses JSON configuration files for code generation:
   "add_comments": true,
   "generate_json_tags": true,
   "json_tag_omitempty": true,
-  "json_tag_case": "snake",
-  "struct_case": "pascal",
-  "field_case": "pascal",
   "language_config": {
     "use_pointers_for_optional": true,
     "int_type": "int64",
@@ -493,8 +485,6 @@ JSON Explorer uses JSON configuration files for code generation:
 {
   "package_name": "models",
   "add_comments": true,
-  "struct_case": "pascal",
-  "field_case": "snake",
   "language_config": {
     "style": "dataclass",
     "dataclass_slots": true,
@@ -511,8 +501,6 @@ JSON Explorer uses JSON configuration files for code generation:
 {
   "package_name": "models",
   "add_comments": true,
-  "struct_case": "pascal",
-  "field_case": "snake",
   "language_config": {
     "style": "pydantic",
     "pydantic_use_field": true,
