@@ -12,7 +12,7 @@
   - [Utils Module](#6-utils-module)
 - [Code Generation](#code-generation)
   - [Core Generator Interface](#1-core-generator-interface)
-  - [Registry System](#2-registry-system)
+  - [Registry and Plugins](#2-registry-and-plugins)
   - [High-Level API](#3-high-level-api)
   - [Go Generator](#4-go-generator)
   - [Python Generator](#5-python-generator)
@@ -562,17 +562,13 @@ JsonTreeBuilder(show_conflicts=True, show_optional=True)
 
 **Methods:**
 
-- `build_tree(summary, parent_tree, name="root")`: Recursively build tree from analysis
+- `build_tree(node, parent, name="root")`: Add an `analyze_json()` node (and everything below it)
+  to a Rich `Tree`
+- `format_label(node, name)`: The label for one node, e.g. `email (string) (nullable)`
 
-**Type Colors:**
-
-- `object`: bold blue
-- `list`: bold magenta
-- `str`: green
-- `int`/`float`: dark orange
-- `bool`: yellow
-- `NoneType`: dim white
-- `conflict`: bold red
+Labels show the kind (plus the string format, e.g. `string, date-time`), `(optional)` for keys
+missing from some objects, `(nullable)` for values that can be `null`, and the kinds of a
+`mixed` value. Colors per kind are in `JsonTreeBuilder.KIND_COLORS`.
 
 ---
 
@@ -890,13 +886,16 @@ Create a configuration object.
 
 - `GeneratorConfig`: Configuration object
 
-#### `load_config(path)`
+#### `load_config(config_file=None, custom_config=None)`
 
-Load configuration from JSON file.
+Build a configuration from the defaults, a JSON config file, and overrides (later wins).
 
 **Parameters:**
 
-- `path` (str | Path): Path to config file
+- `config_file` (str | Path, optional): Path to a JSON config file
+- `custom_config` (dict, optional): Options that override the file
+
+Unknown or invalid options raise `ConfigError`; options removed in 0.5.0 are ignored with a warning.
 
 **Returns:**
 
@@ -910,12 +909,12 @@ Specialized Go struct generation with JSON tags and pointer handling.
 
 #### Features
 
-- Configurable type mappings (`int`, `int64`, `float64`, etc.)
-- Smart pointer usage for optional fields
-- JSON tag generation with customizable cases
-- Package and import management
-- Naming convention handling (PascalCase, camelCase, snake_case)
-- Conflict resolution with `any`
+- Exported PascalCase fields; `json` tags with the original keys (keys Go can't express as a tag
+  are left out with a comment)
+- Pointers for optional fields (`use_pointers_for_optional`), `omitempty` (`json_tag_omitempty`)
+- Configurable `int_type` (`int`, `int32`, `int64`), `float_type` (`float32`, `float64`) and
+  `time_type` (`time.Time` or `string`, for RFC 3339 date-times)
+- `any` for unknown or mixed values; imports added as needed; gofmt-clean output
 
 #### Configuration Options
 
@@ -929,7 +928,8 @@ config = GeneratorConfig(
     language_config={
         "use_pointers_for_optional": True,
         "int_type": "int64",      # "int", "int64", "int32"
-        "float_type": "float64"   # "float64", "float32"
+        "float_type": "float64",  # "float64", "float32"
+        "time_type": "time.Time", # or "string"
     }
 )
 ```
@@ -1173,14 +1173,14 @@ Represents a data structure schema.
 
 **Attributes:**
 
-- `name` (str): Schema name
+- `name` (str): Type name (unique within one run)
+- `original_name` (str): The name it was derived from
 - `fields` (list[Field]): List of fields
 - `description` (str, optional): Schema description
 
 **Methods:**
 
 - `add_field(field)`: Add a field to schema
-- `get_field(name)`: Get field by name
 
 #### `Field` Class
 
@@ -1188,12 +1188,17 @@ Represents an individual field in a schema.
 
 **Attributes:**
 
-- `name` (str): Field name
+- `name` / `original_name` (str): The JSON key
 - `type` (FieldType): Field type
-- `optional` (bool): Whether field is optional
-- `description` (str, optional): Field description
+- `optional` (bool): Missing from some objects or `null` somewhere
+- `missing` (bool) / `nullable` (bool): The two cases separately (TypedDict uses them)
+- `description` (str, optional): Note for unknown or mixed types
 - `nested_schema` (Schema, optional): For object types
-- `array_element_type` (FieldType, optional): For array types
+- `array_element_type` (FieldType, optional) / `array_element_schema` (Schema, optional): The
+  innermost array element
+- `array_dimensions` (int): 1 for `list[T]`, 2 for `list[list[T]]`, ...
+- `array_element_nullable` (bool): `null` seen among the elements
+- `conflicting_types` (list[FieldType]): For `CONFLICT`
 
 #### `FieldType` Enum
 
@@ -1214,28 +1219,23 @@ Supported field types:
 ```python
 from json_explorer.codegen.core.schema import Schema, Field, FieldType
 
-# Create schema
-user_schema = Schema(name="User", description="User data")
+# Usually built from data: convert_analyzer_output(analyze_json(data), "User")
+user_schema = Schema(name="User", original_name="User", description="User data")
 
-# Add fields
-user_schema.add_field(Field(
-    name="user_id",
-    type=FieldType.INTEGER,
-    optional=False
-))
-
-user_schema.add_field(Field(
-    name="email",
-    type=FieldType.STRING,
-    optional=True
-))
-
-user_schema.add_field(Field(
-    name="tags",
-    type=FieldType.ARRAY,
-    array_element_type=FieldType.STRING,
-    optional=False
-))
+user_schema.add_field(
+    Field(name="user_id", original_name="user_id", type=FieldType.INTEGER)
+)
+user_schema.add_field(
+    Field(name="email", original_name="email", type=FieldType.STRING, optional=True)
+)
+user_schema.add_field(
+    Field(
+        name="tags",
+        original_name="tags",
+        type=FieldType.ARRAY,
+        array_element_type=FieldType.STRING,
+    )
+)
 ```
 
 ---
@@ -1286,11 +1286,11 @@ handler.run_interactive()
 **Interactive Flow:**
 
 1. Select language (Go, Python)
-2. Select style (if Python)
-3. Choose configuration template or custom
-4. Configure advanced options
-5. Preview generated code
-6. Save to file or clipboard
+2. Choose how to configure: quick (defaults), custom (questions, including the Python style),
+   a template, or a JSON config file
+3. Enter the root type name
+4. Preview the code, save it to a file, or both
+5. Generate more code or return to the main menu
 
 ---
 
@@ -1565,9 +1565,9 @@ python_code = quick_generate(data, language="python")
   "package_name": "api",
   "language_config": {
     "use_pointers_for_optional": true,
-    "int_type": "int64",
-    "json_tag_omitempty": true
-  }
+    "int_type": "int64"
+  },
+  "json_tag_omitempty": true
 }
 ```
 
@@ -1589,11 +1589,14 @@ python_code = quick_generate(data, language="python")
 
 ### Common Exceptions
 
+All derive from `JsonExplorerError` (`from json_explorer import JsonExplorerError`):
+
 - `JSONLoaderError`: JSON loading/parsing errors
 - `GeneratorError`: Code generation errors
-- `RegistryError`: Generator registry errors
+- `RegistryError`: Unknown language or invalid plugin registration
 - `TemplateError`: Template rendering errors
-- `ConfigError`: Configuration errors
+- `ConfigError`: Unknown or invalid configuration options
+- `CLIError`: Command-line errors (e.g. an unreadable config file)
 
 ### Best Practices
 
@@ -1602,6 +1605,7 @@ from json_explorer import load_json
 from json_explorer.codegen import generate_from_analysis
 from json_explorer.utils import JSONLoaderError
 from json_explorer.codegen import load_config
+from json_explorer.codegen.core import ConfigError
 
 # Handle file loading
 try:
@@ -1621,7 +1625,7 @@ if not result.success:
 # Validate configurations
 try:
     config = load_config("config.json")
-except Exception as e:
+except ConfigError as e:
     print(f"Config error: {e}")
 ```
 
