@@ -74,7 +74,10 @@ CASES: dict[str, typing.Any] = {
             "n": 2.5,
         },
     ],
-} | {p.stem: json.loads(p.read_text()) for p in sorted(DATA_SAMPLES.glob("*.json"))}
+} | {
+    p.stem: json.loads(p.read_text(encoding="utf-8"))
+    for p in sorted(DATA_SAMPLES.glob("*.json"))
+}
 
 TARGETS = (
     "dataclass",

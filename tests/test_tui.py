@@ -214,7 +214,7 @@ class TestCode:
             await pilot.pause()
 
         app = drive(scenario)
-        assert target.read_text() == app.code
+        assert target.read_text(encoding="utf-8") == app.code
 
     def test_save_cancelled(self, tmp_path: Path):
         async def scenario(app, pilot):

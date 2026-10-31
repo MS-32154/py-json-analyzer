@@ -84,7 +84,7 @@ class TestHtml:
         JSONVisualizer().visualize(
             sample_data, output="html", detailed=True, save_path=target
         )
-        assert "Complexity Score" in target.read_text()
+        assert "Complexity Score" in target.read_text(encoding="utf-8")
 
 
 class TestFormats:

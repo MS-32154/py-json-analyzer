@@ -101,7 +101,7 @@ def test_generate_warnings_go_to_stderr(run, tmp_path, capsys):
 def test_generate_to_file_reports_on_stderr(run, tmp_path, capsys):
     target = tmp_path / "models.go"
     assert run(FLAT_SAMPLE, "--generate", "go", "--output", target) == 0
-    assert target.read_text().startswith(GO_HEADER)
+    assert target.read_text(encoding="utf-8").startswith(GO_HEADER)
     out = capsys.readouterr()
     assert out.out == ""
     assert "saved to" in out.err

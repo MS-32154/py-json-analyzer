@@ -30,7 +30,10 @@ DOCUMENTS = {
     "empty_array": [],
     "scalar": 42,
     "null": None,
-} | {p.stem: json.loads(p.read_text()) for p in sorted(SAMPLES.glob("*.json"))}
+} | {
+    p.stem: json.loads(p.read_text(encoding="utf-8"))
+    for p in sorted(SAMPLES.glob("*.json"))
+}
 
 
 @pytest.mark.parametrize("name", list(DOCUMENTS))
@@ -136,7 +139,7 @@ class TestCli:
             run(sample, "--json-schema", "--output", target, "--root-name", "Projects")
             == 0
         )
-        assert json.loads(target.read_text())["title"] == "Projects"
+        assert json.loads(target.read_text(encoding="utf-8"))["title"] == "Projects"
         out = capsys.readouterr()
         assert out.out == ""
         assert "saved" in out.err
