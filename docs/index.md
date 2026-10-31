@@ -10,6 +10,7 @@
   - [Visualization Module](#4-visualization-module)
   - [Tree View Module](#5-tree-view-module)
   - [Utils Module](#6-utils-module)
+  - [Terminal UI Module](#7-terminal-ui-module)
 - [JSON Schema Export](#json-schema-export)
 - [Code Generation](#code-generation)
   - [Core Generator Interface](#1-core-generator-interface)
@@ -646,6 +647,32 @@ try:
 except JSONLoaderError as e:
     print(f"Failed to load JSON: {e}")
 ```
+
+### 7. Terminal UI Module
+
+#### `run_tui(data, source="JSON")`
+
+Open the terminal UI (Textual) for already-loaded data and block until the user quits. It needs a
+terminal; the CLI checks for one before calling it.
+
+**Parameters:**
+
+- `data` (Any): The JSON data
+- `source` (str): Shown in the header and as the root of the data tree
+
+**Returns:**
+
+- `int`: Exit code (0)
+
+```python
+from json_explorer.tui import run_tui
+from json_explorer.utils import load_json
+
+source, data = load_json("data.json")
+run_tui(data, source)
+```
+
+See [Terminal UI](#terminal-ui) for the tabs and keys.
 
 ---
 

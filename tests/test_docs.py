@@ -134,6 +134,7 @@ def _find_callable(name: str):
         "json_explorer.tree_view",
         "json_explorer.utils",
         "json_explorer.ui",
+        "json_explorer.tui",
         "json_explorer.stats",
         "json_explorer.visualizer",
         "json_explorer.analyzer",
