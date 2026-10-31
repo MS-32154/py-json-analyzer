@@ -53,6 +53,13 @@ jobs:
           python-version: ${{ matrix.python }}
           enable-cache: true
 
+      # Generated Go code is type-checked with `go vet` (tests skip without Go)
+      - uses: actions/setup-go@v7
+        if: runner.os == 'Linux'
+        with:
+          go-version: stable
+          cache: false
+
       - name: Install (fails if uv.lock is out of date)
         run: uv sync --locked
 

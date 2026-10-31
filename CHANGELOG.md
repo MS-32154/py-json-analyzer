@@ -19,6 +19,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Lint and format with ruff (replaces black, isort and flake8).
 
 ### Added
+- Compile tests for generated code: Python output is executed and its annotations resolved;
+  Go output is checked with `go vet` (run in CI on Linux).
 - `JsonExplorerError` base class (exported from `json_explorer`): all package errors (`JSONLoaderError`,
   `GeneratorError`, `RegistryError`, `ConfigError`, `TemplateError`, `CLIError`) now derive from it.
 - CI workflow: tests on Ubuntu, macOS and Windows; ruff lint job.

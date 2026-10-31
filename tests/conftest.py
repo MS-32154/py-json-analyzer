@@ -1,6 +1,4 @@
-"""
-Pytest configuration for codegen tests.
-"""
+"""Shared pytest fixtures."""
 
 import pytest
 
