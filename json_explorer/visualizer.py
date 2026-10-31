@@ -7,7 +7,7 @@ for both terminal (ASCII) and interactive browser-based visualizations.
 import tempfile
 import webbrowser
 from pathlib import Path
-from typing import Literal
+from typing import Any, Literal
 
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
@@ -29,7 +29,7 @@ class JSONVisualizer:
 
     def __init__(self) -> None:
         """Initialize the visualizer."""
-        self.stats: dict | None = None
+        self.stats: dict[str, Any] = {}
         self.colors = {
             "primary": "#2E86AB",
             "secondary": "#A23B72",
@@ -43,8 +43,8 @@ class JSONVisualizer:
 
     def visualize(
         self,
-        data: dict | list,
-        output: OutputFormat = "terminal",
+        data: Any,
+        output: OutputFormat | str = "terminal",
         save_path: str | Path | None = None,
         detailed: bool = False,
         open_browser: bool = True,
@@ -402,8 +402,8 @@ class JSONVisualizer:
 
 
 def visualize_json(
-    data: dict | list,
-    output: OutputFormat = "terminal",
+    data: Any,
+    output: OutputFormat | str = "terminal",
     save_path: str | Path | None = None,
     detailed: bool = False,
     open_browser: bool = True,

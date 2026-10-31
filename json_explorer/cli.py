@@ -19,7 +19,7 @@ class CLIHandler:
     def __init__(self) -> None:
         """Initialize CLI handler with default components."""
         self.data: Any | None = None
-        self.source: str | None = None
+        self.source = ""
         self.console = Console()
         self.searcher = JsonSearcher()
         self.analyzer = DataStatsAnalyzer()

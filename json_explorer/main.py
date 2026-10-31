@@ -5,6 +5,7 @@
 import argparse
 import sys
 from pathlib import Path
+from typing import Any
 
 from rich.console import Console
 
@@ -20,8 +21,8 @@ logger = get_logger(__name__)
 class JSONExplorer:
     """Main JSON Explorer application coordinator."""
 
-    data: dict | list
-    source: str | None
+    data: Any
+    source: str
     console: Console
     cli_handler: CLIHandler
     interactive_handler: InteractiveHandler
@@ -29,7 +30,7 @@ class JSONExplorer:
     def __init__(self) -> None:
         """Initialize the JSON Explorer application."""
         self.data = None
-        self.source = None
+        self.source = ""
         self.console = Console()
         self.cli_handler = CLIHandler()
         self.interactive_handler = InteractiveHandler()

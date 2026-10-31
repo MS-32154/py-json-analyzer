@@ -267,7 +267,7 @@ class DataStatsAnalyzer:
         total_elements = self.stats["total_values"]
 
         complexity = (type_variety * 2) + (max_depth * 3) + (total_elements // 10)
-        return min(complexity, 100)
+        return int(min(complexity, 100))
 
     def _assess_uniformity(self) -> str:
         """Assess how uniform the data structure is.
@@ -299,7 +299,7 @@ class DataStatsAnalyzer:
         Returns:
             List of identified issues.
         """
-        issues = []
+        issues: list[str] = []
 
         total_values = self.stats["total_values"]
         if total_values == 0:

@@ -143,4 +143,5 @@ def load_json(
 
     if file_path:
         return load_json_from_file(file_path)
+    assert url is not None  # one of them is set (checked above)
     return load_json_from_url(url, timeout)

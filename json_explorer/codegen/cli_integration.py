@@ -8,6 +8,7 @@ import argparse
 import json
 import sys
 from pathlib import Path
+from typing import Any
 
 from rich import box
 from rich.console import Console
@@ -19,7 +20,6 @@ from json_explorer.analyzer import analyze_json
 from json_explorer.errors import JsonExplorerError
 from json_explorer.logging_config import get_logger
 from json_explorer.ui import print_metadata
-from json_explorer.utils import load_json
 
 from . import (
     GeneratorError,
@@ -134,14 +134,14 @@ def add_codegen_args(parser: argparse.ArgumentParser) -> None:
 
 def handle_codegen_command(
     args: argparse.Namespace,
-    json_data: dict | list | None = None,
+    json_data: Any = None,
 ) -> int:
     """
     Handle code generation command from CLI arguments.
 
     Args:
         args: Parsed command line arguments
-        json_data: Optional pre-loaded JSON data
+        json_data: The loaded JSON document (any JSON value, including null)
 
     Returns:
         Exit code (0 for success, non-zero for error)
@@ -164,12 +164,6 @@ def handle_codegen_command(
         language = args.generate.lower()
         if not _validate_language(language):
             return 1
-
-        # Get input data if not provided
-        if json_data is None:
-            json_data = _get_input_data(args)
-            if json_data is None:
-                return 1
 
         # Build configuration
         config = _build_config(args, language)
@@ -317,30 +311,6 @@ def _validate_language(language: str, silent: bool = False) -> bool:
             f"[dim]Supported languages: {', '.join(list_languages())}[/dim]"
         )
     return False
-
-
-def _get_input_data(args: argparse.Namespace) -> dict | list | None:
-    """Get JSON input data from various sources."""
-    try:
-        if hasattr(args, "file") and args.file:
-            _, data = load_json(args.file)
-            logger.info("Loaded JSON from file: %s", args.file)
-            return data
-        if hasattr(args, "url") and args.url:
-            _, data = load_json(args.url)
-            logger.info("Loaded JSON from URL: %s", args.url)
-            return data
-        # Try to read from stdin
-        logger.debug("Reading JSON from stdin")
-        return json.load(sys.stdin)
-    except json.JSONDecodeError as e:
-        err_console.print(f"[red]✗ Invalid JSON input:[/red] {e}")
-        logger.debug("JSON decode error: %s", e)
-        return None
-    except Exception as e:
-        err_console.print(f"[red]✗ Failed to load input:[/red] {e}")
-        logger.debug("Failed to load input: %s", e)
-        return None
 
 
 # ============================================================================

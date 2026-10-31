@@ -33,6 +33,9 @@ jobs:
       - name: Ruff format
         run: uv run ruff format --check json_explorer tests
 
+      - name: Type check
+        run: uv run mypy json_explorer
+
   test:
     name: test (${{ matrix.os }}, py${{ matrix.python }})
     runs-on: ${{ matrix.os }}

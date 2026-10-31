@@ -191,3 +191,9 @@ def test_bad_config_file_reports_clear_error(run, tmp_path, capsys):
     err = capsys.readouterr().err
     assert "int_type" in err
     assert "int, int32, int64" in err
+
+
+def test_generate_from_null_document(run, tmp_path, capsys):
+    """A document that is just `null` is valid JSON: the code wraps one value."""
+    assert run(write_json(tmp_path, None), "--generate", "python") == 0
+    assert "value: Any" in capsys.readouterr().out

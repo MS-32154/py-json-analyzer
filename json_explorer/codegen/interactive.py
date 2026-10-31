@@ -19,6 +19,7 @@ from json_explorer.logging_config import get_logger
 from json_explorer.ui import ask, ask_path, print_metadata
 
 from . import (
+    GeneratorConfig,
     GeneratorError,
     generate_from_analysis,
     get_language_info,
@@ -41,7 +42,7 @@ class LanguageInteractiveHandler(Protocol):
         """Get available configuration templates."""
         ...
 
-    def create_template_config(self, template_name: str) -> Any:
+    def create_template_config(self, template_name: str) -> GeneratorConfig | None:
         """Create configuration from template."""
         ...
 
@@ -207,7 +208,7 @@ class CodegenInteractiveHandler:
 
     def _custom_configuration(self, language: str) -> dict:
         """Detailed custom configuration."""
-        config_dict = {}
+        config_dict: dict[str, Any] = {}
 
         # Basic configuration
         config_dict["package_name"] = ask(
@@ -265,12 +266,10 @@ class CodegenInteractiveHandler:
                 return self._custom_configuration(language)
             case _:
                 config = lang_handler.create_template_config(template)
-                if config:
-                    self._show_template_info(template, templates[template])
-                    # Convert GeneratorConfig to dict if needed
-                    if hasattr(config, "to_dict"):
-                        return config.to_dict()
-                return config
+                if config is None:
+                    return None
+                self._show_template_info(template, templates[template])
+                return config.to_dict()
 
     def _show_template_info(self, template_name: str, description: str) -> None:
         """Show information about selected template."""
@@ -302,10 +301,7 @@ class CodegenInteractiveHandler:
                 f"[green]✅ Configuration loaded from: {config_path}[/green]"
             )
 
-            # Convert to dict
-            if hasattr(config, "to_dict"):
-                return config.to_dict()
-            return config
+            return config.to_dict()
 
         except Exception as e:
             self.console.print(f"[red]⚠️ Error loading configuration: {e}[/red]")

@@ -49,6 +49,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Lint and format with ruff (replaces black, isort and flake8).
 
 ### Added
+- The package type-checks cleanly with mypy; CI runs mypy on every push.
 - Language plugins: each target language is one `LanguagePlugin` (generator, aliases, interactive
   handler, CLI flags, examples). Third-party languages can be installed through the
   `json_explorer.languages` entry-point group. `register()` now takes a plugin.
@@ -61,6 +62,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `py.typed` marker: type information is now shipped with the package.
 
 ### Fixed
+- `--generate` on a JSON document that is just `null` tried to re-read the input (passing a URL as a
+  file path) and failed; it now generates a wrapper with one `value: Any` field.
 - Timestamp detection treated `"March"`, `"Monday"`, `"1 hour ago"` and `"10.5"` as timestamps (Go
   output then failed to decode real data). Strings now get a type only when every value follows a
   standard RFC 3339 / JSON Schema format, mapped to what each target can decode (see Changed).

@@ -109,7 +109,7 @@ def ask(message: str, default: str | None = None, **kwargs) -> str:
         ).strip() or (default or "")
 
     except Exception:
-        return Prompt.ask(message, default=default, **kwargs)
+        return Prompt.ask(message, default=default or "", **kwargs)
 
 
 def ask_path(message: str, **kwargs) -> str:
