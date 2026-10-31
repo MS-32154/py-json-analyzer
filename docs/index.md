@@ -1638,7 +1638,7 @@ data = [
 # Go with pointers
 go_code = quick_generate(data, language="go")
 # Output:
-# type RootItem struct {
+# type Root struct {
 #     Name  string  `json:"name"`
 #     Email *string `json:"email,omitempty"`  // Optional
 #     Age   int64   `json:"age"`
