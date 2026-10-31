@@ -143,3 +143,20 @@ def test_missing_input_is_reported_on_stderr(run, capsys, argv, message):
 def test_verbose_logging_flag_spellings(run, flag):
     assert run(FLAT_SAMPLE, "--stats", flag) == 0
     assert logging.getLogger(PACKAGE_LOGGER_NAME).level == logging.DEBUG
+
+
+def test_generate_ignores_force_color_when_piped(run, monkeypatch, capsys):
+    monkeypatch.setenv("FORCE_COLOR", "1")
+    assert run(FLAT_SAMPLE, "--generate", "go") == 0
+    assert capsys.readouterr().out.startswith("package main\n")
+
+
+def test_generated_code_is_utf8_on_non_utf8_pipe(monkeypatch):
+    import io
+
+    from json_explorer.codegen.cli_integration import _display_to_stdout
+
+    raw = io.BytesIO()
+    monkeypatch.setattr(sys, "stdout", io.TextIOWrapper(raw, encoding="cp1252"))
+    _display_to_stdout("// ◉ Generated\n", "go")
+    assert raw.getvalue().decode("utf-8") == "// ◉ Generated\n"

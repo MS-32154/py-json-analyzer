@@ -638,9 +638,19 @@ def _display_to_stdout(code: str, language: str) -> None:
     When stdout is redirected or piped, the raw code is written unchanged so
     `json_explorer data.json --generate go > models.go` produces a valid file.
     """
-    if not console.is_terminal:
-        sys.stdout.write(code if code.endswith("\n") else code + "\n")
-        sys.stdout.flush()
+    # isatty, not console.is_terminal: Rich treats FORCE_COLOR as a terminal,
+    # which would decorate piped output again.
+    if not sys.stdout.isatty():
+        text = code if code.endswith("\n") else code + "\n"
+        # Source files are UTF-8; don't depend on the console code page
+        # (e.g. cp1252 on Windows when piping), which can't encode every char.
+        if buffer := getattr(sys.stdout, "buffer", None):
+            sys.stdout.flush()
+            buffer.write(text.encode("utf-8"))
+            buffer.flush()
+        else:
+            sys.stdout.write(text)
+            sys.stdout.flush()
         return
 
     console.print(f"\n[green]📄 Generated {language.title()} Code\n[/green]")
