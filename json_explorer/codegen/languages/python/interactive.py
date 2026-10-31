@@ -11,16 +11,16 @@ from rich.console import Console
 from rich.panel import Panel
 from rich.prompt import Confirm
 
+from json_explorer.logging_config import get_logger
 from json_explorer.utils import prompt_input
+
 from ...core.config import GeneratorConfig
 from .config import (
     get_dataclass_config,
     get_pydantic_config,
-    get_typeddict_config,
     get_strict_dataclass_config,
+    get_typeddict_config,
 )
-
-from json_explorer.logging_config import get_logger
 
 logger = get_logger(__name__)
 
@@ -271,7 +271,7 @@ class Root(BaseModel):
         extra="ignore",
         populate_by_name=True,
     )
-    
+
     user_id: int = Field(alias="user_id")
     name: str
     email: str | None = Field(default=None)

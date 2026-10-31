@@ -7,13 +7,13 @@ Generates Python dataclasses, Pydantic models, or TypedDict using templates.
 from pathlib import Path
 from typing import Any
 
+from json_explorer.logging_config import get_logger
+
 from ...core.config import GeneratorConfig
 from ...core.generator import CodeGenerator
-from ...core.schema import Schema, Field, FieldType
+from ...core.schema import Field, FieldType, Schema
 from .config import PythonConfig, PythonStyle, get_python_generator_config
 from .naming import create_python_name_tracker
-
-from json_explorer.logging_config import get_logger
 
 logger = get_logger(__name__)
 
@@ -26,7 +26,7 @@ logger = get_logger(__name__)
 class PythonGenerator(CodeGenerator):
     """Code generator for Python dataclasses, Pydantic models, and TypedDict."""
 
-    __slots__ = ("python_config", "name_tracker", "types_used", "has_optional_fields")
+    __slots__ = ("has_optional_fields", "name_tracker", "python_config", "types_used")
 
     def __init__(self, config: GeneratorConfig):
         """Initialize Python generator with configuration."""

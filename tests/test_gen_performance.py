@@ -20,7 +20,7 @@ class TestPerformance:
         # Create deeply nested structure
         current = {"type": "str", "optional": False}
 
-        for i in range(10):
+        for _i in range(10):
             current = {
                 "type": "object",
                 "children": {"nested": current},

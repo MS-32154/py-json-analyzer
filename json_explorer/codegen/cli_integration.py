@@ -9,11 +9,15 @@ import json
 import sys
 from pathlib import Path
 
+from rich import box
 from rich.console import Console
 from rich.panel import Panel
 from rich.syntax import Syntax
 from rich.table import Table
-from rich import box
+
+from json_explorer.analyzer import analyze_json
+from json_explorer.logging_config import get_logger
+from json_explorer.utils import load_json
 
 from . import (
     GeneratorError,
@@ -22,10 +26,6 @@ from . import (
     list_all_language_info,
     list_supported_languages,
 )
-from json_explorer.analyzer import analyze_json
-from json_explorer.utils import load_json
-
-from json_explorer.logging_config import get_logger
 
 logger = get_logger(__name__)
 console = Console()
@@ -38,8 +38,6 @@ console = Console()
 
 class CLIError(Exception):
     """Raised for CLI-related errors."""
-
-    pass
 
 
 # ============================================================================
@@ -331,10 +329,10 @@ def _show_language_info(language: str) -> int:
         info = get_language_info(language)
 
         # Create info panel
-        info_text = f"""[bold]Language:[/bold] {info['name']}
-[bold]File Extension:[/bold] {info['file_extension']}
-[bold]Generator Class:[/bold] {info['class']}
-[bold]Module:[/bold] {info['module']}"""
+        info_text = f"""[bold]Language:[/bold] {info["name"]}
+[bold]File Extension:[/bold] {info["file_extension"]}
+[bold]Generator Class:[/bold] {info["class"]}
+[bold]Module:[/bold] {info["module"]}"""
 
         if info["aliases"]:
             info_text += f"\n[bold]Aliases:[/bold] {', '.join(info['aliases'])}"
@@ -432,14 +430,13 @@ def _get_input_data(args: argparse.Namespace) -> dict | list | None:
             _, data = load_json(args.file)
             logger.info(f"Loaded JSON from file: {args.file}")
             return data
-        elif hasattr(args, "url") and args.url:
+        if hasattr(args, "url") and args.url:
             _, data = load_json(args.url)
             logger.info(f"Loaded JSON from URL: {args.url}")
             return data
-        else:
-            # Try to read from stdin
-            logger.debug("Reading JSON from stdin")
-            return json.load(sys.stdin)
+        # Try to read from stdin
+        logger.debug("Reading JSON from stdin")
+        return json.load(sys.stdin)
     except json.JSONDecodeError as e:
         console.print(f"[red]✗ Invalid JSON input:[/red] {e}")
         logger.error(f"JSON decode error: {e}")
@@ -475,7 +472,7 @@ def _build_config(args: argparse.Namespace, language: str) -> dict:
             config_dict.update(file_config)
             logger.info(f"Loaded config from file: {args.config}")
         except Exception as e:
-            raise CLIError(f"Configuration error: {e}")
+            raise CLIError(f"Configuration error: {e}") from e
 
     # Override with CLI arguments
     if hasattr(args, "package_name") and args.package_name:
@@ -540,7 +537,7 @@ def _add_python_config(args: argparse.Namespace, config_dict: dict) -> None:
 def _load_config_file(config_path: str) -> dict:
     """Load configuration from JSON file."""
     try:
-        with open(config_path, encoding="utf-8") as f:
+        with Path(config_path).open(encoding="utf-8") as f:
             config = json.load(f)
 
         if not isinstance(config, dict):
@@ -548,9 +545,9 @@ def _load_config_file(config_path: str) -> dict:
 
         return config
     except json.JSONDecodeError as e:
-        raise CLIError(f"Invalid JSON in configuration file: {e}")
+        raise CLIError(f"Invalid JSON in configuration file: {e}") from e
     except OSError as e:
-        raise CLIError(f"Failed to read configuration file: {e}")
+        raise CLIError(f"Failed to read configuration file: {e}") from e
 
 
 # ============================================================================

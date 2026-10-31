@@ -11,11 +11,11 @@ from rich.console import Console
 from rich.panel import Panel
 from rich.prompt import Confirm
 
-from json_explorer.utils import prompt_input
-from ...core.config import GeneratorConfig
-from .config import get_web_api_config, get_strict_config, get_modern_config
-
 from json_explorer.logging_config import get_logger
+from json_explorer.utils import prompt_input
+
+from ...core.config import GeneratorConfig
+from .config import get_modern_config, get_strict_config, get_web_api_config
 
 logger = get_logger(__name__)
 
@@ -45,12 +45,12 @@ class GoInteractiveHandler:
             """[bold]Go Configuration Examples:[/bold]
 
 [green]Web API Template:[/green]
-• Package: "models" 
+• Package: "models"
 • Pointers for optional fields
 • JSON tags with omitempty
 • int64 and float64 types
 
-[green]Strict Template:[/green]  
+[green]Strict Template:[/green]
 • Package: "types"
 • No pointers (value types only)
 • JSON tags without omitempty
@@ -231,7 +231,7 @@ type Settings struct {
 ```go
 type Root struct {
     UserID   int64    `json:"user_id"`
-    Name     string   `json:"name"`  
+    Name     string   `json:"name"`
     Email    string   `json:"email"`
     Settings Settings `json:"settings"`
 }
@@ -256,18 +256,18 @@ type Root struct {
         warnings = []
 
         # Check for potentially problematic combinations
-        if not config.get("use_pointers_for_optional", True):
-            if config.get("json_tag_omitempty", True):
-                warnings.append(
-                    "Using omitempty without pointers may not work as expected for zero values"
-                )
+        if not config.get("use_pointers_for_optional", True) and config.get(
+            "json_tag_omitempty", True
+        ):
+            warnings.append(
+                "Using omitempty without pointers may not work as expected for zero values"
+            )
 
         # Check modern Go features
-        if config.get("unknown_type") == "any":
-            if config.get("int_type") == "int64":
-                warnings.append(
-                    "Consider using 'int' with 'any' type for consistent modern Go style"
-                )
+        if config.get("unknown_type") == "any" and config.get("int_type") == "int64":
+            warnings.append(
+                "Consider using 'int' with 'any' type for consistent modern Go style"
+            )
 
         # Performance warnings
         if config.get("use_pointers_for_optional", True):

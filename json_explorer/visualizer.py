@@ -218,7 +218,7 @@ class JSONVisualizer:
 
             if open_browser:
                 webbrowser.open(f"file://{temp_path.absolute()}")
-                print(f"🌐 Opening visualization in browser...")
+                print("🌐 Opening visualization in browser...")
 
     def _add_data_types_chart(self, fig: go.Figure, row: int, col: int) -> None:
         """Add data types pie chart to figure."""
@@ -233,15 +233,15 @@ class JSONVisualizer:
             go.Pie(
                 labels=labels,
                 values=values,
-                marker=dict(
-                    colors=[
+                marker={
+                    "colors": [
                         self.colors["primary"],
                         self.colors["secondary"],
                         self.colors["success"],
                         self.colors["warning"],
                         self.colors["info"],
                     ]
-                ),
+                },
             ),
             row=row,
             col=col,
@@ -282,7 +282,7 @@ class JSONVisualizer:
             ("Empty Collections", (patterns["empty_collections"] / total) * 100),
         ]
 
-        labels, values = zip(*metrics)
+        labels, values = zip(*metrics, strict=False)
         colors = [self.colors["warning"], self.colors["secondary"], self.colors["info"]]
 
         fig.add_trace(
@@ -305,7 +305,7 @@ class JSONVisualizer:
             return
 
         top_keys = key_freq.most_common(10)
-        keys, counts = zip(*top_keys)
+        keys, counts = zip(*top_keys, strict=False)
 
         fig.add_trace(
             go.Bar(
@@ -334,8 +334,11 @@ class JSONVisualizer:
                 x=sizes,
                 y=counts,
                 mode="markers",
-                marker=dict(size=12, color=self.colors["primary"]),
-                text=[f"Size: {s}, Count: {c}" for s, c in zip(sizes, counts)],
+                marker={"size": 12, "color": self.colors["primary"]},
+                text=[
+                    f"Size: {s}, Count: {c}"
+                    for s, c in zip(sizes, counts, strict=False)
+                ],
                 hoverinfo="text",
             ),
             row=row,
@@ -424,7 +427,7 @@ class JSONVisualizer:
             key = stdscr.getch()
             if key == ord("q"):
                 break
-            elif key == ord(" "):
+            if key == ord(" "):
                 current_page = (current_page + 1) % max_pages
 
     def _draw_data_types_chart(

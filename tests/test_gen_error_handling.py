@@ -1,8 +1,7 @@
 import pytest
-
+from json_explorer.codegen import quick_generate
 from json_explorer.codegen.core import GeneratorConfig
 from json_explorer.codegen.registry import get_generator_class
-from json_explorer.codegen import quick_generate
 
 
 class TestErrorHandling:

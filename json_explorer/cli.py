@@ -1,12 +1,14 @@
 from __future__ import annotations
+
 from typing import Any
+
 from rich.console import Console
 
-from .tree_view import print_json_analysis, print_compact_tree
+from .logging_config import get_logger
 from .search import JsonSearcher
 from .stats import DataStatsAnalyzer
+from .tree_view import print_compact_tree, print_json_analysis
 from .visualizer import JSONVisualizer
-from .logging_config import get_logger
 
 logger = get_logger(__name__)
 

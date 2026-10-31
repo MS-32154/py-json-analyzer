@@ -6,17 +6,16 @@ Tests for:
 - Python: create_typeddict_generator()
 """
 
-from json_explorer.codegen.languages.go import (
-    create_web_api_generator,
-    create_strict_generator,
-)
-from json_explorer.codegen.languages.python import (
-    create_typeddict_generator,
-    PythonStyle,
-)
 from json_explorer.analyzer import analyze_json
 from json_explorer.codegen.core import convert_analyzer_output, extract_all_schemas
-
+from json_explorer.codegen.languages.go import (
+    create_strict_generator,
+    create_web_api_generator,
+)
+from json_explorer.codegen.languages.python import (
+    PythonStyle,
+    create_typeddict_generator,
+)
 
 # ============================================================================
 # Go Factory Function Tests

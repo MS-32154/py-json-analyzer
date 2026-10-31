@@ -9,11 +9,11 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-from .config import GeneratorConfig
-from .schema import Schema, FieldType
-from .templates import TemplateManager
-
 from json_explorer.logging_config import get_logger
+
+from .config import GeneratorConfig
+from .schema import FieldType, Schema
+from .templates import TemplateManager
 
 logger = get_logger(__name__)
 
@@ -25,8 +25,6 @@ logger = get_logger(__name__)
 
 class GeneratorError(Exception):
     """Base exception for code generation errors."""
-
-    pass
 
 
 # ============================================================================
@@ -62,7 +60,7 @@ class GenerationResult:
         cls,
         message: str,
         exception: Exception | None = None,
-    ) -> "GenerationResult":
+    ) -> GenerationResult:
         """Create a failed generation result."""
         logger.error(f"Generation failed: {message}")
         return cls(
@@ -102,7 +100,7 @@ class CodeGenerator(ABC):
     - generate: Core generation logic
     """
 
-    __slots__ = ("config", "_template_manager")
+    __slots__ = ("_template_manager", "config")
 
     def __init__(self, config: GeneratorConfig):
         """
@@ -142,18 +140,15 @@ class CodeGenerator(ABC):
     @abstractmethod
     def language_name(self) -> str:
         """Return language name (e.g., 'go', 'python')."""
-        pass
 
     @property
     @abstractmethod
     def file_extension(self) -> str:
         """Return file extension (e.g., '.go', '.py')."""
-        pass
 
     @abstractmethod
     def get_template_directory(self) -> Path:
         """Return directory containing templates for this generator."""
-        pass
 
     @abstractmethod
     def generate(
@@ -174,7 +169,6 @@ class CodeGenerator(ABC):
         Raises:
             GeneratorError: If generation fails
         """
-        pass
 
     # ========================================================================
     # Template Methods (Can Override)
@@ -250,20 +244,20 @@ class CodeGenerator(ABC):
                 warnings.append(f"Schema '{schema.name}' has no fields")
 
             # Field-level issues
-            for field in schema.fields:
-                if field.type == FieldType.CONFLICT:
+            for fld in schema.fields:
+                if fld.type == FieldType.CONFLICT:
                     type_names = (
-                        [t.value for t in field.conflicting_types]
-                        if field.conflicting_types
+                        [t.value for t in fld.conflicting_types]
+                        if fld.conflicting_types
                         else ["unknown"]
                     )
                     warnings.append(
-                        f"Type conflict in {schema.name}.{field.name}: "
+                        f"Type conflict in {schema.name}.{fld.name}: "
                         f"{', '.join(type_names)}"
                     )
 
-                elif field.type == FieldType.UNKNOWN:
-                    warnings.append(f"Unknown type in {schema.name}.{field.name}")
+                elif fld.type == FieldType.UNKNOWN:
+                    warnings.append(f"Unknown type in {schema.name}.{fld.name}")
 
         if warnings:
             # Warnings printed out after generated code

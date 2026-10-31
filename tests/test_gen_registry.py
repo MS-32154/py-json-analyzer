@@ -2,28 +2,26 @@
 Tests for generator registry.
 """
 
-import pytest
 from pathlib import Path
 
+import pytest
 from json_explorer.codegen.core import (
-    GeneratorConfig,
     CodeGenerator,
+    GeneratorConfig,
 )
-
+from json_explorer.codegen.languages.go import GoGenerator
+from json_explorer.codegen.languages.python import PythonGenerator
 from json_explorer.codegen.registry import (
-    list_supported_languages,
-    is_language_supported,
-    get_language_info,
     RegistryError,
-    get_generator_class,
     create_generator,
+    get_generator_class,
+    get_language_info,
+    is_language_supported,
     is_supported,
+    list_supported_languages,
     register,
     unregister,
 )
-
-from json_explorer.codegen.languages.go import GoGenerator
-from json_explorer.codegen.languages.python import PythonGenerator
 
 
 class TestRegistry:
@@ -96,7 +94,7 @@ class TestRegistry:
                 return ".mock"
 
             def get_template_directory(self):
-                return Path(".")
+                return Path()
 
             def generate(self, schemas, root_schema_name):
                 return "mock code"

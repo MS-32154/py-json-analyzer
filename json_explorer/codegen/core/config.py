@@ -8,7 +8,7 @@ Handles loading, validation, and merging of configuration from multiple sources:
 """
 
 import json
-from dataclasses import dataclass, field, asdict
+from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any
 
@@ -19,8 +19,6 @@ logger = get_logger(__name__)
 
 class ConfigError(Exception):
     """Raised when configuration is invalid or cannot be loaded."""
-
-    pass
 
 
 # ============================================================================
@@ -98,7 +96,7 @@ class GeneratorConfig:
             f"Config validated: package={self.package_name}, comments={self.add_comments}"
         )
 
-    def merge(self, overrides: dict[str, Any]) -> "GeneratorConfig":
+    def merge(self, overrides: dict[str, Any]) -> GeneratorConfig:
         """
         Create new config by merging with overrides.
 
@@ -182,7 +180,7 @@ def load_config_file(path: str | Path) -> dict[str, Any]:
         raise ConfigError(f"Configuration file must be JSON: {config_path}")
 
     try:
-        with open(config_path, encoding="utf-8") as f:
+        with config_path.open(encoding="utf-8") as f:
             config_data = json.load(f)
 
         if not isinstance(config_data, dict):
@@ -252,7 +250,7 @@ def save_config(config: GeneratorConfig, output_path: str | Path) -> None:
     try:
         path.parent.mkdir(parents=True, exist_ok=True)
 
-        with open(path, "w", encoding="utf-8") as f:
+        with path.open("w", encoding="utf-8") as f:
             json.dump(config.to_dict(), f, indent=2, ensure_ascii=False)
 
         logger.info(f"Saved config to: {path}")

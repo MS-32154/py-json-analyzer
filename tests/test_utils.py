@@ -1,11 +1,11 @@
 """Unit tests for the utils module."""
 
 import json
-import pytest
 import tempfile
 from pathlib import Path
-from unittest.mock import Mock, patch, MagicMock
+from unittest.mock import Mock, patch
 
+import pytest
 from json_explorer.utils import (
     JSONLoaderError,
     load_json,
@@ -74,7 +74,7 @@ class TestLoadJsonFromFile:
 
     def test_load_with_path_object(self, temp_json_file, sample_json_data):
         """Test loading with Path object."""
-        source, data = load_json_from_file(Path(temp_json_file))
+        _source, data = load_json_from_file(Path(temp_json_file))
 
         assert data == sample_json_data
 
@@ -85,7 +85,7 @@ class TestLoadJsonFromFile:
             temp_path = f.name
 
         try:
-            source, data = load_json_from_file(temp_path)
+            _source, data = load_json_from_file(temp_path)
             assert data == sample_json_data
         finally:
             Path(temp_path).unlink(missing_ok=True)
@@ -97,7 +97,7 @@ class TestLoadJsonFromFile:
             temp_path = f.name
 
         try:
-            source, data = load_json_from_file(temp_path)
+            _source, data = load_json_from_file(temp_path)
             assert data == {}
         finally:
             Path(temp_path).unlink(missing_ok=True)
@@ -113,7 +113,7 @@ class TestLoadJsonFromFile:
             temp_path = f.name
 
         try:
-            source, data = load_json_from_file(temp_path)
+            _source, data = load_json_from_file(temp_path)
             assert data == unicode_data
         finally:
             Path(temp_path).unlink(missing_ok=True)
@@ -216,7 +216,7 @@ class TestLoadJsonFromUrl:
         mock_get.return_value = mock_response
 
         # Should still load if URL ends with .json
-        source, data = load_json_from_url("https://api.example.com/data.json")
+        _source, data = load_json_from_url("https://api.example.com/data.json")
         assert data == sample_json_data
 
 
@@ -239,7 +239,7 @@ class TestLoadJson:
         mock_response.raise_for_status = Mock()
         mock_get.return_value = mock_response
 
-        source, data = load_json(url="https://api.example.com/data.json")
+        _source, data = load_json(url="https://api.example.com/data.json")
 
         assert data == sample_json_data
 
@@ -405,7 +405,7 @@ class TestEdgeCases:
             temp_path = f.name
 
         try:
-            source, data = load_json_from_file(temp_path)
+            _source, data = load_json_from_file(temp_path)
             assert len(data["items"]) == 1000
         finally:
             Path(temp_path).unlink(missing_ok=True)
@@ -419,7 +419,7 @@ class TestEdgeCases:
             temp_path = f.name
 
         try:
-            source, data = load_json_from_file(temp_path)
+            _source, data = load_json_from_file(temp_path)
             assert data["level1"]["level2"]["level3"]["level4"]["value"] == "deep"
         finally:
             Path(temp_path).unlink(missing_ok=True)
@@ -437,7 +437,7 @@ class TestEdgeCases:
             temp_path = f.name
 
         try:
-            source, data = load_json_from_file(temp_path)
+            _source, data = load_json_from_file(temp_path)
             assert data == special_data
         finally:
             Path(temp_path).unlink(missing_ok=True)
@@ -451,7 +451,7 @@ class TestEdgeCases:
             temp_path = f.name
 
         try:
-            source, data = load_json_from_file(temp_path)
+            _source, data = load_json_from_file(temp_path)
             assert isinstance(data, list)
             assert len(data) == 3
         finally:
@@ -466,7 +466,7 @@ class TestEdgeCases:
             temp_path = f.name
 
         try:
-            source, data = load_json_from_file(temp_path)
+            _source, data = load_json_from_file(temp_path)
             assert data["value"] is None
             assert data["list"] == [None, None]
         finally:
@@ -481,7 +481,7 @@ class TestEdgeCases:
         mock_response.raise_for_status = Mock()
         mock_get.return_value = mock_response
 
-        source, data = load_json_from_url(
+        _source, data = load_json_from_url(
             "https://api.example.com/data?key=value&format=json"
         )
 
@@ -500,7 +500,7 @@ class TestEdgeCases:
 
         try:
             # utf-8-sig encoding handles BOM
-            with open(temp_path, "r", encoding="utf-8-sig") as f:
+            with Path(temp_path).open(encoding="utf-8-sig") as f:
                 loaded_data = json.load(f)
             assert loaded_data == data_with_bom
         finally:

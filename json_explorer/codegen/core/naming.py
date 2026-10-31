@@ -280,7 +280,7 @@ class NameTracker:
     that maintains a set of used names across multiple calls.
     """
 
-    __slots__ = ("_used_names", "_reserved_words")
+    __slots__ = ("_reserved_words", "_used_names")
 
     def __init__(self, reserved_words: set[str] | None = None):
         """

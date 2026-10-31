@@ -3,12 +3,12 @@ Integration tests for codegen module.
 """
 
 import pytest
-from json_explorer.codegen import (
-    quick_generate,
-    generate_from_analysis,
-    create_config,
-)
 from json_explorer.analyzer import analyze_json
+from json_explorer.codegen import (
+    create_config,
+    generate_from_analysis,
+    quick_generate,
+)
 
 
 class TestQuickGenerate:

@@ -3,11 +3,11 @@ Tests for core naming utilities.
 """
 
 from json_explorer.codegen.core.naming import (
-    to_snake_case,
+    NameTracker,
+    sanitize_name,
     to_camel_case,
     to_pascal_case,
-    sanitize_name,
-    NameTracker,
+    to_snake_case,
 )
 
 

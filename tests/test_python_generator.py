@@ -9,7 +9,6 @@ from json_explorer.codegen.languages.python import (
     PythonStyle,
     create_dataclass_generator,
 )
-from json_explorer.codegen.core import GeneratorConfig
 
 
 class TestPythonConfig:

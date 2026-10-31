@@ -8,12 +8,16 @@ with delegation to language-specific handlers for customization.
 from pathlib import Path
 from typing import Any, Protocol
 
+from rich import box
 from rich.console import Console
 from rich.panel import Panel
 from rich.prompt import Confirm, Prompt
 from rich.syntax import Syntax
 from rich.table import Table
-from rich import box
+
+from json_explorer.analyzer import analyze_json
+from json_explorer.logging_config import get_logger
+from json_explorer.utils import prompt_input, prompt_input_path
 
 from . import (
     GeneratorError,
@@ -23,10 +27,6 @@ from . import (
     list_supported_languages,
     load_config,
 )
-from json_explorer.analyzer import analyze_json
-from json_explorer.utils import prompt_input, prompt_input_path
-
-from json_explorer.logging_config import get_logger
 
 logger = get_logger(__name__)
 
@@ -226,8 +226,8 @@ class CodegenInteractiveHandler:
         for i, lang in enumerate(languages, 1):
             self.console.print(f"  [cyan]{i}.[/cyan] {lang}")
 
-        self.console.print(f"  [cyan]i.[/cyan] Show detailed info")
-        self.console.print(f"  [cyan]b.[/cyan] Back")
+        self.console.print("  [cyan]i.[/cyan] Show detailed info")
+        self.console.print("  [cyan]b.[/cyan] Back")
 
         choice = Prompt.ask(
             "\n[bold]Select language[/bold]",
@@ -341,11 +341,11 @@ class CodegenInteractiveHandler:
             self.console.print(f"  [green]•[/green] [bold]{name}[/bold]: {desc}")
 
         # Add custom option
-        choices = list(templates.keys()) + ["custom", "back"]
+        choices = [*list(templates.keys()), "custom", "back"]
         template = self._input(
             f"\nSelect {language} template",
             choices=choices,
-            default=list(templates.keys())[0] if templates else "custom",
+            default=next(iter(templates.keys())) if templates else "custom",
         )
 
         match template:
@@ -533,13 +533,12 @@ class CodegenInteractiveHandler:
             output_path = Path(filename)
 
             # Check if file exists
-            if output_path.exists():
-                if not Confirm.ask(
-                    f"File {output_path} exists. Overwrite?",
-                    default=False,
-                ):
-                    filename = self._input_path("Enter new filename")
-                    output_path = Path(filename)
+            if output_path.exists() and not Confirm.ask(
+                f"File {output_path} exists. Overwrite?",
+                default=False,
+            ):
+                filename = self._input_path("Enter new filename")
+                output_path = Path(filename)
 
             output_path.write_text(code, encoding="utf-8")
             self.console.print(
@@ -657,7 +656,7 @@ class CodegenInteractiveHandler:
 
         language = self._input(
             "Select language for detailed info",
-            choices=languages + ["back"],
+            choices=[*languages, "back"],
             default=languages[0],
         )
 
@@ -678,11 +677,11 @@ class CodegenInteractiveHandler:
     ) -> None:
         """Display detailed information about a specific language."""
         info_panel = Panel(
-            f"""[bold]Language:[/bold] {info['name']}
-[bold]File Extension:[/bold] {info['file_extension']}
-[bold]Generator Class:[/bold] {info['class']}
-[bold]Module:[/bold] {info['module']}
-[bold]Aliases:[/bold] {', '.join(info['aliases']) if info['aliases'] else 'none'}""",
+            f"""[bold]Language:[/bold] {info["name"]}
+[bold]File Extension:[/bold] {info["file_extension"]}
+[bold]Generator Class:[/bold] {info["class"]}
+[bold]Module:[/bold] {info["module"]}
+[bold]Aliases:[/bold] {", ".join(info["aliases"]) if info["aliases"] else "none"}""",
             title=f"🔧 {info['name'].title()} Generator Info",
             border_style="green",
         )
@@ -702,7 +701,7 @@ class CodegenInteractiveHandler:
 
 [bold]What it does:[/bold]
 • Analyzes JSON data structure
-• Generates strongly-typed data structures  
+• Generates strongly-typed data structures
 • Supports multiple programming languages
 • Handles nested objects and arrays
 • Preserves field names and types
@@ -719,7 +718,7 @@ class CodegenInteractiveHandler:
 [bold]Current Status:[/bold]
 • Go - Full support with multiple templates ✅
 • Python - Full support (dataclass, pydantic, typeddict) ✅
-• TypeScript - Coming soon 🚧  
+• TypeScript - Coming soon 🚧
 • Rust - Coming soon 🚧
 
 [bold]Use Cases:[/bold]

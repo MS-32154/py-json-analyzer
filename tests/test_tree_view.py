@@ -1,15 +1,15 @@
 """Unit tests for the tree_view module."""
 
-import pytest
-from unittest.mock import Mock, patch, MagicMock
-from rich.tree import Tree
+from unittest.mock import patch
 
+import pytest
 from json_explorer.tree_view import (
     JsonTreeBuilder,
-    print_json_tree,
-    print_json_analysis,
     print_compact_tree,
+    print_json_analysis,
+    print_json_tree,
 )
+from rich.tree import Tree
 
 
 @pytest.fixture

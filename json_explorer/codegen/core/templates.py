@@ -19,8 +19,6 @@ logger = get_logger(__name__)
 class TemplateError(Exception):
     """Raised when template operations fail."""
 
-    pass
-
 
 # ============================================================================
 # Template Engine
@@ -31,7 +29,7 @@ def create_template_env(
     template_dir: Path | None = None,
     trim_blocks: bool = False,
     lstrip_blocks: bool = True,
-) -> "Environment":
+) -> Environment:
     """
     Create Jinja2 environment for code generation.
 
@@ -78,7 +76,7 @@ def create_template_env(
 
 
 def render_template(
-    env: "Environment",
+    env: Environment,
     template_name: str,
     context: dict[str, Any],
 ) -> str:
@@ -110,7 +108,7 @@ def render_template(
 
 
 def render_string(
-    env: "Environment",
+    env: Environment,
     template_string: str,
     context: dict[str, Any],
 ) -> str:
@@ -137,7 +135,7 @@ def render_string(
         raise TemplateError(f"Failed to render string template: {e}") from e
 
 
-def template_exists(env: "Environment", template_name: str) -> bool:
+def template_exists(env: Environment, template_name: str) -> bool:
     """
     Check if a template exists in the environment.
 
@@ -155,7 +153,7 @@ def template_exists(env: "Environment", template_name: str) -> bool:
         return False
 
 
-def list_templates(env: "Environment") -> list[str]:
+def list_templates(env: Environment) -> list[str]:
     """
     List all available templates.
 

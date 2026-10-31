@@ -5,9 +5,9 @@ Go-specific configuration and type mappings.
 from dataclasses import dataclass, field
 from typing import Literal
 
-from ...core.schema import FieldType
-
 from json_explorer.logging_config import get_logger
+
+from ...core.schema import FieldType
 
 logger = get_logger(__name__)
 
@@ -133,10 +133,14 @@ class GoConfig:
             go_type = self.type_map.get(field_type, self.unknown_type)
 
         # Add pointer for optional fields if configured
-        if is_optional and self.use_pointers_for_optional:
-            # Don't add pointer to interface{}, any, or arrays
-            if not go_type.startswith("[]") and go_type not in {"interface{}", "any"}:
-                return f"*{go_type}"
+        # (never for interface{}, any, or slices)
+        if (
+            is_optional
+            and self.use_pointers_for_optional
+            and not go_type.startswith("[]")
+            and go_type not in {"interface{}", "any"}
+        ):
+            return f"*{go_type}"
 
         return go_type
 

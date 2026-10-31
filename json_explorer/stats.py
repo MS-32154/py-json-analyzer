@@ -126,7 +126,7 @@ class DataStatsAnalyzer:
         self.stats["total_values"] += 1
 
         # Analyze key naming patterns
-        for key in obj.keys():
+        for key in obj:
             if isinstance(key, str):
                 if "_" in key:
                     self.stats["structure_insights"]["key_naming_patterns"][
@@ -243,7 +243,7 @@ class DataStatsAnalyzer:
         Returns:
             Dictionary of computed insights.
         """
-        insights = {
+        return {
             "complexity_score": self._calculate_complexity(),
             "most_common_type": (
                 self.stats["data_types"].most_common(1)[0]
@@ -253,8 +253,6 @@ class DataStatsAnalyzer:
             "structure_uniformity": self._assess_uniformity(),
             "data_quality_issues": self._identify_quality_issues(),
         }
-
-        return insights
 
     def _calculate_complexity(self) -> int:
         """Calculate a complexity score based on depth and variety.
@@ -289,10 +287,9 @@ class DataStatsAnalyzer:
 
         if uniformity_ratio > 0.8:
             return "highly_uniform"
-        elif uniformity_ratio > 0.5:
+        if uniformity_ratio > 0.5:
             return "moderately_uniform"
-        else:
-            return "highly_varied"
+        return "highly_varied"
 
     def _identify_quality_issues(self) -> list[str]:
         """Identify potential data quality issues.

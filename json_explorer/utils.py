@@ -10,13 +10,11 @@ from typing import Any
 from urllib.parse import urlparse
 
 import requests
-
+from prompt_toolkit import prompt
+from prompt_toolkit.completion import FuzzyCompleter, PathCompleter, WordCompleter
+from prompt_toolkit.history import FileHistory
 from rich.console import Console
 from rich.prompt import Prompt
-
-from prompt_toolkit import prompt
-from prompt_toolkit.history import FileHistory
-from prompt_toolkit.completion import PathCompleter, WordCompleter, FuzzyCompleter
 
 from .logging_config import get_logger
 
@@ -25,8 +23,6 @@ logger = get_logger(__name__)
 
 class JSONLoaderError(Exception):
     """Custom exception for JSON loading errors."""
-
-    pass
 
 
 def load_json_from_file(file_path: str | Path) -> tuple[str, Any]:
@@ -100,9 +96,9 @@ def load_json_from_url(url: str, timeout: int = 30) -> tuple[str, Any]:
         logger.info(f"Successfully loaded JSON from {url}")
         return f"🌐 {url}", data
 
-    except requests.exceptions.Timeout:
+    except requests.exceptions.Timeout as e:
         logger.error(f"Request timeout for URL: {url}")
-        raise JSONLoaderError(f"Request timeout for URL: {url}")
+        raise JSONLoaderError(f"Request timeout for URL: {url}") from e
     except requests.exceptions.ConnectionError as e:
         logger.error(f"Connection error for URL {url}: {e}")
         raise JSONLoaderError(f"Connection error for URL: {url}") from e
@@ -148,8 +144,7 @@ def load_json(
 
     if file_path:
         return load_json_from_file(file_path)
-    else:
-        return load_json_from_url(url, timeout)
+    return load_json_from_url(url, timeout)
 
 
 def prompt_input(message: str, default: str | None = None, **kwargs) -> str:
@@ -170,7 +165,6 @@ def prompt_input(message: str, default: str | None = None, **kwargs) -> str:
     choices = kwargs.get("choices")
     console = kwargs.get("console") or Console()
     try:
-
         history = FileHistory(".json_explorer_input_history")
 
         if choices:
@@ -221,7 +215,6 @@ def prompt_input_path(message: str, **kwargs) -> str:
     """
     default = kwargs.get("default") or ""
     try:
-
         history = FileHistory(".json_explorer_path_history")
         completer = PathCompleter(expanduser=True)
 

@@ -1,21 +1,22 @@
 from __future__ import annotations
+
 import json
 from datetime import datetime
+from pathlib import Path
 from typing import Any
 
-
 from rich.console import Console
-from rich.prompt import Prompt, Confirm
 from rich.panel import Panel
+from rich.prompt import Confirm, Prompt
 from rich.table import Table
 
-from .tree_view import print_json_analysis, print_compact_tree
-from .search import JsonSearcher
-from .stats import DataStatsAnalyzer
-from .visualizer import JSONVisualizer
-from .utils import load_json, prompt_input, prompt_input_path
 from .codegen.interactive import CodegenInteractiveHandler
 from .logging_config import get_logger
+from .search import JsonSearcher
+from .stats import DataStatsAnalyzer
+from .tree_view import print_compact_tree, print_json_analysis
+from .utils import load_json, prompt_input, prompt_input_path
+from .visualizer import JSONVisualizer
 
 logger = get_logger(__name__)
 
@@ -54,7 +55,7 @@ class InteractiveHandler:
             self.console.print("⚠️ [red]No data loaded. Please load data first.[/red]")
             return 1
 
-        self.console.print(f"\n🎯 [bold green]Interactive JSON Explorer[/bold green]")
+        self.console.print("\n🎯 [bold green]Interactive JSON Explorer[/bold green]")
         self.console.print(f"📄 [cyan]Loaded: {self.source}[/cyan]\n")
 
         while True:
@@ -68,7 +69,7 @@ class InteractiveHandler:
             if choice == "q":
                 self.console.print("👋 [yellow]Goodbye![/yellow]")
                 break
-            elif choice == "1":
+            if choice == "1":
                 self._interactive_tree_view()
             elif choice == "2":
                 self._interactive_jmespath_search()
@@ -327,7 +328,7 @@ class InteractiveHandler:
                 "result_type": result.data_type,
                 "result": result.value,
             }
-            with open(filename, "w", encoding="utf-8") as f:
+            with Path(filename).open("w", encoding="utf-8") as f:
                 json.dump(output_data, f, indent=2, ensure_ascii=False)
             self.console.print(f"✅ [green]Result saved to: {filename}[/green]")
         except Exception as e:

@@ -4,9 +4,9 @@ Python-specific naming utilities.
 Provides Python reserved words, builtin types, and pre-configured name tracker.
 """
 
-from ...core.naming import NameTracker
-
 from json_explorer.logging_config import get_logger
+
+from ...core.naming import NameTracker
 
 logger = get_logger(__name__)
 

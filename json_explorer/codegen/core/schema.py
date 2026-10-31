@@ -81,11 +81,11 @@ class Field:
     description: str | None = None
 
     # Nested structures
-    nested_schema: "Schema | None" = None
+    nested_schema: Schema | None = None
 
     # Array information
     array_element_type: FieldType | None = None
-    array_element_schema: "Schema | None" = None
+    array_element_schema: Schema | None = None
 
     # Type conflicts
     conflicting_types: list[FieldType] = field(default_factory=list)
@@ -159,11 +159,11 @@ class Field:
         if not self.nested_schema:
             return False
 
-        for field in self.nested_schema.fields:
-            if field.type in (FieldType.OBJECT, FieldType.ARRAY):
-                if field.nested_schema or field.array_element_schema:
-                    return True
-        return False
+        return any(
+            fld.type in (FieldType.OBJECT, FieldType.ARRAY)
+            and (fld.nested_schema or fld.array_element_schema)
+            for fld in self.nested_schema.fields
+        )
 
 
 @dataclass(slots=True)
@@ -196,12 +196,12 @@ class Schema:
         """Calculate maximum nesting depth."""
         max_depth = current_depth
 
-        for field in self.fields:
-            if field.nested_schema:
-                depth = field.nested_schema.get_max_depth(current_depth + 1)
+        for fld in self.fields:
+            if fld.nested_schema:
+                depth = fld.nested_schema.get_max_depth(current_depth + 1)
                 max_depth = max(max_depth, depth)
-            elif field.array_element_schema:
-                depth = field.array_element_schema.get_max_depth(current_depth + 1)
+            elif fld.array_element_schema:
+                depth = fld.array_element_schema.get_max_depth(current_depth + 1)
                 max_depth = max(max_depth, depth)
 
         return max_depth
@@ -572,11 +572,11 @@ def extract_all_schemas(root_schema: Schema) -> dict[str, Schema]:
 
     def collect(schema: Schema) -> None:
         schemas[schema.name] = schema
-        for field in schema.fields:
-            if field.nested_schema:
-                collect(field.nested_schema)
-            if field.array_element_schema:
-                collect(field.array_element_schema)
+        for fld in schema.fields:
+            if fld.nested_schema:
+                collect(fld.nested_schema)
+            if fld.array_element_schema:
+                collect(fld.array_element_schema)
 
     collect(root_schema)
     logger.info(f"Extracted {len(schemas)} schemas from root: {root_schema.name}")

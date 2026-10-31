@@ -61,10 +61,8 @@ windows-curses>=2.4.0    # Terminal UI on Windows (auto-installed on Python 3.14
 ```
 pytest>=7.0.0
 pytest-cov>=4.0.0
-black>=23.0.0
-isort>=5.12.0
+ruff>=0.17.0
 mypy>=1.0.0
-flake8>=6.0.0
 types-requests>=2.31.0
 types-dateparser>=1.1.0
 ```
@@ -667,9 +665,9 @@ uv sync --extra dev
 # Run tests
 uv run pytest
 
-# Format code
-uv run black json_explorer/
-uv run isort json_explorer/
+# Lint and format code
+uv run ruff check --fix json_explorer/ tests/
+uv run ruff format json_explorer/ tests/
 
 # Type checking (if using mypy)
 uv run mypy json_explorer/

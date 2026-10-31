@@ -8,10 +8,10 @@ Uses a simple dict-based approach instead of complex singleton pattern.
 from pathlib import Path
 from typing import Any
 
+from json_explorer.logging_config import get_logger
+
 from .core.config import GeneratorConfig, load_config
 from .core.generator import CodeGenerator
-
-from json_explorer.logging_config import get_logger
 
 logger = get_logger(__name__)
 
@@ -23,8 +23,6 @@ logger = get_logger(__name__)
 
 class RegistryError(Exception):
     """Raised for registry-related errors."""
-
-    pass
 
 
 # ============================================================================
@@ -214,7 +212,7 @@ def get_generator_class(language: str) -> type[CodeGenerator]:
     # Not found
     available = list_languages()
     raise RegistryError(
-        f"No generator for language: {language}. " f"Available: {', '.join(available)}"
+        f"No generator for language: {language}. Available: {', '.join(available)}"
     )
 
 

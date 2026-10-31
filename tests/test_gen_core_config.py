@@ -2,13 +2,14 @@
 Tests for core configuration.
 """
 
-import pytest
-import tempfile
 import json
+import tempfile
 from pathlib import Path
+
+import pytest
 from json_explorer.codegen.core.config import (
-    GeneratorConfig,
     ConfigError,
+    GeneratorConfig,
     load_config,
     save_config,
 )

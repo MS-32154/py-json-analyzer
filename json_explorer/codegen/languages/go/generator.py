@@ -7,13 +7,13 @@ Generates Go structs with JSON tags using templates.
 from pathlib import Path
 from typing import Any
 
+from json_explorer.logging_config import get_logger
+
 from ...core.config import GeneratorConfig
 from ...core.generator import CodeGenerator
-from ...core.schema import Schema, Field, FieldType
+from ...core.schema import Field, FieldType, Schema
 from .config import GoConfig
 from .naming import create_go_name_tracker
-
-from json_explorer.logging_config import get_logger
 
 logger = get_logger(__name__)
 

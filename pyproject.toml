@@ -66,10 +66,8 @@ dependencies = [
 dev = [
     "pytest>=7.0.0",
     "pytest-cov>=4.0.0",
-    "black>=23.0.0",
-    "isort>=5.12.0",
+    "ruff>=0.17.0",
     "mypy>=1.0.0",
-    "flake8>=6.0.0",
     "types-requests>=2.31.0",
     "types-dateparser>=1.1.0",
 ]
@@ -134,31 +132,6 @@ exclude_lines = [
     "@(abc\\.)?abstractmethod",
 ]
 
-[tool.black]
-line-length = 88
-include = '\.pyi?$'
-extend-exclude = '''
-/(
-  # directories
-  \.eggs
-  | \.git
-  | \.hg
-  | \.mypy_cache
-  | \.tox
-  | \.venv
-  | build
-  | dist
-)/
-'''
-
-[tool.isort]
-profile = "black"
-line_length = 88
-multi_line_output = 3
-include_trailing_comma = true
-force_grid_wrap = 0
-use_parentheses = true
-ensure_newline_before_comments = true
 
 [tool.mypy]
 python_version = "3.14"
@@ -183,18 +156,29 @@ module = [
 ]
 ignore_missing_imports = true
 
-[tool.flake8]
-max-line-length = 88
-extend-ignore = ["E203", "W503"]
-exclude = [
-    ".git",
-    "__pycache__",
-    "build",
-    "dist",
-    ".eggs",
-    ".venv",
-    "venv",
+[tool.ruff]
+line-length = 88
+src = ["json_explorer", "tests"]
+
+[tool.ruff.lint]
+select = [
+    "E", "W",  # pycodestyle
+    "F",       # pyflakes
+    "I",       # isort
+    "UP",      # pyupgrade
+    "B",       # bugbear
+    "C4",      # comprehensions
+    "PIE",
+    "SIM",
+    "RET",
+    "PTH",     # pathlib
+    "LOG",
+    "RUF",
 ]
-per-file-ignores = [
-    "__init__.py:F401",
+ignore = [
+    "E501",    # long lines: the formatter handles code; long strings are fine
 ]
+
+[tool.ruff.lint.per-file-ignores]
+"__init__.py" = ["F401"]   # re-exports
+

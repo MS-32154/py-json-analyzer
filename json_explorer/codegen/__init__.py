@@ -11,8 +11,6 @@ Example:
 
 from json_explorer.logging_config import get_logger
 
-logger = get_logger(__name__)
-
 # Import core interfaces
 from .core import (
     CodeGenerator,
@@ -48,6 +46,7 @@ from .registry import (
     register,
 )
 
+logger = get_logger(__name__)
 
 # ============================================================================
 # High-Level API Functions
@@ -123,8 +122,9 @@ def quick_generate(
         ... )
         >>> print(code)
     """
-    from json_explorer.analyzer import analyze_json
     import json as json_module
+
+    from json_explorer.analyzer import analyze_json
 
     logger.info(f"Quick generate: {language}")
 
@@ -133,19 +133,18 @@ def quick_generate(
         try:
             json_data = json_module.loads(json_data)
         except json_module.JSONDecodeError as e:
-            raise GeneratorError(f"Invalid JSON data: {e}")
+            raise GeneratorError(f"Invalid JSON data: {e}") from e
 
     # Analyze JSON
     try:
         analysis = analyze_json(json_data)
     except Exception as e:
-        raise GeneratorError(f"JSON analysis failed: {e}")
+        raise GeneratorError(f"JSON analysis failed: {e}") from e
 
     # Apply language-specific defaults
-    if language.lower() in ("python", "py"):
-        # Python uses snake_case for fields by default
-        if "field_case" not in options:
-            options["field_case"] = "snake"
+    # Python uses snake_case for fields by default
+    if language.lower() in ("python", "py") and "field_case" not in options:
+        options["field_case"] = "snake"
 
     # Generate code
     result = generate_from_analysis(analysis, language, options)
@@ -153,8 +152,7 @@ def quick_generate(
     if result.success:
         logger.info("Quick generation completed successfully")
         return result.code
-    else:
-        raise GeneratorError(f"Code generation failed: {result.error_message}")
+    raise GeneratorError(f"Code generation failed: {result.error_message}")
 
 
 def create_config(language: str = "go", **kwargs) -> GeneratorConfig:
@@ -184,41 +182,41 @@ def create_config(language: str = "go", **kwargs) -> GeneratorConfig:
 
 
 __all__ = [
-    # High-level API
-    "generate_from_analysis",
-    "quick_generate",
-    "create_config",
-    # Registry
-    "register",
-    "get_generator",
-    "create_generator",
-    "get_generator_class",
-    "list_languages",
-    "list_supported_languages",
-    "is_supported",
-    "is_language_supported",
-    "get_aliases",
-    "get_language_info",
-    "list_all_language_info",
     # Core interfaces
     "CodeGenerator",
-    "GeneratorError",
-    "GenerationResult",
-    "generate_code",
-    # Schema system
-    "Schema",
     "Field",
     "FieldType",
-    "convert_analyzer_output",
-    "extract_all_schemas",
+    "GenerationResult",
     # Configuration
     "GeneratorConfig",
-    "load_config",
+    "GeneratorError",
     # Naming utilities
     "NameTracker",
-    "sanitize_name",
+    # Schema system
+    "Schema",
+    "TemplateError",
     # Template system
     "TemplateManager",
-    "TemplateError",
+    "convert_analyzer_output",
+    "create_config",
+    "create_generator",
     "create_template_env",
+    "extract_all_schemas",
+    "generate_code",
+    # High-level API
+    "generate_from_analysis",
+    "get_aliases",
+    "get_generator",
+    "get_generator_class",
+    "get_language_info",
+    "is_language_supported",
+    "is_supported",
+    "list_all_language_info",
+    "list_languages",
+    "list_supported_languages",
+    "load_config",
+    "quick_generate",
+    # Registry
+    "register",
+    "sanitize_name",
 ]

@@ -1,4 +1,5 @@
 import unittest
+
 from json_explorer.stats import DataStatsAnalyzer
 
 

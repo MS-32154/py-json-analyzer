@@ -3,14 +3,12 @@ Tests for Go generator.
 """
 
 import pytest
-
 from json_explorer.codegen import quick_generate
-from json_explorer.codegen.core import Schema
+from json_explorer.codegen.core import FieldType, GeneratorConfig, Schema
 from json_explorer.codegen.languages.go import (
     GoConfig,
     create_go_generator,
 )
-from json_explorer.codegen.core import GeneratorConfig, FieldType
 
 
 class TestGoConfig:

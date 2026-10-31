@@ -6,9 +6,9 @@ import re
 from dataclasses import dataclass, field
 from enum import Enum
 
-from ...core.schema import FieldType
-
 from json_explorer.logging_config import get_logger
+
+from ...core.schema import FieldType
 
 logger = get_logger(__name__)
 
@@ -238,21 +238,16 @@ class PythonConfig:
             imports.add(import_stmt)
 
         # Add NotRequired for TypedDict with optional fields
-        if has_optional and self.use_optional:
-            if self.style == PythonStyle.TYPEDDICT:
-                imports.add(
-                    PYTHON_IMPORTS.get("NotRequired", "from typing import NotRequired")
-                )
+        if has_optional and self.use_optional and self.style == PythonStyle.TYPEDDICT:
+            imports.add(
+                PYTHON_IMPORTS.get("NotRequired", "from typing import NotRequired")
+            )
 
         # Sort: standard library first, then third-party
         sorted_imports = sorted(
             imports,
             key=lambda x: (
-                (
-                    0
-                    if x.startswith("from typing") or x.startswith("from datetime")
-                    else 1
-                ),
+                (0 if x.startswith(("from typing", "from datetime")) else 1),
                 x,
             ),
         )

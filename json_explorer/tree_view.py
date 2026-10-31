@@ -1,7 +1,9 @@
 from __future__ import annotations
-from typing import Any
-from rich.tree import Tree
+
+from typing import Any, ClassVar
+
 from rich import print as rich_print
+from rich.tree import Tree
 
 from .analyzer import analyze_json
 from .logging_config import get_logger
@@ -15,7 +17,7 @@ class JsonTreeBuilder:
     Supports optional and conflict annotations, as well as type-based coloring.
     """
 
-    TYPE_COLORS: dict[str, str] = {
+    TYPE_COLORS: ClassVar[dict[str, str]] = {
         "object": "bold blue",
         "list": "bold magenta",
         "str": "green",

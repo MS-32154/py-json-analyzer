@@ -20,18 +20,18 @@ from .interactive import GoInteractiveHandler
 from .naming import create_go_name_tracker
 
 __all__ = [
-    # Generator
-    "GoGenerator",
-    "create_go_generator",
-    "create_web_api_generator",
-    "create_strict_generator",
     # Configuration
     "GoConfig",
-    "get_web_api_config",
-    "get_strict_config",
-    "get_modern_config",
-    # Naming
-    "create_go_name_tracker",
+    # Generator
+    "GoGenerator",
     # Interactive
     "GoInteractiveHandler",
+    "create_go_generator",
+    # Naming
+    "create_go_name_tracker",
+    "create_strict_generator",
+    "create_web_api_generator",
+    "get_modern_config",
+    "get_strict_config",
+    "get_web_api_config",
 ]

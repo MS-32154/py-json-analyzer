@@ -1,10 +1,10 @@
 """Unit tests for the visualizer module."""
 
-import pytest
 import tempfile
 from pathlib import Path
-from unittest.mock import Mock, patch, MagicMock
+from unittest.mock import MagicMock, patch
 
+import pytest
 from json_explorer.visualizer import JSONVisualizer, visualize_json
 
 

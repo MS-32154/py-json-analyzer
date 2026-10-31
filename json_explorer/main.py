@@ -19,10 +19,10 @@ from pathlib import Path
 from rich.console import Console
 
 from .cli import CLIHandler
-from .interactive import InteractiveHandler
-from .utils import load_json
 from .codegen.cli_integration import add_codegen_args, handle_codegen_command
+from .interactive import InteractiveHandler
 from .logging_config import configure_logging, get_logger
+from .utils import load_json
 
 logger = get_logger(__name__)
 
@@ -90,8 +90,7 @@ class JSONExplorer:
 
         if getattr(args, "interactive", False) or not self._has_cli_actions(args):
             return self.interactive_handler.run()
-        else:
-            return self.cli_handler.run(args)
+        return self.cli_handler.run(args)
 
     def _is_codegen_command(self, args: argparse.Namespace) -> bool:
         """Check if the current command is related to code generation."""
@@ -125,14 +124,14 @@ Examples:
   %(prog)s data.json --search "users[*].name"
   %(prog)s data.json --search "users[?age > `30`]"
   %(prog)s --url https://api.example.com/data --plot
-  
+
 JMESPath Query Examples:
   %(prog)s data.json --search "users[0]"                    # First user
   %(prog)s data.json --search "users[*].email"              # All emails
   %(prog)s data.json --search "users[?age > `30`]"          # Filter by age
   %(prog)s data.json --search "sort_by(users, &age)"        # Sort users
   %(prog)s data.json --search "length(users)"               # Count users
-  
+
 Code Generation:
   %(prog)s data.json --generate go --output user.go --root-name User
   %(prog)s data.json --generate python --package-name models
@@ -254,22 +253,20 @@ def main() -> int:
         return 0
 
     # For codegen, we need either file or url
-    if hasattr(args, "generate") and args.generate:
-        if not (args.file or args.url):
-            print("❌ Error: Code generation requires a file path or --url")
-            parser.print_help()
-            return 1
+    if hasattr(args, "generate") and args.generate and not (args.file or args.url):
+        print("❌ Error: Code generation requires a file path or --url")
+        parser.print_help()
+        return 1
 
     # For other operations, file or url is required
     if (
         not hasattr(args, "generate")
         and not hasattr(args, "list_languages")
         and not hasattr(args, "language_info")
-    ):
-        if not (args.file or args.url):
-            print("❌ Error: You must provide a file path or --url")
-            parser.print_help()
-            return 1
+    ) and not (args.file or args.url):
+        print("❌ Error: You must provide a file path or --url")
+        parser.print_help()
+        return 1
 
     explorer = JSONExplorer()
     return explorer.run(args)

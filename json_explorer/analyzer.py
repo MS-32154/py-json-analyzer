@@ -74,7 +74,7 @@ def analyze_json(data: Any) -> dict[str, Any]:
                     children[key] = analyze_node(val)
                 return {"type": "object", "children": children}
 
-            elif isinstance(node, list):
+            if isinstance(node, list):
                 # Skip empty or null-only lists
                 non_empty_items = [
                     item for item in node if item not in (None, {}, [], "")
@@ -111,17 +111,14 @@ def analyze_json(data: Any) -> dict[str, Any]:
 
                 return {"type": "list", "child_type": "mixed"}
 
-            elif node is None:
+            if node is None:
                 return {"type": "unknown", "is_none": True}
 
-            else:
-                if isinstance(node, str):
-                    if detect_timestamp(node):
-                        return {"type": "timestamp"}
-                    else:
-                        return {"type": "str"}
-                else:
-                    return {"type": type(node).__name__}
+            if isinstance(node, str):
+                if detect_timestamp(node):
+                    return {"type": "timestamp"}
+                return {"type": "str"}
+            return {"type": type(node).__name__}
 
         def merge_object_summaries(
             summaries: list[dict[str, Any]],
@@ -168,7 +165,7 @@ def analyze_json(data: Any) -> dict[str, Any]:
                 types = {s["type"] for s in working_structures}
 
                 if len(types) == 1:
-                    structure_type = list(types)[0]
+                    structure_type = next(iter(types))
 
                     if structure_type == "object":
                         merged_children, child_conflicts = merge_object_summaries(
@@ -217,7 +214,7 @@ def analyze_json(data: Any) -> dict[str, Any]:
                 structure_types = {s["type"] for s in child_structures}
 
                 if len(structure_types) == 1:
-                    structure_type = list(structure_types)[0]
+                    structure_type = next(iter(structure_types))
 
                     if structure_type == "object":
                         merged_children, child_conflicts = merge_object_summaries(
@@ -231,20 +228,19 @@ def analyze_json(data: Any) -> dict[str, Any]:
                                 "conflicts": child_conflicts,
                             },
                         }
-                    elif structure_type == "list":
+                    if structure_type == "list":
                         merged_nested = merge_list_summaries(child_structures)
                         return {"type": "list", "child": merged_nested}
 
                 return {"type": "list", "child_type": "mixed_complex"}
 
-            elif child_types:
+            if child_types:
                 if len(child_types) == 1:
-                    return {"type": "list", "child_type": list(child_types)[0]}
-                else:
-                    return {
-                        "type": "list",
-                        "child_type": f"mixed: {', '.join(sorted(child_types))}",
-                    }
+                    return {"type": "list", "child_type": next(iter(child_types))}
+                return {
+                    "type": "list",
+                    "child_type": f"mixed: {', '.join(sorted(child_types))}",
+                }
 
             return {"type": "list", "child_type": "unknown"}
 
