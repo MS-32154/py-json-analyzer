@@ -176,8 +176,8 @@ class TestPythonGenerator:
 
         # Should have Field() with alias
         assert "Field(" in code
-        assert "alias='userId'" in code
-        assert "alias='userName'" in code
+        assert 'alias="userId"' in code
+        assert 'alias="userName"' in code
 
         # Test 2: Optional field (should generate Field with default)
         data = [
@@ -239,7 +239,9 @@ class TestDataclassFieldOrder:
         ]
 
     def test_required_fields_come_first_json_order_kept(self):
-        code = quick_generate(FIELD_ORDER_DATA, "python", style="dataclass")
+        code = quick_generate(
+            FIELD_ORDER_DATA, "python", style="dataclass", dataclass_kw_only=False
+        )
         assert self.field_names(code) == ["b", "a", "c"]
 
     def test_kw_only_keeps_json_order(self):

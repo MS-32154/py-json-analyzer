@@ -50,7 +50,7 @@ class PythonConfig:
 
     dataclass_frozen: bool = False
     dataclass_slots: bool = True
-    dataclass_kw_only: bool = False
+    dataclass_kw_only: bool = True
 
     pydantic_config_dict: bool = True
     pydantic_extra_forbid: bool = False

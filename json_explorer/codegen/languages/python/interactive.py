@@ -81,7 +81,7 @@ class PythonInteractiveHandler:
                     "Make dataclasses immutable (frozen)?", default=False
                 )
                 config["dataclass_kw_only"] = Confirm.ask(
-                    "Keyword-only arguments?", default=False
+                    "Keyword-only arguments?", default=True
                 )
             case "pydantic":
                 config["pydantic_config_dict"] = Confirm.ask(

@@ -158,7 +158,7 @@ class CodeGenerator(ABC):
         return warnings
 
     def format_code(self, code: str) -> str:
-        """Strip trailing whitespace and collapse runs of blank lines (max 2)."""
+        """Strip trailing whitespace, collapse blank-line runs (max 2), end with one newline."""
         lines: list[str] = []
         blank = 0
         for line in code.split("\n"):
@@ -166,7 +166,7 @@ class CodeGenerator(ABC):
             blank = blank + 1 if not line else 0
             if blank <= 2:
                 lines.append(line)
-        return "\n".join(lines)
+        return "\n".join(lines).strip("\n") + "\n"  # exactly one final newline
 
 
 # ============================================================================

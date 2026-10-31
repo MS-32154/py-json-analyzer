@@ -27,7 +27,10 @@ PLUGIN = LanguagePlugin(
             "--frozen", "dataclass_frozen", "Make dataclasses frozen (immutable)"
         ),
         CliOption(
-            "--kw-only", "dataclass_kw_only", "Make dataclass fields keyword-only"
+            "--no-kw-only",
+            "dataclass_kw_only",
+            "Positional dataclass fields (optional fields are moved last)",
+            value=False,
         ),
         CliOption(
             "--pydantic-forbid-extra",

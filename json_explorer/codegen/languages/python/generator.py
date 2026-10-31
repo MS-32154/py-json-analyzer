@@ -115,9 +115,14 @@ class PythonGenerator(CodeGenerator):
         data: dict[str, Any] = {
             "name": name,
             "type": self._type(fld, run),
-            "key": repr(fld.original_name),  # as a Python string literal
+            "key": py_str(fld.original_name),
         }
-        if self.config.add_comments and fld.description:
+        # Pydantic carries the note in Field(description=...) instead
+        if (
+            self.config.add_comments
+            and fld.description
+            and self.style != PythonStyle.PYDANTIC
+        ):
             data["comment"] = fld.description
         match self.style:
             case PythonStyle.DATACLASS if fld.optional:
@@ -126,13 +131,15 @@ class PythonGenerator(CodeGenerator):
             case PythonStyle.PYDANTIC:
                 args = []
                 if fld.original_name != name:  # the alias maps it to the JSON key
-                    args.append(f"alias={fld.original_name!r}")
+                    args.append(f"alias={py_str(fld.original_name)}")
                 if fld.description and self.config.add_comments:
-                    args.append(f"description={fld.description!r}")
+                    args.append(f"description={py_str(fld.description)}")
                 if fld.optional:
                     args.append("default=None")
                 if args:
-                    data["field_config"] = ", ".join(args)
+                    data["assignment"] = field_call(
+                        f"    {name}: {data['type']} = ", args
+                    )
         return data
 
     def _type(self, fld: Field, run: _Run) -> str:
@@ -163,3 +170,33 @@ class PythonGenerator(CodeGenerator):
         if annotation in PYTHON_IMPORTS:
             run.uses.add(annotation)
         return annotation
+
+
+def py_str(text: str) -> str:
+    """Python string literal, quoted the way ruff/black format it.
+
+    Double quotes unless the text contains a double quote and no single one.
+    """
+    literal = repr(text)
+    if literal.startswith("'") and '"' not in text:
+        literal = '"' + literal[1:-1].replace("\\'", "'") + '"'
+    return literal
+
+
+LINE_LENGTH = 88
+
+
+def field_call(prefix: str, args: list[str]) -> str:
+    """`` = Field(...)`` wrapped the way ruff/black format it.
+
+    One line if it fits; otherwise the arguments on one indented line; if that
+    is still too long, one argument per line with a trailing comma.
+    """
+    one_line = f"Field({', '.join(args)})"
+    if len(prefix) + len(one_line) <= LINE_LENGTH:
+        return one_line
+    hugged = "        " + ", ".join(args)
+    if len(hugged) <= LINE_LENGTH:
+        return f"Field(\n{hugged}\n    )"
+    lines = "".join(f"        {arg},\n" for arg in args)
+    return f"Field(\n{lines}    )"

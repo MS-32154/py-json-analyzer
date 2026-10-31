@@ -1127,7 +1127,7 @@ dataclass_config = GeneratorConfig(
         "style": "dataclass",
         "dataclass_slots": True,
         "dataclass_frozen": False,
-        "dataclass_kw_only": False,
+        "dataclass_kw_only": True,
     }
 )
 

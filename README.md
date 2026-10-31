@@ -227,7 +227,7 @@ json_explorer data.json --generate python \
 # Python-specific options
 --frozen                             # Make dataclasses immutable
 --no-slots                           # Don't use __slots__
---kw-only                            # Make fields keyword-only
+--no-kw-only                         # Positional fields (default: keyword-only)
 --pydantic-forbid-extra              # Forbid extra fields in Pydantic
 
 # Common options
@@ -486,7 +486,7 @@ JSON Explorer uses JSON configuration files for code generation:
     "style": "dataclass",
     "dataclass_slots": true,
     "dataclass_frozen": false,
-    "dataclass_kw_only": false
+    "dataclass_kw_only": true
   }
 }
 ```

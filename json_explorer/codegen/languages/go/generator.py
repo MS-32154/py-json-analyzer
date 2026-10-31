@@ -52,11 +52,19 @@ class GoGenerator(CodeGenerator):
             },
         )
 
+    def format_code(self, code: str) -> str:
+        """gofmt keeps at most one blank line in a row."""
+        lines = super().format_code(code).split("\n")
+        kept = [line for i, line in enumerate(lines) if line or i == 0 or lines[i - 1]]
+        return "\n".join(kept)
+
     def _struct(self, schema: Schema, run: _Run) -> dict[str, Any]:
+        fields = [self._field(f, run) for f in schema.fields]
+        _align_like_gofmt(fields)
         return {
             "struct_name": run.names.type_name(schema),
             "description": schema.description if self.config.add_comments else None,
-            "fields": [self._field(f, run) for f in schema.fields],
+            "fields": fields,
         }
 
     def _field(self, fld: Field, run: _Run) -> dict[str, Any]:
@@ -108,3 +116,25 @@ class GoGenerator(CodeGenerator):
             and self.go_config.time_type == "time.Time"
         ):
             run.imports.add('"time"')
+
+
+def _align_like_gofmt(fields: list[dict[str, Any]]) -> None:
+    """Pad names and types into columns the way gofmt does.
+
+    gofmt aligns consecutive field lines; a comment line starts a new group.
+    Sets ``name_col`` and ``type_col`` (padded) on every field.
+    """
+    groups: list[list[dict[str, Any]]] = [[]]
+    for fld in fields:
+        if "skipped" in fld or fld.get("comment"):
+            groups.append([])
+        if "skipped" not in fld:
+            groups[-1].append(fld)
+    for group in groups:
+        if not group:
+            continue
+        name_width = max(len(f["name"]) for f in group)
+        type_width = max(len(f["type"]) for f in group)
+        for fld in group:
+            fld["name_col"] = fld["name"].ljust(name_width)
+            fld["type_col"] = fld["type"].ljust(type_width)
