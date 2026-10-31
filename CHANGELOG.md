@@ -43,7 +43,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Keys starting with a digit became `_123abc`: unexported in Go (silently never (un)marshalled) and
   rejected by Pydantic. They are now `Field123abc` / `field_123abc`.
 - JSON keys are escaped in Go struct tags and Pydantic aliases/descriptions. Keys Go's encoding/json
-  can't express as a tag name (containing `"`, `,`, `\\`, ...) are left out with a comment instead of
+  can't express as a tag name (containing `"`, `,`, `\`, ...) are left out with a comment instead of
   producing an invalid tag.
 - Reserved-word handling was case-insensitive (Go `Type_`, `String_`; Python `Id_`). Go exported
   names can't clash with keywords; Python now only renames keywords and names that would break the
