@@ -137,7 +137,7 @@ JsonSearcher(console=None)
 
 #### Core Methods
 
-##### `search(data, query, compile_query=False)`
+##### `search(data, query)`
 
 Execute a JMESPath query on JSON data.
 
@@ -145,7 +145,6 @@ Execute a JMESPath query on JSON data.
 
 - `data` (Any): JSON data to search
 - `query` (str): JMESPath query expression
-- `compile_query` (bool): Compile query for reuse (performance optimization)
 
 **Returns:**
 
@@ -169,35 +168,6 @@ result = searcher.search(data, "users[*].email")
 
 # Complex query with functions
 result = searcher.search(data, "sort_by(users, &age)[0].name")
-```
-
-##### `search_multiple(data, queries)`
-
-Execute multiple JMESPath queries efficiently.
-
-**Parameters:**
-
-- `data` (Any): JSON data to search
-- `queries` (list[str]): List of JMESPath query expressions
-
-**Returns:**
-
-- `dict[str, SearchResult]`: Mapping of query strings to results
-
-**Example:**
-
-```python
-queries = [
-    "users[*].name",
-    "users[?age > `30`]",
-    "length(users)",
-    "max_by(users, &age).name"
-]
-results = searcher.search_multiple(data, queries)
-
-for query, result in results.items():
-    print(f"Query: {query}")
-    searcher.print_result(result)
 ```
 
 ##### `validate_query(query)`
@@ -668,9 +638,9 @@ Load JSON from a URL.
 
 - `tuple[str, Any]`: (source, data)
 
-#### Interactive Input Functions
+#### Interactive Input Functions (`json_explorer.ui`)
 
-##### `prompt_input(message, default=None, **kwargs)`
+##### `ask(message, default=None, **kwargs)`
 
 User-friendly input with optional choices and autocompletion.
 
@@ -684,16 +654,16 @@ User-friendly input with optional choices and autocompletion.
 **Example:**
 
 ```python
-from json_explorer.utils import prompt_input
+from json_explorer.ui import ask
 
-language = prompt_input(
+language = ask(
     "Select language",
     choices=["go", "python", "typescript"],
     default="go"
 )
 ```
 
-##### `prompt_input_path(message, **kwargs)`
+##### `ask_path(message, **kwargs)`
 
 Input for file paths with autocompletion.
 
@@ -705,9 +675,9 @@ Input for file paths with autocompletion.
 **Example:**
 
 ```python
-from json_explorer.utils import prompt_input_path
+from json_explorer.ui import ask_path
 
-filepath = prompt_input_path("Enter JSON file path", default="data.json")
+filepath = ask_path("Enter JSON file path", default="data.json")
 ```
 
 #### Custom Exception
@@ -1457,13 +1427,9 @@ result = searcher.search(data, "sort_by(users, &age)[-1].name")
 # Aggregations
 result = searcher.search(data, "length(users[?active == `true`])")
 
-# Multiple queries
-queries = [
-    "users[*].name",
-    "max_by(users, &age).name",
-    "length(users)"
-]
-results = searcher.search_multiple(data, queries)
+# Several queries
+queries = ["users[*].name", "max_by(users, &age).name", "length(users)"]
+results = {q: searcher.search(data, q) for q in queries}
 ```
 
 ### 3. Custom Go Generation

@@ -290,13 +290,8 @@ result = searcher.search(data, "users[*].email")
 if result:
     searcher.print_result(result)
 
-# Multiple queries
-queries = [
-    "users[*].name",
-    "users[?age > `30`]",
-    "length(users)"
-]
-results = searcher.search_multiple(data, queries)
+# Several queries
+results = {q: searcher.search(data, q) for q in ["users[*].name", "length(users)"]}
 
 # Validate query before executing
 valid, error = searcher.validate_query("users[*].invalid...")

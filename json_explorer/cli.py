@@ -136,7 +136,7 @@ class CLIHandler:
         Args:
             args: Parsed CLI arguments containing visualization options.
         """
-        plot_format = getattr(args, "plot_format", "interactive")
+        plot_format = getattr(args, "plot_format", "html")
         save_path = getattr(args, "save_path", None)
         detailed = getattr(args, "detailed", False)
         open_browser = not getattr(args, "no_browser", False)
