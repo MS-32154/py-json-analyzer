@@ -182,20 +182,15 @@ def create_config(language: str = "go", **kwargs) -> GeneratorConfig:
 
 
 __all__ = [
-    # Core interfaces
     "CodeGenerator",
     "Field",
     "FieldType",
     "GenerationResult",
-    # Configuration
     "GeneratorConfig",
     "GeneratorError",
-    # Naming utilities
     "NameTracker",
-    # Schema system
     "Schema",
     "TemplateError",
-    # Template system
     "TemplateManager",
     "convert_analyzer_output",
     "create_config",
@@ -203,7 +198,6 @@ __all__ = [
     "create_template_env",
     "extract_all_schemas",
     "generate_code",
-    # High-level API
     "generate_from_analysis",
     "get_aliases",
     "get_generator",
@@ -216,7 +210,6 @@ __all__ = [
     "list_supported_languages",
     "load_config",
     "quick_generate",
-    # Registry
     "register",
     "sanitize_name",
 ]

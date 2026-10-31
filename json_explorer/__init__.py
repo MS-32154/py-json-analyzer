@@ -3,6 +3,7 @@
 from importlib import metadata as _metadata
 
 from .analyzer import analyze_json
+from .errors import JsonExplorerError
 from .logging_config import configure_logging, get_logger
 from .search import JsonSearcher, SearchResult
 from .stats import DataStatsAnalyzer, generate_stats
@@ -15,18 +16,13 @@ except _metadata.PackageNotFoundError:  # running from a source tree without ins
     __version__ = "0+unknown"
 
 __all__ = [
-    # Statistics
     "DataStatsAnalyzer",
-    # Exceptions
     "JSONLoaderError",
-    # Visualization
     "JSONVisualizer",
-    # Search (now JMESPath-based)
+    "JsonExplorerError",
     "JsonSearcher",
     "SearchResult",
-    # Core
     "analyze_json",
-    # Logging
     "configure_logging",
     "generate_stats",
     "get_logger",

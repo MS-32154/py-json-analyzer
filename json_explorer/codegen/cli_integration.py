@@ -16,6 +16,7 @@ from rich.syntax import Syntax
 from rich.table import Table
 
 from json_explorer.analyzer import analyze_json
+from json_explorer.errors import JsonExplorerError
 from json_explorer.logging_config import get_logger
 from json_explorer.utils import load_json
 
@@ -36,7 +37,7 @@ console = Console()
 # ============================================================================
 
 
-class CLIError(Exception):
+class CLIError(JsonExplorerError):
     """Raised for CLI-related errors."""
 
 

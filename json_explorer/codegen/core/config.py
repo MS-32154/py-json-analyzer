@@ -12,12 +12,13 @@ from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any
 
+from json_explorer.errors import JsonExplorerError
 from json_explorer.logging_config import get_logger
 
 logger = get_logger(__name__)
 
 
-class ConfigError(Exception):
+class ConfigError(JsonExplorerError):
     """Raised when configuration is invalid or cannot be loaded."""
 
 

@@ -23,17 +23,13 @@ from .interactive import PythonInteractiveHandler
 from .naming import create_python_name_tracker
 
 __all__ = [
-    # Configuration
     "PythonConfig",
-    # Generator
     "PythonGenerator",
-    # Interactive
     "PythonInteractiveHandler",
     "PythonStyle",
     "create_dataclass_generator",
     "create_pydantic_generator",
     "create_python_generator",
-    # Naming
     "create_python_name_tracker",
     "create_typeddict_generator",
     "get_dataclass_config",

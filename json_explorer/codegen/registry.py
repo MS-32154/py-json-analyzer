@@ -8,6 +8,7 @@ Uses a simple dict-based approach instead of complex singleton pattern.
 from pathlib import Path
 from typing import Any
 
+from json_explorer.errors import JsonExplorerError
 from json_explorer.logging_config import get_logger
 
 from .core.config import GeneratorConfig, load_config
@@ -21,7 +22,7 @@ logger = get_logger(__name__)
 # ============================================================================
 
 
-class RegistryError(Exception):
+class RegistryError(JsonExplorerError):
     """Raised for registry-related errors."""
 
 

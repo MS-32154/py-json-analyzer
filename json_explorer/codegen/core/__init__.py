@@ -53,11 +53,8 @@ from .templates import (
 )
 
 __all__ = [
-    # Naming
     "CaseStyle",
-    # Generator
     "CodeGenerator",
-    # Configuration
     "ConfigError",
     "Field",
     "FieldType",
@@ -65,10 +62,8 @@ __all__ = [
     "GeneratorConfig",
     "GeneratorError",
     "NameTracker",
-    # Schema
     "Schema",
     "TemplateError",
-    # Templates
     "TemplateManager",
     "clean_identifier",
     "convert_analyzer_output",

@@ -16,12 +16,14 @@ from prompt_toolkit.history import FileHistory
 from rich.console import Console
 from rich.prompt import Prompt
 
+from json_explorer.errors import JsonExplorerError
+
 from .logging_config import get_logger
 
 logger = get_logger(__name__)
 
 
-class JSONLoaderError(Exception):
+class JSONLoaderError(JsonExplorerError):
     """Custom exception for JSON loading errors."""
 
 

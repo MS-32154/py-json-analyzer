@@ -9,6 +9,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
+from json_explorer.errors import JsonExplorerError
 from json_explorer.logging_config import get_logger
 
 from .config import GeneratorConfig
@@ -23,7 +24,7 @@ logger = get_logger(__name__)
 # ============================================================================
 
 
-class GeneratorError(Exception):
+class GeneratorError(JsonExplorerError):
     """Base exception for code generation errors."""
 
 

@@ -11,12 +11,13 @@ from typing import Any
 import jinja2
 from jinja2 import Environment
 
+from json_explorer.errors import JsonExplorerError
 from json_explorer.logging_config import get_logger
 
 logger = get_logger(__name__)
 
 
-class TemplateError(Exception):
+class TemplateError(JsonExplorerError):
     """Raised when template operations fail."""
 
 

@@ -19,6 +19,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Lint and format with ruff (replaces black, isort and flake8).
 
 ### Added
+- `JsonExplorerError` base class (exported from `json_explorer`): all package errors (`JSONLoaderError`,
+  `GeneratorError`, `RegistryError`, `ConfigError`, `TemplateError`, `CLIError`) now derive from it.
 - CI workflow: tests on Ubuntu, macOS and Windows; ruff lint job.
 - Publish workflow: runs CI first, checks the tag matches the version, verifies and smoke-tests the built distributions.
 - `py.typed` marker: type information is now shipped with the package.
