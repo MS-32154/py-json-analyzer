@@ -94,7 +94,7 @@ class CodegenInteractiveHandler:
         Returns:
             True if successful, False if cancelled or error
         """
-        if not self.data:
+        if self.data is None:
             self.console.print("[red]⚠️ No data available for code generation[/red]")
             return False
 

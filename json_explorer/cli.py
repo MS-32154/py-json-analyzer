@@ -46,7 +46,7 @@ class CLIHandler:
         Returns:
             Exit code (0 for success, 1 for failure).
         """
-        if not self.data:
+        if self.data is None:
             self.console.print("❌ [red]No data loaded[/red]")
             logger.debug("No data loaded; aborting CLI run")
             return 1

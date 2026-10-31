@@ -51,7 +51,7 @@ class InteractiveHandler:
         Returns:
             Exit code (0 for success, 1 if no data loaded).
         """
-        if not self.data:
+        if self.data is None:
             self.console.print("⚠️ [red]No data loaded. Please load data first.[/red]")
             return 1
 
@@ -289,7 +289,7 @@ class InteractiveHandler:
 
     def _show_data_summary(self) -> None:
         """Show a quick summary of the loaded data."""
-        if not self.data:
+        if self.data is None:
             self.console.print("⚠️ [red]No data loaded[/red]")
             return
 
