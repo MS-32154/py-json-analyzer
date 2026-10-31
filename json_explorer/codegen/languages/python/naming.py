@@ -23,7 +23,6 @@ GENERATED_NAMES = frozenset(
         "TypedDict",
         "bool",
         "dataclass",
-        "datetime",
         "dict",
         "field",
         "float",
@@ -33,9 +32,14 @@ GENERATED_NAMES = frozenset(
     }
 )
 
-# BaseModel attributes a field must not shadow (Pydantic v2).
+# BaseModel attributes a field must not shadow (Pydantic v2), and the
+# datetime names Pydantic models import for date/time fields.
 PYDANTIC_RESERVED = frozenset(
     {
+        "date",
+        "datetime",
+        "time",
+        "timedelta",
         "construct",
         "copy",
         "dict",

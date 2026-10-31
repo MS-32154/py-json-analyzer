@@ -5,10 +5,10 @@ Converts analyzer output into normalized Schema/Field objects that
 generators can work with consistently across languages.
 """
 
-from dataclasses import dataclass, field
-from enum import Enum
-from typing import Any
+from dataclasses import dataclass, field, replace
+from enum import StrEnum
 
+from json_explorer.analyzer import Format, Kind, Node
 from json_explorer.logging_config import get_logger
 
 from .naming import to_pascal_case, unique_name
@@ -21,37 +21,51 @@ logger = get_logger(__name__)
 # ============================================================================
 
 
-class FieldType(Enum):
-    """Supported field types across all target languages."""
+class FieldType(StrEnum):
+    """Field types shared by all target languages."""
 
     STRING = "string"
     INTEGER = "integer"
     FLOAT = "float"
     BOOLEAN = "boolean"
-    TIMESTAMP = "timestamp"
+    # Strings in a standard format (RFC 3339 / JSON Schema "format")
+    DATE_TIME = "date-time"
+    LOCAL_DATE_TIME = "local-date-time"
+    DATE = "date"
+    TIME = "time"
+    DURATION = "duration"
     OBJECT = "object"
     ARRAY = "array"
-    UNKNOWN = "unknown"
-    CONFLICT = "conflict"  # Multiple types detected
+    UNKNOWN = "unknown"  # only null values (or empty arrays) seen
+    CONFLICT = "conflict"  # different kinds seen
 
 
-# Analyzer type to FieldType mapping
-ANALYZER_TYPE_MAP: dict[str, FieldType] = {
-    "str": FieldType.STRING,
-    "int": FieldType.INTEGER,
-    "float": FieldType.FLOAT,
-    "bool": FieldType.BOOLEAN,
-    "timestamp": FieldType.TIMESTAMP,
-    "object": FieldType.OBJECT,
-    "list": FieldType.ARRAY,
-    "conflict": FieldType.CONFLICT,
-    "unknown": FieldType.UNKNOWN,
+_KIND_TYPES: dict[Kind, FieldType] = {
+    Kind.STRING: FieldType.STRING,
+    Kind.INTEGER: FieldType.INTEGER,
+    Kind.FLOAT: FieldType.FLOAT,
+    Kind.BOOLEAN: FieldType.BOOLEAN,
+    Kind.OBJECT: FieldType.OBJECT,
+    Kind.ARRAY: FieldType.ARRAY,
+    Kind.NULL: FieldType.UNKNOWN,
+    Kind.MIXED: FieldType.CONFLICT,
+}
+_FORMAT_TYPES: dict[Format, FieldType] = {
+    Format.DATE_TIME: FieldType.DATE_TIME,
+    Format.LOCAL_DATE_TIME: FieldType.LOCAL_DATE_TIME,
+    Format.DATE: FieldType.DATE,
+    Format.TIME: FieldType.TIME,
+    Format.DURATION: FieldType.DURATION,
 }
 
 
-def map_analyzer_type(analyzer_type: str) -> FieldType:
-    """Map analyzer type string to FieldType enum."""
-    return ANALYZER_TYPE_MAP.get(analyzer_type, FieldType.UNKNOWN)
+def field_type_of(node: Node | None) -> FieldType:
+    """FieldType for an analyzer node (``None``: nothing seen)."""
+    if node is None:
+        return FieldType.UNKNOWN
+    if node.kind == Kind.STRING and node.format:
+        return _FORMAT_TYPES[node.format]
+    return _KIND_TYPES[node.kind]
 
 
 # ============================================================================
@@ -193,282 +207,62 @@ def type_name_for_key(key: str, *, item: bool = False) -> str:
 
 
 def convert_analyzer_output(
-    analyzer_result: dict[str, Any],
+    analysis: Node,
     root_name: str = "Root",
     add_attention: bool = True,
 ) -> Schema:
+    """Turn ``analyze_json()`` output into a root Schema with nested schemas.
+
+    The root is the analyzed object; for an array of objects, the element
+    type (named after ``root_name``); otherwise a wrapper with one field
+    (``items`` for other arrays, ``value`` for a single value).
     """
-    Convert analyzer output to internal Schema representation.
-
-    Args:
-        analyzer_result: Output from analyze_json()
-        root_name: Name for root schema
-        add_attention: Generate attention descriptions for issues
-
-    Returns:
-        Root Schema object with nested structures
-    """
-    logger.info("Converting analyzer output to schema: %s", root_name)
-
-    root_type = analyzer_result["type"]
-
-    match root_type:
-        case "object":
-            # Standard case: root is an object
-            schema = _create_schema_from_object(
-                analyzer_result,
-                root_name,
-                add_attention,
-            )
-            logger.debug("Created object schema: %s", root_name)
-            return schema
-
-        case "list":
-            # Root is an array
-            return _handle_root_array(analyzer_result, root_name, add_attention)
-
+    match analysis:
+        case Node(kind=Kind.OBJECT):
+            return _schema(analysis, root_name, add_attention)
+        case Node(kind=Kind.ARRAY, items=Node(kind=Kind.OBJECT) as element):
+            name = to_pascal_case(singularize(root_name)) or root_name
+            return _schema(element, name, add_attention)
+        case Node(kind=Kind.ARRAY):
+            wrapper_key = "items"
         case _:
-            # Root is a primitive value
-            return _handle_root_primitive(
-                analyzer_result, root_name, root_type, add_attention
-            )
-
-
-def _create_schema_from_object(
-    node: dict[str, Any],
-    schema_name: str,
-    add_attention: bool,
-) -> Schema:
-    """Create schema from analyzer object node."""
-    schema = Schema(name=schema_name, original_name=schema_name)
-
-    children = node.get("children", {})
-    conflicts = node.get("conflicts", {})
-
-    for field_name, field_data in children.items():
-        field_obj = _create_field_from_node(
-            field_data,
-            field_name,
-            schema_name,
-            conflicts,
-            add_attention,
-        )
-        schema.add_field(field_obj)
-
+            wrapper_key = "value"
+    schema = Schema(name=root_name, original_name=root_name)
+    schema.add_field(
+        _field(wrapper_key, replace(analysis, optional=False), add_attention)
+    )
     return schema
 
 
-def _create_field_from_node(
-    field_node: dict[str, Any],
-    field_name: str,
-    parent_schema_name: str,
-    conflicts: dict[str, Any],
-    add_attention: bool,
-) -> Field:
-    """Create field from analyzer field node."""
-    field_type_str = field_node["type"]
-    field_type = map_analyzer_type(field_type_str)
-    optional = field_node.get("optional", False)
+def _schema(node: Node, name: str, add_attention: bool) -> Schema:
+    schema = Schema(name=name, original_name=name)
+    for key, child in node.fields.items():
+        schema.add_field(_field(key, child, add_attention))
+    return schema
 
-    field_obj = Field(
-        name=field_name,
-        original_name=field_name,
-        type=field_type,
-        optional=optional,
+
+def _field(key: str, node: Node, add_attention: bool) -> Field:
+    fld = Field(
+        name=key, original_name=key, type=field_type_of(node), optional=node.optional
     )
-
-    # Handle type conflicts with None/unknown handling
-    if field_name in conflicts:
-        conflict_types = conflicts[field_name]
-
-        if "unknown" in conflict_types:
-            # Filter out "unknown" to see what concrete types remain
-            concrete_types = [t for t in conflict_types if t != "unknown"]
-
-            if len(concrete_types) == 1:
-                # Single concrete type + None → Optional[ConcreteType]
-                # This is the most common case and should NOT be treated as a conflict
-                field_obj.type = map_analyzer_type(concrete_types[0])
-                field_obj.optional = True
-                logger.debug(
-                    "Resolved None conflict in %s.%s: using %s as optional",
-                    parent_schema_name,
-                    field_name,
-                    concrete_types[0],
-                )
-
-            elif len(concrete_types) > 1:
-                # Multiple concrete types + None → Real conflict
-                # Example: [{"value": None}, {"value": 1}, {"value": "text"}]
-                field_obj.type = FieldType.CONFLICT
-                field_obj.conflicting_types = [
-                    map_analyzer_type(t) for t in concrete_types
-                ]
-                field_obj.optional = True  # Can also be None
-                logger.debug(
-                    "Type conflict in %s.%s: %s (plus None)",
-                    parent_schema_name,
-                    field_name,
-                    ", ".join(concrete_types),
-                )
-
-            else:
-                # Only "unknown" types → Keep as unknown but mark optional
-                field_obj.type = FieldType.UNKNOWN
-                field_obj.optional = True
-                logger.debug(
-                    "Unknown type in %s.%s (only None values found)",
-                    parent_schema_name,
-                    field_name,
-                )
-        else:
-            # Real conflict without None involved
-            field_obj.type = FieldType.CONFLICT
-            field_obj.conflicting_types = [map_analyzer_type(t) for t in conflict_types]
-            logger.debug(
-                "Type conflict in %s.%s: %s",
-                parent_schema_name,
-                field_name,
-                ", ".join(conflict_types),
-            )
-
-    # Handle specific field types
-    elif field_type == FieldType.OBJECT:
-        nested_name = type_name_for_key(field_name)
-        field_obj.nested_schema = _create_schema_from_object(
-            field_node,
-            nested_name,
-            add_attention,
-        )
-
-    elif field_type == FieldType.ARRAY:
-        _handle_array_field(
-            field_obj, field_node, parent_schema_name, field_name, add_attention
-        )
-
-    # Generate attention description
+    match node.kind:
+        case Kind.MIXED:
+            fld.conflicting_types = sorted({_KIND_TYPES[k] for k in node.kinds})
+        case Kind.OBJECT:
+            fld.nested_schema = _schema(node, type_name_for_key(key), add_attention)
+        case Kind.ARRAY:
+            # Nested arrays: describe the innermost element and count levels
+            element, dimensions = node.items, 1
+            while element is not None and element.kind == Kind.ARRAY:
+                element, dimensions = element.items, dimensions + 1
+            fld.array_dimensions = dimensions
+            fld.array_element_type = field_type_of(element)
+            if element is not None and element.kind == Kind.OBJECT:
+                name = type_name_for_key(key, item=True)
+                fld.array_element_schema = _schema(element, name, add_attention)
     if add_attention:
-        desc = field_obj.generate_attention_description(True)
-        if desc:
-            field_obj.description = desc
-
-    return field_obj
-
-
-def _handle_array_field(
-    field_obj: Field,
-    field_node: dict[str, Any],
-    parent_schema_name: str,
-    field_name: str,
-    add_attention: bool,
-) -> None:
-    """Handle array field type detection."""
-    if "child_type" in field_node:
-        # Simple array (primitives or mixed)
-        child_type_str = field_node["child_type"]
-        if "mixed" in child_type_str.lower():
-            field_obj.array_element_type = FieldType.CONFLICT
-        else:
-            field_obj.array_element_type = map_analyzer_type(child_type_str)
-
-    elif "child" in field_node:
-        # Complex array (objects or nested arrays)
-        child_node = field_node["child"]
-        child_type = child_node["type"]
-
-        match child_type:
-            case "object":
-                # Array of objects
-                element_name = type_name_for_key(field_name, item=True)
-                field_obj.array_element_schema = _create_schema_from_object(
-                    child_node,
-                    element_name,
-                    add_attention,
-                )
-                field_obj.array_element_type = FieldType.OBJECT
-
-            case "list":
-                # Nested arrays: describe the innermost element and count the
-                # levels, so [[1, 2]] stays list[list[int]] (not list[int])
-                nested_field = _create_field_from_node(
-                    child_node,
-                    field_name,
-                    parent_schema_name,
-                    {},
-                    add_attention,
-                )
-                field_obj.array_dimensions = nested_field.array_dimensions + 1
-                field_obj.array_element_schema = nested_field.array_element_schema
-                field_obj.array_element_type = nested_field.array_element_type
-
-            case _:
-                # Other types
-                field_obj.array_element_type = map_analyzer_type(child_type)
-
-    else:
-        # Unknown array type
-        field_obj.array_element_type = FieldType.UNKNOWN
-
-
-def _handle_root_array(
-    analyzer_result: dict[str, Any],
-    root_name: str,
-    add_attention: bool,
-) -> Schema:
-    """Handle case where root is an array."""
-    if "child" in analyzer_result and analyzer_result["child"]["type"] == "object":
-        # Array of objects - use element schema as root
-        child_node = analyzer_result["child"]
-        element_name = to_pascal_case(singularize(root_name)) or root_name
-        schema = _create_schema_from_object(child_node, element_name, add_attention)
-
-        logger.info(
-            "Root is array of objects, extracted element schema: %s", element_name
-        )
-        return schema
-
-    # Array of primitives or unknown - create wrapper
-    schema = Schema(name=root_name, original_name=root_name)
-
-    if "child_type" in analyzer_result:
-        child_type_str = analyzer_result["child_type"]
-        element_type = (
-            FieldType.CONFLICT
-            if "mixed" in child_type_str.lower()
-            else map_analyzer_type(child_type_str)
-        )
-    else:
-        element_type = FieldType.UNKNOWN
-
-    field_obj = Field(
-        name="items",
-        original_name="items",
-        type=FieldType.ARRAY,
-        array_element_type=element_type,
-    )
-
-    schema.add_field(field_obj)
-    logger.info("Root is array of primitives: %s", element_type.value)
-    return schema
-
-
-def _handle_root_primitive(
-    analyzer_result: dict[str, Any],
-    root_name: str,
-    root_type: str,
-    add_attention: bool,
-) -> Schema:
-    """Handle case where root is a primitive value."""
-    schema = Schema(name=root_name, original_name=root_name)
-    field_obj = Field(
-        name="value",
-        original_name="value",
-        type=map_analyzer_type(root_type),
-    )
-
-    schema.add_field(field_obj)
-    logger.info("Root is primitive: %s", root_type)
-    return schema
+        fld.description = fld.generate_attention_description(True)
+    return fld
 
 
 # ============================================================================

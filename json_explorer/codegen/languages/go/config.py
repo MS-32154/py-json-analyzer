@@ -16,7 +16,7 @@ class GoConfig:
     Attributes:
         int_type: Go type for JSON integers.
         float_type: Go type for JSON floats.
-        time_type: Go type for timestamps (``string`` keeps them as text).
+        time_type: Go type for RFC 3339 date-times (``string`` keeps them as text).
         use_pointers_for_optional: Use ``*T`` for optional fields so a
             missing value can be told apart from the zero value.
     """
@@ -34,7 +34,13 @@ class GoConfig:
             FieldType.INTEGER: self.int_type,
             FieldType.FLOAT: self.float_type,
             FieldType.BOOLEAN: "bool",
-            FieldType.TIMESTAMP: self.time_type,
+            # encoding/json decodes RFC 3339 date-times into time.Time; it has
+            # no types for the other formats, so they stay strings.
+            FieldType.DATE_TIME: self.time_type,
+            FieldType.LOCAL_DATE_TIME: "string",
+            FieldType.DATE: "string",
+            FieldType.TIME: "string",
+            FieldType.DURATION: "string",
             FieldType.UNKNOWN: UNKNOWN_TYPE,
             FieldType.CONFLICT: UNKNOWN_TYPE,
         }

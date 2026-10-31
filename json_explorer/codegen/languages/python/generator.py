@@ -63,7 +63,13 @@ class PythonGenerator(CodeGenerator):
 
     def _imports(self, run: _Run) -> list[str]:
         imports = set(STYLE_IMPORTS[self.style])
-        imports.update(PYTHON_IMPORTS[name] for name in run.uses)
+        by_module: dict[str, list[str]] = {}
+        for name in sorted(run.uses):
+            by_module.setdefault(PYTHON_IMPORTS[name], []).append(name)
+        imports.update(
+            f"from {module} import {', '.join(names)}"
+            for module, names in by_module.items()
+        )
         # Standard library before third party
         return sorted(
             imports,

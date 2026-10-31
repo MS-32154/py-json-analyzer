@@ -23,7 +23,7 @@ from .schema import (
     Schema,
     convert_analyzer_output,
     extract_all_schemas,
-    map_analyzer_type,
+    field_type_of,
 )
 from .templates import TemplateError, TemplateManager
 
@@ -41,9 +41,9 @@ __all__ = [
     "TemplateManager",
     "convert_analyzer_output",
     "extract_all_schemas",
+    "field_type_of",
     "generate_code",
     "load_config",
-    "map_analyzer_type",
     "plan_names",
     "save_config",
     "split_words",

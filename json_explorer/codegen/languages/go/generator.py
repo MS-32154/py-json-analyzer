@@ -112,7 +112,7 @@ class GoGenerator(CodeGenerator):
 
     def _note_import(self, field_type: FieldType, run: _Run) -> None:
         if (
-            field_type == FieldType.TIMESTAMP
+            field_type == FieldType.DATE_TIME
             and self.go_config.time_type == "time.Time"
         ):
             run.imports.add('"time"')

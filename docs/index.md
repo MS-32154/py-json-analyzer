@@ -49,33 +49,19 @@ The analyzer module performs deep structural analysis of JSON data with intellig
 
 #### `analyze_json(data)`
 
-Analyzes JSON structure and returns detailed metadata including types, optional fields, and conflicts.
+Describes the structure of JSON data as a tree of `Node` objects: one node per
+position, merged over **every** value seen there (all array elements are used).
 
-**Parameters:**
+**Returns:** `Node` with
 
-- `data (dict|list|Any)`: JSON data to analyze
+- `kind`: `object`, `array`, `string`, `integer`, `float`, `boolean`, `null` or `mixed`
+- `optional`: missing from some objects, or `null` somewhere
+- `fields`: for objects, the node of each key
+- `items`: for arrays, the merged node of all elements (`None` if only empty arrays were seen)
+- `kinds`: for `mixed`, the kinds seen
+- `format`: for strings, the standard format every value follows (see below)
 
-**Returns:**
-
-- `dict`: Analysis summary with structure, types, and conflicts
-
-**Return Structure:**
-
-```python
-{
-    "type": "object",           # Root type: "object", "list", or primitive
-    "children": {               # For objects: field definitions
-        "field_name": {
-            "type": "str",      # Field type
-            "optional": False,  # Whether field is optional
-            "conflicts": {}     # Type conflicts if any
-        }
-    },
-    "conflicts": {              # Top-level conflicts
-        "field_name": ["str", "int"]
-    }
-}
-```
+`node.to_dict()` gives a plain-dict form for printing or JSON.
 
 **Example:**
 
@@ -85,81 +71,48 @@ from json_explorer import analyze_json
 data = {
     "users": [
         {"id": 1, "name": "Alice", "email": "alice@example.com"},
-        {"id": 2, "name": "Bob"}  # email missing
+        {"id": 2, "name": "Bob"},  # email missing
     ]
 }
 
-analysis = analyze_json(data)
-print(analysis)
-# {
-#     "type": "object",
-#     "children": {
-#         "users": {
-#             "type": "list",
-#             "child": {
-#                 "type": "object",
-#                 "children": {
-#                     "id": {"type": "int", "optional": False},
-#                     "name": {"type": "str", "optional": False},
-#                     "email": {"type": "str", "optional": True}
-#                 }
-#             }
-#         }
-#     }
-# }
+analyze_json(data).to_dict()
+# {'kind': 'object', 'fields': {'users': {'kind': 'array', 'items': {
+#     'kind': 'object', 'fields': {
+#         'id': {'kind': 'integer'},
+#         'name': {'kind': 'string'},
+#         'email': {'kind': 'string', 'optional': True}}}}}}
 ```
 
-#### Optional Field Detection
+#### Merging rules
 
-Fields are marked as optional when:
+- **Missing keys or `null` values** make a node optional:
+  `[{"value": None}, {"value": 42}]` → `value: integer (optional)`
+- **Integers and floats** merge to float: `[1, 2.5]` → `float`
+- **Other different kinds** give `mixed`, recorded in `kinds` (generated code uses `Any`/`any`):
+  `[{"value": 42}, {"value": "text"}]` → `value: mixed (integer, string)`
 
-1. **Missing from some objects**:
+#### String formats
 
-   ```python
-   [{"name": "Alice"}, {"name": "Bob", "age": 30}]
-   # age is optional
-   ```
+Strings are given a format only if **every** value follows the same standard
+format (RFC 3339, the formats JSON Schema uses):
 
-2. **Contains None values**:
-   ```python
-   [{"name": "Alice", "email": None}, {"name": "Bob", "email": "bob@example.com"}]
-   # email is optional
-   ```
+| Format | Example | Go | Pydantic | dataclass / TypedDict |
+|---|---|---|---|---|
+| `date-time` | `2024-01-01T10:00:00Z` | `time.Time` | `datetime` | `str` |
+| `local-date-time` | `2024-01-01T10:00:00` | `string` | `datetime` | `str` |
+| `date` | `2024-01-01` | `string` | `date` | `str` |
+| `time` | `10:30:00`, `10:30:00Z` | `string` | `time` | `str` |
+| `duration` | `P1DT4H30M` | `string` | `timedelta` | `str` |
 
-#### Type Conflict Resolution
-
-The analyzer intelligently handles mixed types:
-
-- **None + Single Type** → Optional field
-
-  ```python
-  [{"value": None}, {"value": 42}]
-  # Result: value: int (optional)
-  ```
-
-- **None + Multiple Types** → Conflict (uses `Any`/`any`)
-
-  ```python
-  [{"value": None}, {"value": 42}, {"value": "text"}]
-  # Result: value: conflict (int, str)
-  ```
-
-- **Multiple Non-None Types** → Conflict
-  ```python
-  [{"value": 42}, {"value": "text"}]
-  # Result: value: conflict (int, str)
-  ```
-
-#### Timestamp Detection
-
-The analyzer automatically detects timestamp strings:
+Natural-language dates (`"March"`, `"1 hour ago"`), ISO 8601 forms outside RFC 3339
+(`20240101T100000Z`, `2024-W01-1`) and invalid dates stay plain strings.
 
 ```python
-from json_explorer.analyzer import detect_timestamp
+from json_explorer.analyzer import detect_format
 
-detect_timestamp("2024-01-01T12:00:00Z")  # True
-detect_timestamp("2024-01-01")  # True
-detect_timestamp("not a date")  # False
+detect_format("2024-01-01T12:00:00Z")  # Format.DATE_TIME
+detect_format("2024-01-01")            # Format.DATE
+detect_format("not a date")            # None
 ```
 
 ---
@@ -1289,7 +1242,7 @@ Supported field types:
 - `INTEGER`: Integer numbers
 - `FLOAT`: Floating-point numbers
 - `BOOLEAN`: Boolean values
-- `TIMESTAMP`: Datetime/timestamp strings
+- `DATE_TIME`, `LOCAL_DATE_TIME`, `DATE`, `TIME`, `DURATION`: strings in a standard format
 - `OBJECT`: Nested objects
 - `ARRAY`: Arrays/lists
 - `UNKNOWN`: Unknown type (null only)
@@ -1465,7 +1418,7 @@ source, data = load_json("data.json")
 
 # Analyze structure
 analysis = analyze_json(data)
-print(f"Analysis complete: {analysis['type']}")
+print(f"Analysis complete: {analysis.kind}")
 
 # JMESPath search
 searcher = JsonSearcher()

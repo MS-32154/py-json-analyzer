@@ -2,6 +2,7 @@
 Tests for core schema representation.
 """
 
+import pytest
 from json_explorer.codegen.core.schema import (
     Field,
     FieldType,
@@ -81,81 +82,74 @@ class TestSchema:
 
 
 class TestConvertAnalyzerOutput:
-    """Test analyzer output conversion."""
+    """analyze_json() output -> Schema."""
+
+    @staticmethod
+    def convert(data, name="Root"):
+        from json_explorer.analyzer import analyze_json
+
+        return convert_analyzer_output(analyze_json(data), name)
 
     def test_simple_object(self):
-        analyzer_result = {
-            "type": "object",
-            "children": {
-                "name": {"type": "str", "optional": False},
-                "age": {"type": "int", "optional": False},
-            },
-            "conflicts": {},
-        }
-
-        schema = convert_analyzer_output(analyzer_result, "User")
+        schema = self.convert({"name": "x", "age": 1}, "User")
 
         assert schema.name == "User"
-        assert len(schema.fields) == 2
-        assert schema.fields[0].type == FieldType.STRING
-        assert schema.fields[1].type == FieldType.INTEGER
+        assert [f.type for f in schema.fields] == [FieldType.STRING, FieldType.INTEGER]
 
     def test_nested_object(self):
-        analyzer_result = {
-            "type": "object",
-            "children": {
-                "profile": {
-                    "type": "object",
-                    "children": {
-                        "age": {"type": "int", "optional": False},
-                    },
-                    "conflicts": {},
-                },
-            },
-            "conflicts": {},
-        }
+        schema = self.convert({"profile": {"age": 1}}, "User")
 
-        schema = convert_analyzer_output(analyzer_result, "User")
-
-        assert len(schema.fields) == 1
         assert schema.fields[0].type == FieldType.OBJECT
-        assert schema.fields[0].nested_schema is not None
+        assert schema.fields[0].nested_schema.name == "Profile"
 
     def test_array_of_primitives(self):
-        analyzer_result = {
-            "type": "object",
-            "children": {
-                "tags": {
-                    "type": "list",
-                    "child_type": "str",
-                    "optional": False,
-                },
-            },
-            "conflicts": {},
-        }
+        fld = self.convert({"tags": ["a"]}).fields[0]
 
-        schema = convert_analyzer_output(analyzer_result, "Data")
-
-        assert schema.fields[0].type == FieldType.ARRAY
-        assert schema.fields[0].array_element_type == FieldType.STRING
+        assert fld.type == FieldType.ARRAY
+        assert fld.array_element_type == FieldType.STRING
+        assert fld.array_dimensions == 1
 
     def test_extract_all_schemas(self):
-        analyzer_result = {
-            "type": "object",
-            "children": {
-                "profile": {
-                    "type": "object",
-                    "children": {
-                        "age": {"type": "int", "optional": False},
-                    },
-                    "conflicts": {},
-                },
-            },
-            "conflicts": {},
-        }
+        all_schemas = extract_all_schemas(self.convert({"profile": {"age": 1}}, "User"))
 
-        root_schema = convert_analyzer_output(analyzer_result, "User")
-        all_schemas = extract_all_schemas(root_schema)
+        assert set(all_schemas) == {"User", "Profile"}
 
-        assert len(all_schemas) == 2  # User + UserProfile
-        assert "User" in all_schemas
+    def test_optional_and_null(self):
+        schema = self.convert([{"a": 1, "b": None}, {"a": 2, "b": "x"}, {"b": "y"}])
+        a, b = schema.fields
+
+        assert (a.type, a.optional) == (FieldType.INTEGER, True)  # missing once
+        assert (b.type, b.optional) == (FieldType.STRING, True)  # null once
+
+    def test_int_and_float_widen_to_float(self):
+        """#12: 1 and 1.5 are both numbers, not a type conflict."""
+        fld = self.convert([{"v": 1}, {"v": 1.5}]).fields[0]
+
+        assert fld.type == FieldType.FLOAT
+
+    def test_mixed_kinds_conflict(self):
+        fld = self.convert([{"v": 1}, {"v": "x"}]).fields[0]
+
+        assert fld.type == FieldType.CONFLICT
+        assert fld.conflicting_types == [FieldType.INTEGER, FieldType.STRING]
+
+    @pytest.mark.parametrize(
+        ("values", "expected"),
+        [
+            (
+                ["2024-01-01T10:00:00Z", "2024-02-01T00:00:00+02:00"],
+                FieldType.DATE_TIME,
+            ),
+            (["2024-01-01T10:00:00"], FieldType.LOCAL_DATE_TIME),
+            (["2024-01-01"], FieldType.DATE),
+            (["10:30:00"], FieldType.TIME),
+            (["PT4H30M", "P1D"], FieldType.DURATION),
+            (["2024-01-01", "not a date"], FieldType.STRING),  # all values must match
+            (["2024-01-01", "2024-01-01T10:00:00Z"], FieldType.STRING),  # one format
+            (["March", "1 hour ago", "10.5"], FieldType.STRING),  # #8
+        ],
+    )
+    def test_string_formats(self, values, expected):
+        fld = self.convert([{"v": v} for v in values]).fields[0]
+
+        assert fld.type == expected

@@ -9,6 +9,7 @@ Example:
     >>> print(code)
 """
 
+from json_explorer.analyzer import Node
 from json_explorer.logging_config import get_logger
 
 # Import core interfaces
@@ -54,7 +55,7 @@ logger = get_logger(__name__)
 
 
 def generate_from_analysis(
-    analyzer_result: dict,
+    analyzer_result: Node,
     language: str = "go",
     config: GeneratorConfig | dict | str | None = None,
     root_name: str = "Root",

@@ -15,10 +15,14 @@ class PythonStyle(Enum):
 
 
 # Import statements for types used in annotations
+# Module each annotation name is imported from
 PYTHON_IMPORTS: dict[str, str] = {
-    "datetime": "from datetime import datetime",
-    "Any": "from typing import Any",
-    "NotRequired": "from typing import NotRequired",
+    "datetime": "datetime",
+    "date": "datetime",
+    "time": "datetime",
+    "timedelta": "datetime",
+    "Any": "typing",
+    "NotRequired": "typing",
 }
 
 # Imports every file of a style needs
@@ -26,6 +30,15 @@ STYLE_IMPORTS: dict[PythonStyle, list[str]] = {
     PythonStyle.DATACLASS: ["from dataclasses import dataclass"],
     PythonStyle.PYDANTIC: ["from pydantic import BaseModel, Field, ConfigDict"],
     PythonStyle.TYPEDDICT: ["from typing import TypedDict"],
+}
+
+
+_PYDANTIC_FORMATS = {
+    FieldType.DATE_TIME: "datetime",
+    FieldType.LOCAL_DATE_TIME: "datetime",
+    FieldType.DATE: "date",
+    FieldType.TIME: "time",
+    FieldType.DURATION: "timedelta",
 }
 
 
@@ -62,10 +75,11 @@ class PythonConfig:
             FieldType.FLOAT: "float",
             FieldType.BOOLEAN: "bool",
             # Only Pydantic parses values; dataclasses and TypedDicts hold the
-            # JSON string as-is, so annotating it as datetime would be wrong.
-            FieldType.TIMESTAMP: (
-                "datetime" if self.style == PythonStyle.PYDANTIC else "str"
-            ),
+            # JSON string as-is, so a datetime annotation there would be wrong.
+            **{
+                field_type: annotation if self.style == PythonStyle.PYDANTIC else "str"
+                for field_type, annotation in _PYDANTIC_FORMATS.items()
+            },
             FieldType.UNKNOWN: "Any",
             FieldType.CONFLICT: "Any",
         }

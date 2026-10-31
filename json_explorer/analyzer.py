@@ -1,235 +1,199 @@
-"""JSON structure analyzer with type detection and schema inference.
+"""JSON structure analysis.
 
-This module analyzes JSON data structures to detect types, optional fields,
-conflicts, and generates comprehensive structural summaries.
+``analyze_json`` describes the shape of a JSON document as a tree of
+:class:`Node` objects: one node per position, merged over every value seen
+there (every array element is used, not a sample). Merging is a single rule:
+
+- the same kind merges recursively (object fields, array items);
+- ``null`` or a key missing from some objects makes the node *optional*;
+- integers and floats merge to float;
+- anything else becomes ``mixed``, recording the kinds seen.
+
+Strings that all follow one standard date/time format (RFC 3339, as used by
+JSON Schema's ``format``) carry that :class:`Format`.
 """
 
-from collections import Counter
+import datetime as dt
+import re
+from dataclasses import dataclass, field, replace
+from enum import StrEnum
 from typing import Any
-
-import dateparser
 
 from .logging_config import get_logger
 
 logger = get_logger(__name__)
 
 
-def detect_timestamp(value: Any) -> bool:
-    """Detect if a string value is a timestamp.
+class Kind(StrEnum):
+    """JSON value kinds (integers and floats kept apart)."""
 
-    Args:
-        value: Value to check.
+    OBJECT = "object"
+    ARRAY = "array"
+    STRING = "string"
+    INTEGER = "integer"
+    FLOAT = "float"
+    BOOLEAN = "boolean"
+    NULL = "null"
+    MIXED = "mixed"
 
-    Returns:
-        True if the value is a parseable timestamp, False otherwise.
+
+class Format(StrEnum):
+    """Standard string formats (JSON Schema names; RFC 3339 / ISO 8601)."""
+
+    DATE_TIME = "date-time"  # 2024-01-01T10:00:00Z (with offset: RFC 3339)
+    LOCAL_DATE_TIME = "local-date-time"  # 2024-01-01T10:00:00 (no offset)
+    DATE = "date"  # 2024-01-01
+    TIME = "time"  # 10:00:00, 10:00:00Z, 10:00:00.5+02:00
+    DURATION = "duration"  # P3D, PT4H30M, P1DT0.5S (days and smaller units)
+
+
+_SECONDS = r"\d{2}:\d{2}:\d{2}(?:\.\d+)?"
+_OFFSET = r"(?:Z|[+-]\d{2}:\d{2})"
+# Anchored patterns following RFC 3339's grammar; values are then range-checked.
+_PATTERNS: tuple[tuple[Format, re.Pattern[str]], ...] = (
+    (Format.DATE_TIME, re.compile(rf"\d{{4}}-\d{{2}}-\d{{2}}T{_SECONDS}{_OFFSET}")),
+    (Format.LOCAL_DATE_TIME, re.compile(rf"\d{{4}}-\d{{2}}-\d{{2}}T{_SECONDS}")),
+    (Format.DATE, re.compile(r"\d{4}-\d{2}-\d{2}")),
+    (Format.TIME, re.compile(rf"{_SECONDS}{_OFFSET}?")),
+    (
+        Format.DURATION,
+        re.compile(
+            r"P(?=\d|T\d)(?:\d+D)?(?:T(?=\d)(?:\d+H)?(?:\d+M)?(?:\d+(?:\.\d+)?S)?)?"
+        ),
+    ),
+)
+_VALIDATORS = {
+    Format.DATE_TIME: dt.datetime.fromisoformat,
+    Format.LOCAL_DATE_TIME: dt.datetime.fromisoformat,
+    Format.DATE: dt.date.fromisoformat,
+    Format.TIME: dt.time.fromisoformat,
+}
+
+
+def detect_format(text: str) -> Format | None:
+    """The standard format ``text`` follows, if any (``2024-13-45`` is none)."""
+    for fmt, pattern in _PATTERNS:
+        if pattern.fullmatch(text):
+            validate = _VALIDATORS.get(fmt)
+            if validate is None:
+                return fmt
+            try:
+                validate(text)
+            except ValueError:
+                return None
+            return fmt
+    return None
+
+
+@dataclass(slots=True, frozen=True)
+class Node:
+    """The shape of the values found at one position of a JSON document.
+
+    Attributes:
+        kind: The value kind (``mixed`` if different kinds were seen).
+        optional: Missing from some objects, or ``null`` somewhere.
+        fields: For objects: the shape of each key.
+        items: For arrays: the merged shape of all elements (``None`` if only
+            empty arrays were seen).
+        kinds: For ``mixed``: the kinds seen (without ``null``).
+        format: For strings: the standard format all values follow, if any.
     """
-    if not isinstance(value, str) or len(value) < 4:
-        return False
 
-    try:
-        parsed = dateparser.parse(value)
-        return parsed is not None
-    except Exception:
-        return False
+    kind: Kind
+    optional: bool = False
+    fields: dict[str, Node] = field(default_factory=dict)
+    items: Node | None = None
+    kinds: frozenset[Kind] = frozenset()
+    format: Format | None = None
+
+    def to_dict(self) -> dict[str, Any]:
+        """Plain-dict form (for printing or JSON), omitting empty attributes."""
+        result: dict[str, Any] = {"kind": self.kind.value}
+        if self.optional:
+            result["optional"] = True
+        if self.kind == Kind.OBJECT:
+            result["fields"] = {k: v.to_dict() for k, v in self.fields.items()}
+        if self.kind == Kind.ARRAY:
+            result["items"] = self.items.to_dict() if self.items else None
+        if self.kinds:
+            result["kinds"] = sorted(k.value for k in self.kinds)
+        if self.format:
+            result["format"] = self.format.value
+        return result
 
 
-def analyze_json(data: Any) -> dict[str, Any]:
-    """Analyze JSON structure and return detailed metadata.
-
-    This function performs deep structural analysis of JSON data, identifying:
-    - Data types and their distribution
-    - Optional and required fields
-    - Type conflicts across similar structures
-    - Nested object and array patterns
-
-    Args:
-        data: JSON data to analyze (dict, list, or primitive type).
-
-    Returns:
-        Dictionary containing analysis summary with structure, types, and conflicts.
+def analyze_json(data: Any) -> Node:
+    """Describe the structure of JSON data (as returned by ``json.load``).
 
     Example:
-        >>> data = {"users": [{"id": 1, "name": "Alice"}]}
-        >>> analysis = analyze_json(data)
-        >>> print(analysis['type'])
-        'object'
+        >>> analyze_json([{"id": 1}, {"id": 2.5, "tag": "x"}]).to_dict()
+        {'kind': 'array', 'items': {'kind': 'object', 'fields': {'id': {'kind': 'float'}, 'tag': {'kind': 'string', 'optional': True}}}}
     """
-    logger.info("Starting JSON analysis")
+    return _analyze(data)
 
-    def analyze_node(node: Any) -> dict[str, Any]:
-        """Recursively analyze a node in the JSON structure."""
-        if isinstance(node, dict):
-            children = {}
-            for key, val in node.items():
-                children[key] = analyze_node(val)
-            return {"type": "object", "children": children}
 
-        if isinstance(node, list):
-            # Skip empty or null-only lists
-            non_empty_items = [item for item in node if item not in (None, {}, [], "")]
-            if not non_empty_items:
-                return {"type": "list", "child_type": "unknown"}
+def _analyze(value: Any) -> Node:
+    match value:
+        case None:
+            return Node(Kind.NULL, optional=True)
+        case bool():
+            return Node(Kind.BOOLEAN)
+        case int():
+            return Node(Kind.INTEGER)
+        case float():
+            return Node(Kind.FLOAT)
+        case str():
+            return Node(Kind.STRING, format=detect_format(value))
+        case dict():
+            return Node(Kind.OBJECT, fields={k: _analyze(v) for k, v in value.items()})
+        case list() | tuple():
+            items: Node | None = None
+            for element in value:
+                node = _analyze(element)
+                items = node if items is None else merge(items, node)
+            return Node(Kind.ARRAY, items=items)
+        case _:
+            raise TypeError(f"Not a JSON value: {type(value).__name__}")
 
-            sample = non_empty_items[:20]
-            element_summaries = [analyze_node(item) for item in sample]
-            types = {e["type"] for e in element_summaries}
 
-            # List of primitives
-            if len(types) == 1 and all(
-                e["type"] not in {"object", "list"} for e in element_summaries
-            ):
-                return {"type": "list", "child_type": types.pop()}
+def merge(a: Node, b: Node) -> Node:
+    """Shape describing values of both shapes."""
+    optional = a.optional or b.optional
+    if a.kind == Kind.NULL:
+        return replace(b, optional=True)
+    if b.kind == Kind.NULL:
+        return replace(a, optional=True)
 
-            # List of objects
-            if all(e["type"] == "object" for e in element_summaries):
-                merged, conflicts = merge_object_summaries(element_summaries)
-                return {
-                    "type": "list",
-                    "child": {
-                        "type": "object",
-                        "children": merged,
-                        "conflicts": conflicts,
-                    },
-                }
-
-            # List of lists
-            if all(e["type"] == "list" for e in element_summaries):
-                merged_list = merge_list_summaries(element_summaries)
-                return {"type": "list", "child": merged_list}
-
-            return {"type": "list", "child_type": "mixed"}
-
-        if node is None:
-            return {"type": "unknown", "is_none": True}
-
-        if isinstance(node, str):
-            if detect_timestamp(node):
-                return {"type": "timestamp"}
-            return {"type": "str"}
-        return {"type": type(node).__name__}
-
-    def merge_object_summaries(
-        summaries: list[dict[str, Any]],
-    ) -> tuple[dict[str, Any], dict[str, list[str]]]:
-        """Merge multiple object summaries, detecting optional fields and conflicts."""
-        key_structures: dict[str, list] = {}
-        key_counts = Counter()
-        key_none_counts = Counter()
-        total = len(summaries)
-
-        for summary in summaries:
-            seen_keys = set()
-
-            for key, val in summary.get("children", {}).items():
-                key_counts[key] += 1
-                seen_keys.add(key)
-
-                if val.get("type") == "unknown":
-                    key_none_counts[key] += 1
-
-                if key not in key_structures:
-                    key_structures[key] = []
-                key_structures[key].append(val)
-
-        merged: dict[str, Any] = {}
-        conflicts: dict[str, list[str]] = {}
-
-        for key, structures in key_structures.items():
-            count = key_counts[key]
-            none_count = key_none_counts[key]
-
-            # Field is optional if missing or has None values
-            optional = (count < total) or (none_count > 0)
-
-            # Filter out None/unknown types
-            concrete_structures = [s for s in structures if s.get("type") != "unknown"]
-
-            working_structures = (
-                concrete_structures if concrete_structures else structures
-            )
-
-            types = {s["type"] for s in working_structures}
-
-            if len(types) == 1:
-                structure_type = next(iter(types))
-
-                if structure_type == "object":
-                    merged_children, child_conflicts = merge_object_summaries(
-                        working_structures
-                    )
-                    merged[key] = {
-                        "type": "object",
-                        "children": merged_children,
-                        "optional": optional,
-                    }
-                    if child_conflicts:
-                        merged[key]["conflicts"] = child_conflicts
-
-                elif structure_type == "list":
-                    merged_list = merge_list_summaries(working_structures)
-                    merged[key] = {
-                        "type": "list",
-                        "optional": optional,
-                        **{k: v for k, v in merged_list.items() if k != "type"},
-                    }
-
+    if a.kind == b.kind:
+        match a.kind:
+            case Kind.OBJECT:
+                fields = {}
+                for key in a.fields | b.fields:
+                    if key in a.fields and key in b.fields:
+                        fields[key] = merge(a.fields[key], b.fields[key])
+                    else:  # missing from one of the objects
+                        fields[key] = replace(
+                            a.fields.get(key) or b.fields[key], optional=True
+                        )
+                return Node(Kind.OBJECT, optional, fields=fields)
+            case Kind.ARRAY:
+                if a.items is None or b.items is None:
+                    items = a.items or b.items
                 else:
-                    merged[key] = {"type": structure_type, "optional": optional}
+                    items = merge(a.items, b.items)
+                return Node(Kind.ARRAY, optional, items=items)
+            case Kind.MIXED:
+                return Node(Kind.MIXED, optional, kinds=a.kinds | b.kinds)
+            case Kind.STRING:
+                # A format holds only if every value follows it
+                fmt = a.format if a.format == b.format else None
+                return Node(Kind.STRING, optional, format=fmt)
+            case _:
+                return Node(a.kind, optional)
 
-            elif len(types) > 1:
-                merged[key] = {"type": "conflict", "optional": optional}
-                conflicts[key] = list(types)
-
-            else:
-                merged[key] = {"type": "unknown", "optional": optional}
-
-        return merged, conflicts
-
-    def merge_list_summaries(summaries: list[dict[str, Any]]) -> dict[str, Any]:
-        """Merge multiple list summaries."""
-        child_types = set()
-        child_structures = []
-
-        for summary in summaries:
-            if "child_type" in summary:
-                child_types.add(summary["child_type"])
-            elif "child" in summary:
-                child_structures.append(summary["child"])
-
-        if child_structures:
-            structure_types = {s["type"] for s in child_structures}
-
-            if len(structure_types) == 1:
-                structure_type = next(iter(structure_types))
-
-                if structure_type == "object":
-                    merged_children, child_conflicts = merge_object_summaries(
-                        child_structures
-                    )
-                    return {
-                        "type": "list",
-                        "child": {
-                            "type": "object",
-                            "children": merged_children,
-                            "conflicts": child_conflicts,
-                        },
-                    }
-                if structure_type == "list":
-                    merged_nested = merge_list_summaries(child_structures)
-                    return {"type": "list", "child": merged_nested}
-
-            return {"type": "list", "child_type": "mixed_complex"}
-
-        if child_types:
-            if len(child_types) == 1:
-                return {"type": "list", "child_type": next(iter(child_types))}
-            return {
-                "type": "list",
-                "child_type": f"mixed: {', '.join(sorted(child_types))}",
-            }
-
-        return {"type": "list", "child_type": "unknown"}
-
-    result = analyze_node(data)
-    logger.info("JSON analysis completed successfully")
-    return result
+    kinds = (a.kinds or {a.kind}) | (b.kinds or {b.kind})
+    if Kind.FLOAT in kinds:
+        kinds -= {Kind.INTEGER}  # integers widen to float
+    if len(kinds) == 1:
+        return Node(next(iter(kinds)), optional)
+    return Node(Kind.MIXED, optional, kinds=frozenset(kinds))

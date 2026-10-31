@@ -34,6 +34,24 @@ CASES: dict[str, typing.Any] = {
     "quote_key": {'q"k': 1},
     "nested_arrays": {"matrix": [[1, 2]], "groups": [[{"id": 1}]], "cube": [[[1.5]]]},
     "timestamps": [{"at": "2024-01-01T10:00:00Z", "tags": ["2024-01-02"]}, {}],
+    "formats": [
+        {
+            "at": "2024-01-01T10:00:00.5+02:00",
+            "local": "2024-01-01T10:00:00",
+            "date": "2024-01-01",
+            "time": "10:30:00",
+            "dur": "P1DT4H30M",
+            "n": 1,
+        },
+        {
+            "at": "2024-06-01T00:00:00Z",
+            "local": "2024-06-01T23:59:59",
+            "date": "2024-06-01",
+            "time": "23:00:00Z",
+            "dur": "PT0.5S",
+            "n": 2.5,
+        },
+    ],
 } | {p.stem: json.loads(p.read_text()) for p in sorted(DATA_SAMPLES.glob("*.json"))}
 
 TARGETS = ("dataclass", "pydantic", "typeddict", "go")
@@ -124,3 +142,64 @@ def test_typeddict_keeps_json_keys() -> None:
     exec(quick_generate(data, "python", style="typeddict"), namespace)
     root = namespace["Root"]
     assert set(typing.get_type_hints(root)) == set(data)
+
+
+# ---------------------------------------------------------------------------
+# Decoding: the generated types must accept the data they were generated from
+# ---------------------------------------------------------------------------
+
+GO_DECODE_MAIN = """package main
+
+import (
+	"encoding/json"
+	"os"
+)
+
+func main() {
+	data, err := os.ReadFile("data.json")
+	if err != nil {
+		panic(err)
+	}
+	var v %s
+	if err := json.Unmarshal(data, &v); err != nil {
+		os.Stderr.WriteString(err.Error())
+		os.Exit(1)
+	}
+}
+"""
+
+# Root is generated for objects and arrays of objects
+DECODE_CASES = [
+    case
+    for case, data in CASES.items()
+    if isinstance(data, dict) or (data and all(isinstance(x, dict) for x in data))
+]
+
+
+@pytest.mark.parametrize("case", DECODE_CASES)
+def test_go_decodes_source_data(case: str, tmp_path: Path) -> None:
+    go = _find_go()
+    if go is None:
+        pytest.skip("Go toolchain not found (set JSON_EXPLORER_GO or add go to PATH)")
+    data = CASES[case]
+    (tmp_path / "go.mod").write_text("module example.com/decode\n\ngo 1.22\n")
+    (tmp_path / "models.go").write_text(quick_generate(data, "go"))
+    root = "[]Root" if isinstance(data, list) else "Root"
+    (tmp_path / "main.go").write_text(GO_DECODE_MAIN % root)
+    (tmp_path / "data.json").write_text(json.dumps(data))
+    result = subprocess.run(
+        [go, "run", "."], cwd=tmp_path, capture_output=True, text=True, check=False
+    )
+    assert result.returncode == 0, result.stderr
+
+
+@pytest.mark.parametrize("case", DECODE_CASES)
+def test_pydantic_validates_source_data(case: str) -> None:
+    import pydantic
+
+    data = CASES[case]
+    namespace: dict[str, typing.Any] = {"__name__": "generated"}
+    exec(quick_generate(data, "python", style="pydantic"), namespace)
+    root = namespace["Root"]
+    adapter = pydantic.TypeAdapter(list[root] if isinstance(data, list) else root)
+    adapter.validate_python(data)

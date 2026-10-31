@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Changed
+- **Breaking:** `analyze_json()` returns a typed `Node` (`kind`, `optional`, `fields`, `items`,
+  `kinds`, `format`; `to_dict()` for a plain-dict form) instead of a dict with `type`/`children`/
+  `child_type` keys and string markers like `"mixed: int, str"`. `convert_analyzer_output()` and
+  `generate_from_analysis()` take a `Node`; `FieldType` is a `StrEnum`.
+- **Breaking:** `FieldType.TIMESTAMP` is replaced by `DATE_TIME`, `LOCAL_DATE_TIME`, `DATE`, `TIME`
+  and `DURATION`. Go: `date-time` -> `time.Time` (or `string` with `time_type`), others `string`.
+  Pydantic: `datetime`, `date`, `time`, `timedelta`. Dataclasses and TypedDicts: `str`.
 - **Generated code follows its language's standard formatting:** Go output is gofmt-clean (aligned
   struct fields). Python output matches ruff/black formatting (double quotes, wrapped `Field(...)`
   calls), except that other lines longer than 88 characters (very long keys or type names) are not
@@ -52,6 +59,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `py.typed` marker: type information is now shipped with the package.
 
 ### Fixed
+- Timestamp detection treated `"March"`, `"Monday"`, `"1 hour ago"` and `"10.5"` as timestamps (Go
+  output then failed to decode real data). Strings now get a type only when every value follows a
+  standard RFC 3339 / JSON Schema format, mapped to what each target can decode (see Changed).
+- Only the first 20 array elements were analyzed, so keys appearing later were missed and optional
+  keys could be marked required. Every element is analyzed now.
+- A value that was an integer in some objects and a float in others became a type conflict
+  (`interface{}`/`Any`). It is now a float.
+- `--tree raw` printed Rich markup (`[bold yellow]...`) literally.
 - An unknown or invalid generator option crashed with a raw `TypeError` (or was silently accepted,
   e.g. `int_type: "int8"`). It now fails with a `ConfigError` naming the option and the valid
   options or values.
@@ -88,6 +103,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   (snake_case fields for Python) and rejects unsupported languages.
 
 ### Removed
+- The `dateparser` dependency (and with it `regex`, `pytz`, `tzlocal`, `python-dateutil`): about 10 MB
+  installed and ~230 ms import time. Analysis is roughly 5x faster on the test suite's data.
+- `detect_timestamp()` (use `detect_format()`), `map_analyzer_type()`.
 - **Breaking:** the Python `datetime_type` option. Timestamps are `datetime` in Pydantic models (which
   parse them) and `str` in dataclasses and TypedDicts (which hold the JSON string as-is).
 - The progress spinner shown by `analyze_json()`: a library function no longer draws terminal UI.

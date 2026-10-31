@@ -46,7 +46,6 @@
 ### Core Dependencies
 
 ```
-dateparser>=1.2.0        # Timestamp detection
 jmespath>=1.0.1          # JMESPath query language
 jinja2>=3.0.0            # Template engine for code generation
 plotly>=5.0.0            # Interactive, browser-based graphing
@@ -64,7 +63,6 @@ pytest-cov>=4.0.0
 ruff>=0.17.0
 mypy>=1.0.0
 types-requests>=2.31.0
-types-dateparser>=1.1.0
 ```
 
 ---
@@ -278,9 +276,9 @@ source, data = load_json(url="https://api.example.com/data")
 
 # Analyze structure
 analysis = analyze_json(data)
-print(f"Type: {analysis['type']}")
-print(f"Children: {analysis.get('children', {})}")
-print(f"Conflicts: {analysis.get('conflicts', {})}")
+print(f"Kind: {analysis.kind}")          # object, array, string, ...
+print(f"Fields: {list(analysis.fields)}")  # for objects
+print(analysis.to_dict())                  # plain-dict form
 ```
 
 ### JMESPath Search

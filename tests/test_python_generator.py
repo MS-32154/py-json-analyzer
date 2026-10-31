@@ -15,10 +15,10 @@ class TestPythonConfig:
         config = PythonConfig()
 
         assert config.style == PythonStyle.DATACLASS
-        assert config.type_map[FieldType.TIMESTAMP] == "str"
-        assert (
-            PythonConfig(style="pydantic").type_map[FieldType.TIMESTAMP] == "datetime"
-        )
+        assert config.type_map[FieldType.DATE_TIME] == "str"
+        pydantic = PythonConfig(style="pydantic").type_map
+        assert pydantic[FieldType.DATE_TIME] == "datetime"
+        assert pydantic[FieldType.DURATION] == "timedelta"
 
     def test_dataclass_config(self):
         config = PythonConfig(

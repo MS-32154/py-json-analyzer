@@ -15,7 +15,7 @@ from rich.prompt import Confirm, Prompt
 from rich.syntax import Syntax
 from rich.table import Table
 
-from json_explorer.analyzer import analyze_json
+from json_explorer.analyzer import Node, analyze_json
 from json_explorer.codegen.registry import get_plugin
 from json_explorer.logging_config import get_logger
 from json_explorer.utils import prompt_input, prompt_input_path
@@ -83,7 +83,7 @@ class CodegenInteractiveHandler:
         """
         self.data = data
         self.console = console or Console()
-        self._analysis_cache: dict | None = None
+        self._analysis_cache: Node | None = None
         self._language_handlers: dict[str, LanguageInteractiveHandler] = {}
 
         logger.info("CodegenInteractiveHandler initialized")
