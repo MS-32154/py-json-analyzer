@@ -107,6 +107,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `py.typed` marker: type information is now shipped with the package.
 
 ### Fixed
+- `null` elements inside arrays were ignored (`[1, null]` became `list[int]`, which Pydantic rejects).
+  They are now `list[int | None]` / `[]*int64`.
 - TypedDicts typed a key that is present but sometimes `null` as `NotRequired[T]`, which rejects the
   data. The analysis now tells missing keys (`optional`, `NotRequired`) from `null` values
   (`nullable`, `T | None`); the tree view shows both.

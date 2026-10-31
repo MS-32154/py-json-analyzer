@@ -176,8 +176,12 @@ class PythonGenerator(CodeGenerator):
 
     def _element_type(self, fld: Field, run: _Run) -> str:
         if fld.array_element_schema:
-            return run.names.type_name(fld.array_element_schema)
-        return self._primitive(fld.array_element_type or FieldType.UNKNOWN, run)
+            element = run.names.type_name(fld.array_element_schema)
+        else:
+            element = self._primitive(fld.array_element_type or FieldType.UNKNOWN, run)
+        if fld.array_element_nullable and element != "Any":
+            element = f"{element} | None"
+        return element
 
     def _primitive(self, field_type: FieldType, run: _Run) -> str:
         annotation = self.python_config.type_map.get(field_type, "Any")

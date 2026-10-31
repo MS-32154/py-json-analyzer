@@ -106,11 +106,16 @@ class GoGenerator(CodeGenerator):
 
     def _element_type(self, fld: Field, run: _Run) -> str:
         if fld.array_element_schema:
-            return run.names.type_name(fld.array_element_schema)
-        if fld.array_element_type in (None, FieldType.UNKNOWN):
+            element = run.names.type_name(fld.array_element_schema)
+        elif fld.array_element_type in (None, FieldType.UNKNOWN):
             return UNKNOWN_TYPE
-        self._note_import(fld.array_element_type, run)
-        return self.go_config.type_map.get(fld.array_element_type, UNKNOWN_TYPE)
+        else:
+            self._note_import(fld.array_element_type, run)
+            element = self.go_config.type_map.get(fld.array_element_type, UNKNOWN_TYPE)
+        # *T keeps null elements apart from zero values (any already holds nil)
+        if fld.array_element_nullable and element != UNKNOWN_TYPE:
+            return f"*{element}"
+        return element
 
     def _note_import(self, field_type: FieldType, run: _Run) -> None:
         if (

@@ -33,6 +33,11 @@ CASES: dict[str, typing.Any] = {
     "digit_key": {"123abc": 1},
     "quote_key": {'q"k': 1},
     "nested_arrays": {"matrix": [[1, 2]], "groups": [[{"id": 1}]], "cube": [[[1.5]]]},
+    "null_elements": {
+        "vals": [1, None, 2],
+        "grid": [[1, None]],
+        "objs": [{"a": 1}, None],
+    },
     "timestamps": [{"at": "2024-01-01T10:00:00Z", "tags": ["2024-01-02"]}, {}],
     "formats": [
         {

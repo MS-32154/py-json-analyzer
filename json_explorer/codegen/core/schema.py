@@ -107,6 +107,8 @@ class Field:
     array_element_type: FieldType | None = None
     # Nesting depth: 1 for list[T], 2 for list[list[T]], ...
     array_dimensions: int = 1
+    # null seen among the (innermost) array elements: list[T | None]
+    array_element_nullable: bool = False
     array_element_schema: Schema | None = None
 
     # Type conflicts
@@ -261,6 +263,7 @@ def _field(key: str, node: Node, add_attention: bool) -> Field:
             while element is not None and element.kind == Kind.ARRAY:
                 element, dimensions = element.items, dimensions + 1
             fld.array_dimensions = dimensions
+            fld.array_element_nullable = element is not None and element.nullable
             fld.array_element_type = field_type_of(element)
             if element is not None and element.kind == Kind.OBJECT:
                 name = type_name_for_key(key, item=True)
