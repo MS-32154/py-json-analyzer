@@ -80,7 +80,13 @@ class TestAnnotations:
         assert "mixed:" not in text
 
     def test_null_only(self):
-        assert "v (null) (optional)" in render({"v": None})
+        assert "v (null)" in render({"v": None})
+        assert "(nullable)" not in render({"v": None})  # implied by null
+
+    def test_nullable_and_optional(self):
+        text = render([{"a": None, "b": 1}, {"a": "x"}])
+        assert "a (string) (nullable)" in text
+        assert "b (integer) (optional)" in text
 
 
 class TestPrintFunctions:
@@ -92,7 +98,7 @@ class TestPrintFunctions:
         print_json_tree(data, "sample")
         out = capsys.readouterr().out
         assert "sample" in out
-        assert "email (string) (optional)" in out
+        assert "email (string) (nullable)" in out
 
     def test_print_compact_tree(self, data, capsys):
         print_compact_tree(data, "sample")

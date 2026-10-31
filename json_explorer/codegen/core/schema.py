@@ -93,7 +93,11 @@ class Field:
     name: str
     original_name: str
     type: FieldType
+    # Missing from some objects or null somewhere (what most targets need)
     optional: bool = False
+    # The finer distinction (TypedDict: NotRequired vs. "| None")
+    missing: bool = False
+    nullable: bool = False
     description: str | None = None
 
     # Nested structures
@@ -239,7 +243,12 @@ def _schema(node: Node, name: str, add_attention: bool) -> Schema:
 
 def _field(key: str, node: Node, add_attention: bool) -> Field:
     fld = Field(
-        name=key, original_name=key, type=field_type_of(node), optional=node.optional
+        name=key,
+        original_name=key,
+        type=field_type_of(node),
+        optional=node.optional or node.nullable,
+        missing=node.optional,
+        nullable=node.nullable,
     )
     match node.kind:
         case Kind.MIXED:

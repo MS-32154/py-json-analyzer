@@ -25,8 +25,9 @@ class TestPrimitives:
     def test_kinds(self, value, kind):
         assert analyze_json(value).kind == kind
 
-    def test_null_is_optional(self):
-        assert analyze_json(None).optional
+    def test_null_is_nullable(self):
+        node = analyze_json(None)
+        assert node.nullable and not node.optional
 
     def test_not_json(self):
         with pytest.raises(TypeError):
@@ -49,8 +50,8 @@ class TestArrays:
         assert items.kind == Kind.MIXED
         assert items.kinds == {Kind.INTEGER, Kind.STRING, Kind.BOOLEAN}
 
-    def test_null_elements_make_items_optional(self):
-        assert analyze_json([1, None]).items == Node(Kind.INTEGER, optional=True)
+    def test_null_elements_make_items_nullable(self):
+        assert analyze_json([1, None]).items == Node(Kind.INTEGER, nullable=True)
 
     def test_nested(self):
         items = analyze_json([[1], [], [2, 3]]).items
@@ -76,20 +77,25 @@ class TestObjects:
         assert not fields["a"].optional
         assert fields["b"].optional
 
-    def test_null_values_are_optional(self):
+    def test_null_values_are_nullable_not_missing(self):
+        """#23: a null value and a missing key are different things."""
         fields = analyze_json([{"a": None}, {"a": "x"}]).items.fields
-        assert fields["a"] == Node(Kind.STRING, optional=True)
+        assert fields["a"] == Node(Kind.STRING, nullable=True)
+
+    def test_missing_and_null(self):
+        fields = analyze_json([{"a": None}, {"a": "x"}, {}]).items.fields
+        assert fields["a"] == Node(Kind.STRING, optional=True, nullable=True)
 
     def test_only_nulls(self):
         assert analyze_json([{"a": None}]).items.fields["a"] == Node(
-            Kind.NULL, optional=True
+            Kind.NULL, nullable=True
         )
 
     def test_conflict(self):
         fields = analyze_json([{"v": 1}, {"v": "x"}, {"v": None}]).items.fields
         assert fields["v"].kind == Kind.MIXED
         assert fields["v"].kinds == {Kind.INTEGER, Kind.STRING}
-        assert fields["v"].optional
+        assert fields["v"].nullable
 
     def test_nested_merge(self):
         data = [{"p": {"x": 1}}, {"p": {"x": 2, "y": "a"}}]
@@ -157,7 +163,7 @@ class TestToDict:
                     "id": {"kind": "float"},
                     "at": {"kind": "string", "optional": True, "format": "date"},
                     "tags": {"kind": "array", "optional": True, "items": None},
-                    "v": {"kind": "null", "optional": True},
+                    "v": {"kind": "null", "optional": True, "nullable": True},
                 },
             },
         }

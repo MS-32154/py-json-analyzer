@@ -203,3 +203,12 @@ def test_pydantic_validates_source_data(case: str) -> None:
     root = namespace["Root"]
     adapter = pydantic.TypeAdapter(list[root] if isinstance(data, list) else root)
     adapter.validate_python(data)
+
+
+def test_typeddict_null_vs_missing() -> None:
+    """#23: a TypedDict must accept the data it was generated from."""
+    data = [{"name": "A", "email": None, "nick": "a"}, {"name": "B", "email": "b@x"}]
+    code = quick_generate(data, "python", style="typeddict")
+    assert "email: str | None" in code  # present, possibly null
+    assert "nick: NotRequired[str]" in code  # may be missing, never null
+    assert "name: str" in code

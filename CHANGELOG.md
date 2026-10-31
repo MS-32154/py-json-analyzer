@@ -107,6 +107,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `py.typed` marker: type information is now shipped with the package.
 
 ### Fixed
+- TypedDicts typed a key that is present but sometimes `null` as `NotRequired[T]`, which rejects the
+  data. The analysis now tells missing keys (`optional`, `NotRequired`) from `null` values
+  (`nullable`, `T | None`); the tree view shows both.
 - Statistics counted booleans as numbers (`numeric_ranges.min` could be `False`).
 - Docs: every Python example parses and every documented import and CLI flag exists.
 - `--generate` on a JSON document that is just `null` tried to re-read the input (passing a URL as a

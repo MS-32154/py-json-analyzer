@@ -161,10 +161,17 @@ class PythonGenerator(CodeGenerator):
                 annotation = self._primitive(FieldType.UNKNOWN, run)
             case _:
                 annotation = self._primitive(fld.type, run)
+        if self.style == PythonStyle.TYPEDDICT:
+            # A TypedDict describes the dict as-is: a null value is "| None",
+            # a key that can be missing is NotRequired
+            if fld.nullable:
+                annotation = f"{annotation} | None"
+            if fld.missing:
+                run.uses.add("NotRequired")
+                annotation = f"NotRequired[{annotation}]"
+            return annotation
         if not fld.optional:
             return annotation
-        if self.style == PythonStyle.TYPEDDICT:
-            run.uses.add("NotRequired")
         return self.python_config.optional(annotation)
 
     def _element_type(self, fld: Field, run: _Run) -> str:

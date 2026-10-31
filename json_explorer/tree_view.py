@@ -50,8 +50,11 @@ class JsonTreeBuilder:
         if node.format:
             type_text += f", {node.format.value}"
         label = f"{name} [{color}]({type_text})[/{color}]"
-        if node.optional and self.show_optional:
-            label += " [dim](optional)[/dim]"
+        if self.show_optional:
+            if node.optional:  # key missing from some objects
+                label += " [dim](optional)[/dim]"
+            if node.nullable and node.kind != Kind.NULL:
+                label += " [dim](nullable)[/dim]"
         if node.kind == Kind.MIXED and self.show_conflicts:
             kinds = ", ".join(sorted(k.value for k in node.kinds))
             label += f" [bold red](mixed: {kinds})[/bold red]"

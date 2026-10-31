@@ -5,7 +5,8 @@
 there (every array element is used, not a sample). Merging is a single rule:
 
 - the same kind merges recursively (object fields, array items);
-- ``null`` or a key missing from some objects makes the node *optional*;
+- a key missing from some objects makes the node *optional*; ``null`` makes it
+  *nullable*;
 - integers and floats merge to float;
 - anything else becomes ``mixed``, recording the kinds seen.
 
@@ -91,7 +92,8 @@ class Node:
 
     Attributes:
         kind: The value kind (``mixed`` if different kinds were seen).
-        optional: Missing from some objects, or ``null`` somewhere.
+        optional: The key is missing from some objects.
+        nullable: ``null`` was seen.
         fields: For objects: the shape of each key.
         items: For arrays: the merged shape of all elements (``None`` if only
             empty arrays were seen).
@@ -101,6 +103,7 @@ class Node:
 
     kind: Kind
     optional: bool = False
+    nullable: bool = False
     fields: dict[str, Node] = field(default_factory=dict)
     items: Node | None = None
     kinds: frozenset[Kind] = frozenset()
@@ -111,6 +114,8 @@ class Node:
         result: dict[str, Any] = {"kind": self.kind.value}
         if self.optional:
             result["optional"] = True
+        if self.nullable:
+            result["nullable"] = True
         if self.kind == Kind.OBJECT:
             result["fields"] = {k: v.to_dict() for k, v in self.fields.items()}
         if self.kind == Kind.ARRAY:
@@ -135,7 +140,7 @@ def analyze_json(data: Any) -> Node:
 def _analyze(value: Any) -> Node:
     match value:
         case None:
-            return Node(Kind.NULL, optional=True)
+            return Node(Kind.NULL, nullable=True)
         case bool():
             return Node(Kind.BOOLEAN)
         case int():
@@ -159,10 +164,11 @@ def _analyze(value: Any) -> Node:
 def merge(a: Node, b: Node) -> Node:
     """Shape describing values of both shapes."""
     optional = a.optional or b.optional
+    nullable = a.nullable or b.nullable
     if a.kind == Kind.NULL:
-        return replace(b, optional=True)
+        return replace(b, optional=optional, nullable=True)
     if b.kind == Kind.NULL:
-        return replace(a, optional=True)
+        return replace(a, optional=optional, nullable=True)
 
     if a.kind == b.kind:
         match a.kind:
@@ -175,25 +181,25 @@ def merge(a: Node, b: Node) -> Node:
                         fields[key] = replace(
                             a.fields.get(key) or b.fields[key], optional=True
                         )
-                return Node(Kind.OBJECT, optional, fields=fields)
+                return Node(Kind.OBJECT, optional, nullable, fields=fields)
             case Kind.ARRAY:
                 if a.items is None or b.items is None:
                     items = a.items or b.items
                 else:
                     items = merge(a.items, b.items)
-                return Node(Kind.ARRAY, optional, items=items)
+                return Node(Kind.ARRAY, optional, nullable, items=items)
             case Kind.MIXED:
-                return Node(Kind.MIXED, optional, kinds=a.kinds | b.kinds)
+                return Node(Kind.MIXED, optional, nullable, kinds=a.kinds | b.kinds)
             case Kind.STRING:
                 # A format holds only if every value follows it
                 fmt = a.format if a.format == b.format else None
-                return Node(Kind.STRING, optional, format=fmt)
+                return Node(Kind.STRING, optional, nullable, format=fmt)
             case _:
-                return Node(a.kind, optional)
+                return Node(a.kind, optional, nullable)
 
     kinds = (a.kinds or {a.kind}) | (b.kinds or {b.kind})
     if Kind.FLOAT in kinds:
         kinds -= {Kind.INTEGER}  # integers widen to float
     if len(kinds) == 1:
-        return Node(next(iter(kinds)), optional)
-    return Node(Kind.MIXED, optional, kinds=frozenset(kinds))
+        return Node(next(iter(kinds)), optional, nullable)
+    return Node(Kind.MIXED, optional, nullable, kinds=frozenset(kinds))
