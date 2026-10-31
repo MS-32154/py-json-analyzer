@@ -235,7 +235,7 @@ def generate_code(
         result.log_summary()
         return result
 
-    except Exception as e:
+    except JsonExplorerError as e:  # template/config problems; bugs propagate
         logger.debug("Generation failed with exception", exc_info=True)
         return GenerationResult.error(
             message=f"Code generation failed: {e}",

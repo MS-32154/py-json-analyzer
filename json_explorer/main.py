@@ -11,6 +11,7 @@ from rich.console import Console
 
 from .cli import CLIHandler
 from .codegen.cli_integration import add_codegen_args, handle_codegen_command
+from .errors import JsonExplorerError
 from .interactive import InteractiveHandler
 from .logging_config import configure_logging, get_logger
 from .utils import load_json
@@ -50,7 +51,7 @@ class JSONExplorer:
             self.source, self.data = load_json(file_path, url)
             logger.info("Loaded JSON data from %s", self.source)
             return True
-        except Exception as e:
+        except (JsonExplorerError, OSError) as e:  # JSONLoaderError, FileNotFoundError
             self.console.print(f"❌ [red]Error loading data: {e}[/red]")
             return False
 

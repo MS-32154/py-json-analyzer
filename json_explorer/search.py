@@ -107,10 +107,6 @@ class JsonSearcher:
             logger.debug("JMESPath query error: %s", e)
             self.console.print(f"[red]Query error: {e}[/red]")
             return None
-        except Exception as e:
-            logger.debug("Unexpected error during search: %s", e, exc_info=True)
-            self.console.print(f"[red]Unexpected error: {e}[/red]")
-            return None
 
     def validate_query(self, query: str) -> tuple[bool, str | None]:
         """Validate a JMESPath query without executing it.
@@ -131,8 +127,6 @@ class JsonSearcher:
             return True, None
         except JMESPathError as e:
             return False, str(e)
-        except Exception as e:
-            return False, f"Unexpected error: {e}"
 
     def print_result(
         self,

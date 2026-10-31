@@ -29,7 +29,7 @@ from . import (
     list_languages,
 )
 from .core.plugin import LanguagePlugin
-from .registry import all_plugins, get_plugin, is_supported
+from .registry import RegistryError, all_plugins, get_plugin, is_supported
 
 logger = get_logger(__name__)
 # Generated code is the program's output and goes to stdout; status messages,
@@ -237,7 +237,7 @@ def _list_languages() -> int:
         logger.info("Listed %s available languages", len(language_info))
         return 0
 
-    except Exception as e:
+    except RegistryError as e:
         err_console.print(f"[red]✗ Error listing languages:[/red] {e}")
         logger.debug("Failed to list languages: %s", e)
         return 1
@@ -276,7 +276,7 @@ def _show_language_info(language: str) -> int:
         logger.info("Displayed info for language: %s", language)
         return 0
 
-    except Exception as e:
+    except RegistryError as e:
         err_console.print(f"[red]✗ Error getting language info:[/red] {e}")
         logger.debug("Failed to get language info: %s", e)
         return 1
@@ -333,12 +333,8 @@ def _build_config(args: argparse.Namespace, language: str) -> dict:
 
     # Load from config file if provided
     if hasattr(args, "config") and args.config:
-        try:
-            file_config = _load_config_file(args.config)
-            config_dict.update(file_config)
-            logger.info("Loaded config from file: %s", args.config)
-        except Exception as e:
-            raise CLIError(f"Configuration error: {e}") from e
+        config_dict.update(_load_config_file(args.config))  # raises CLIError
+        logger.info("Loaded config from file: %s", args.config)
 
     # Override with CLI arguments
     if hasattr(args, "package_name") and args.package_name:
@@ -471,16 +467,12 @@ def _display_to_stdout(code: str, language: str) -> None:
 
     console.print(f"\n[green]📄 Generated {language.title()} Code\n[/green]")
 
-    try:
-        # Map language names for syntax highlighting
-        syntax_lang = language.lower()
-        if syntax_lang == "golang":
-            syntax_lang = "go"
-        elif syntax_lang == "py":
-            syntax_lang = "python"
+    # Rich renders unknown languages as plain text
+    syntax_lang = language.lower()
+    if syntax_lang == "golang":
+        syntax_lang = "go"
+    elif syntax_lang == "py":
+        syntax_lang = "python"
 
-        syntax = Syntax(code, syntax_lang, theme="monokai", padding=1)
-        console.print(syntax)
-    except Exception:
-        # Fallback to plain text
-        console.print(code)
+    syntax = Syntax(code, syntax_lang, theme="monokai", padding=1)
+    console.print(syntax)

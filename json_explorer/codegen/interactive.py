@@ -15,6 +15,7 @@ from rich.syntax import Syntax
 
 from json_explorer.analyzer import Node, analyze_json
 from json_explorer.codegen.registry import get_plugin
+from json_explorer.errors import JsonExplorerError
 from json_explorer.logging_config import get_logger
 from json_explorer.ui import ask, ask_path, print_metadata
 
@@ -303,7 +304,7 @@ class CodegenInteractiveHandler:
 
             return config.to_dict()
 
-        except Exception as e:
+        except JsonExplorerError as e:  # ConfigError: missing/invalid file
             self.console.print(f"[red]⚠️ Error loading configuration: {e}[/red]")
             logger.debug("Failed to load config file: %s", e)
             return None
@@ -397,28 +398,24 @@ class CodegenInteractiveHandler:
             f"\n[green]📄 Generated {language.title()} Code Preview[/green]"
         )
 
-        try:
-            # Map language names for syntax highlighting
-            syntax_lang = language.lower()
-            if syntax_lang == "golang":
-                syntax_lang = "go"
-            elif syntax_lang == "py":
-                syntax_lang = "python"
+        # Rich renders unknown languages as plain text
+        # Map language names for syntax highlighting
+        syntax_lang = language.lower()
+        if syntax_lang == "golang":
+            syntax_lang = "go"
+        elif syntax_lang == "py":
+            syntax_lang = "python"
 
-            syntax = Syntax(
-                code,
-                syntax_lang,
-                theme="monokai",
-                line_numbers=False,
-                padding=1,
-            )
-            self.console.print()
-            self.console.print(syntax)
-            self.console.print()
-
-        except Exception:
-            # Fallback to plain text
-            self.console.print("[dim]" + code + "[/dim]")
+        syntax = Syntax(
+            code,
+            syntax_lang,
+            theme="monokai",
+            line_numbers=False,
+            padding=1,
+        )
+        self.console.print()
+        self.console.print(syntax)
+        self.console.print()
 
     def _save_code(self, code: str, language: str, root_name: str) -> None:
         """Save generated code to file."""
@@ -452,7 +449,7 @@ class CodegenInteractiveHandler:
             )
             logger.info("Code saved to: %s", output_path)
 
-        except Exception as e:
+        except OSError as e:
             self.console.print(f"[red]⚠️ Error saving file:[/red] {e}")
             logger.debug("Failed to save file: %s", e)
 

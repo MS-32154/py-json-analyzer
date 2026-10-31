@@ -156,6 +156,6 @@ class CLIHandler:
                 detailed,
                 save_path,
             )
-        except Exception as e:
+        except (OSError, ValueError) as e:  # report not writable, bad format
             self.console.print(f"❌ [red]Visualization error: {e}[/red]")
             logger.debug("Visualization error: %s", e)

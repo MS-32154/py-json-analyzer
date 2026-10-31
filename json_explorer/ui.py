@@ -108,7 +108,9 @@ def ask(message: str, default: str | None = None, **kwargs) -> str:
             f"{message} > ", default=default or "", history=history
         ).strip() or (default or "")
 
-    except Exception:
+    except EOFError:  # Ctrl-D: let the caller handle it
+        raise
+    except Exception:  # prompt_toolkit can't drive this terminal
         return Prompt.ask(message, default=default or "", **kwargs)
 
 
@@ -130,7 +132,9 @@ def ask_path(message: str, **kwargs) -> str:
             complete_while_typing=True,
         ).strip()
 
-    except Exception:
+    except EOFError:  # Ctrl-D: let the caller handle it
+        raise
+    except Exception:  # prompt_toolkit can't drive this terminal
         return Prompt.ask(message)
 
 

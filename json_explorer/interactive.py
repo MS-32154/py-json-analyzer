@@ -8,6 +8,7 @@ from rich.panel import Panel
 from rich.prompt import Confirm, Prompt
 
 from .codegen.interactive import CodegenInteractiveHandler
+from .errors import JsonExplorerError
 from .logging_config import get_logger
 from .search import JsonSearcher
 from .stats import DataStatsAnalyzer
@@ -191,7 +192,7 @@ class InteractiveHandler:
                 detailed=detailed,
                 open_browser=open_browser,
             )
-        except Exception as e:
+        except (OSError, ValueError) as e:  # report not writable, bad format
             self.console.print(f"⚠️ [red]Visualization error: {e}[/red]")
 
     def _interactive_codegen(self) -> None:
@@ -214,7 +215,7 @@ class InteractiveHandler:
                 self.source, self.data = load_json(None, url)
 
             self.console.print(f"✅ [green]Successfully loaded: {self.source}[/green]")
-        except Exception as e:
+        except (JsonExplorerError, OSError) as e:  # JSONLoaderError, FileNotFoundError
             self.console.print(f"⚠️ [red]Failed to load data: {e}[/red]")
 
     def _save_search_result(self, result: Any) -> None:
@@ -237,5 +238,5 @@ class InteractiveHandler:
             with Path(filename).open("w", encoding="utf-8") as f:
                 json.dump(output_data, f, indent=2, ensure_ascii=False)
             self.console.print(f"✅ [green]Result saved to: {filename}[/green]")
-        except Exception as e:
+        except OSError as e:
             self.console.print(f"⚠️ [red]Error saving result: {e}[/red]")

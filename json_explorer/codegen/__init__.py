@@ -139,7 +139,7 @@ def quick_generate(
     # Analyze JSON
     try:
         analysis = analyze_json(json_data)
-    except Exception as e:
+    except TypeError as e:  # not a JSON value
         raise GeneratorError(f"JSON analysis failed: {e}") from e
 
     # Apply language-specific defaults
