@@ -21,7 +21,8 @@
 - **Visualization**: text charts in the terminal, an interactive HTML report (Plotly), or both
 - **JSON Schema export**: a draft 2020-12 schema of the data (`--json-schema`) for validation or for
   other code generators
-- **Interactive Mode**: Full-featured terminal UI for exploration and analysis
+- **Terminal UI**: a full-screen app (Textual) with the data, its structure, live JMESPath search,
+  statistics and code generation with a live preview, side by side in tabs
 
 ### Code Generation
 
@@ -36,7 +37,7 @@
 - **Correct names**: types named after their keys (`TeamLead`, `Project`), every name planned once so
   declarations and references agree, keys escaped or mapped with aliases
 - **Verified output**: the test suite compiles the generated code and decodes the source data with it
-- **Configuration**: JSON config file, CLI flags, or guided interactive setup with presets;
+- **Configuration**: JSON config file, CLI flags, or the options panel in the terminal UI;
   invalid options fail with a clear message
 
 ### Library Features
@@ -59,9 +60,9 @@
 jmespath>=1.0.1          # JMESPath query language
 jinja2>=3.0.0            # Template engine for code generation
 plotly>=5.0.0            # Interactive, browser-based graphing
-prompt-toolkit>=3.0.0    # Interactive input with autocomplete
 requests>=2.32.0         # HTTP requests for URL loading
 rich>=13.0.0             # Rich terminal formatting
+textual>=8.2             # Terminal UI
 ```
 
 ### Development Dependencies (`dev` dependency group)
@@ -111,8 +112,8 @@ uv sync              # installs the dev group; or (pip >= 25.1): pip install -e 
 ### Command Line
 
 ```bash
-# Interactive mode (recommended for first-time users)
-json_explorer data.json --interactive
+# Terminal UI (the default when no action is given)
+json_explorer data.json
 
 # Quick analysis
 json_explorer data.json --tree compact --stats
@@ -165,12 +166,28 @@ json_explorer data.json              # Load from file
 json_explorer --url https://api.example.com/data  # Load from URL
 
 # Display Modes
---interactive, -i                    # Interactive mode (full UI)
+--interactive, -i                    # Terminal UI (default without other actions)
 --tree {compact,analysis,raw}        # Display tree structure
 --stats                              # Show statistics
 --detailed                           # Show detailed information
 --plot                               # Generate visualizations
 ```
+
+### Terminal UI
+
+`json_explorer data.json` (or `--interactive`) opens a full-screen terminal UI with five tabs:
+
+| Tab | Key | Shows |
+|---|---|---|
+| Data | `1` | The document as a tree; large containers expand on demand |
+| Structure | `2` | The inferred types: optional keys, nullable values, formats, mixed kinds |
+| Search | `3` | JMESPath queries, checked as you type, with the result as JSON and examples |
+| Statistics | `4` | Size, depth, complexity and quality issues; opens the HTML report |
+| Code | `5` | Every language and JSON Schema with a live preview; options come from each language's flags |
+
+Other keys: `/` search, `Esc` leave a text box, `Ctrl+S` save the generated code, `Ctrl+Y` copy it,
+`q` quit.
+The UI needs a terminal; in scripts and pipes use the flags below.
 
 ### JMESPath Search
 
@@ -299,9 +316,9 @@ source, data = load_json(url="https://api.example.com/data")
 
 # Analyze structure
 analysis = analyze_json(data)
-print(f"Kind: {analysis.kind}")          # object, array, string, ...
+print(f"Kind: {analysis.kind}")  # object, array, string, ...
 print(f"Fields: {list(analysis.fields)}")  # for objects
-print(analysis.to_dict())                  # plain-dict form
+print(analysis.to_dict())  # plain-dict form
 ```
 
 ### JMESPath Search
@@ -369,11 +386,7 @@ visualizer.visualize(data, output="terminal", detailed=True)
 
 # HTML visualization
 visualizer.visualize(
-    data,
-    output="html",
-    save_path="report.html",
-    detailed=True,
-    open_browser=True
+    data, output="html", save_path="report.html", detailed=True, open_browser=True
 )
 
 # Or use convenience function
@@ -406,22 +419,14 @@ from json_explorer.codegen import (
     generate_from_analysis,
     create_config,
     list_languages,
-    get_language_info
+    get_language_info,
 )
 
 # Quick generation
-go_code = quick_generate(
-    data,
-    language="go",
-    package_name="models",
-    root_name="User"
-)
+go_code = quick_generate(data, language="go", package_name="models", root_name="User")
 
 python_code = quick_generate(
-    data,
-    language="python",
-    style="pydantic",
-    package_name="models"
+    data, language="python", style="pydantic", package_name="models"
 )
 
 # Detailed workflow
@@ -430,10 +435,7 @@ config = create_config(
     language="go",
     package_name="api",
     add_comments=True,
-    language_config={
-        "use_pointers_for_optional": True,
-        "int_type": "int64"
-    }
+    language_config={"use_pointers_for_optional": True, "int_type": "int64"},
 )
 
 result = generate_from_analysis(analysis, "go", config, "User")
@@ -452,14 +454,12 @@ info = get_language_info("python")
 print(f"Python styles: {info.get('styles', [])}")
 ```
 
-### Interactive Mode
+### Terminal UI from Python
 
 ```python
-from json_explorer.interactive import InteractiveHandler
+from json_explorer.tui import run_tui
 
-handler = InteractiveHandler()
-handler.set_data(data, source="my_data.json")
-exit_code = handler.run()  # Launches interactive UI
+exit_code = run_tui(data, source="my_data.json")  # until the user quits
 ```
 
 ---
@@ -554,7 +554,7 @@ json_explorer/
 ├── __main__.py              # Entry point for `python -m json_explorer`
 ├── main.py                  # CLI application coordinator
 ├── cli.py                   # CLI command handler
-├── interactive.py           # Interactive mode handler
+├── tui.py                   # Terminal UI (Textual)
 │
 ├── analyzer.py              # JSON structure analysis
 ├── search.py                # JMESPath-based search
@@ -562,7 +562,7 @@ json_explorer/
 ├── tree_view.py             # Tree visualization
 ├── visualizer.py            # Terminal text charts and Plotly HTML report
 ├── utils.py                 # File/URL loading
-├── ui.py                    # Prompts and shared terminal helpers
+├── ui.py                    # Small terminal output helpers
 ├── errors.py                # JsonExplorerError base exception
 ├── logging_config.py        # Logging setup (silent unless configured)
 │
@@ -570,7 +570,6 @@ json_explorer/
     ├── __init__.py          # Code generation API
     ├── registry.py          # Generator registry system
     ├── cli_integration.py   # CLI integration
-    ├── interactive.py       # Interactive codegen UI
     │
     ├── core/                # Core codegen infrastructure
     │   ├── naming.py        # Word splitting and the name plan
@@ -586,7 +585,6 @@ json_explorer/
         │   ├── generator.py
         │   ├── config.py
         │   ├── naming.py
-        │   ├── interactive.py
         │   └── templates/   # Jinja2 templates
         │
         ├── python/
@@ -594,7 +592,6 @@ json_explorer/
         │   ├── generator.py
         │   ├── config.py
         │   ├── naming.py
-        │   ├── interactive.py
         │   └── templates/   # Jinja2 templates
         │
         ├── rust/            # serde structs
@@ -616,8 +613,8 @@ json_explorer/
 
 - **Typed analysis**: `analyze_json()` returns `Node` trees merged by one rule
 - **Name plan**: every type and field is named once before rendering
-- **Language plugins**: each language is one `LanguagePlugin` (generator, flags, examples, interactive
-  handler), registered by the registry or an entry point
+- **Language plugins**: each language is one `LanguagePlugin` (generator, flags, examples),
+  registered by the registry or an entry point; the terminal UI builds its options from the flags
 
 ---
 
@@ -752,6 +749,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 - **JMESPath**: Powerful JSON query language
 - **Rich**: Beautiful terminal formatting
+- **Textual**: Terminal UI framework
 - **Plotly**: Interactive visualizations
 - **Jinja2**: Flexible template engine
 

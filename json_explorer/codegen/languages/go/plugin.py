@@ -2,14 +2,12 @@
 
 from ...core.plugin import CliOption, LanguagePlugin
 from .generator import GoGenerator
-from .interactive import GoInteractiveHandler
 
 PLUGIN = LanguagePlugin(
     name="go",
     display_name="Go",
     generator=GoGenerator,
     aliases=("golang",),
-    interactive=GoInteractiveHandler,
     cli_options=(
         CliOption(
             "--no-pointers",

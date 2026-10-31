@@ -117,7 +117,6 @@ def _documented_signatures() -> list:
 
 def _find_callable(name: str):
     from json_explorer import DataStatsAnalyzer, JsonSearcher, JSONVisualizer
-    from json_explorer.codegen.interactive import CodegenInteractiveHandler
     from json_explorer.tree_view import JsonTreeBuilder
 
     for cls in (
@@ -125,7 +124,6 @@ def _find_callable(name: str):
         DataStatsAnalyzer,
         JSONVisualizer,
         JsonTreeBuilder,
-        CodegenInteractiveHandler,
     ):
         if inspect.isfunction(getattr(cls, name, None)):
             return getattr(cls, name)

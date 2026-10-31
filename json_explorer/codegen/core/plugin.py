@@ -1,6 +1,6 @@
 """Language plugins: everything the tool knows about one target language.
 
-A plugin bundles the generator class, aliases, the interactive handler, the
+A plugin bundles the generator class, aliases, the
 language's CLI flags and its usage examples. The registry loads the built-in
 plugins and any installed through the ``json_explorer.languages`` entry-point
 group, so adding a language means adding one package.
@@ -39,7 +39,6 @@ class LanguagePlugin:
     name: str
     generator: type[CodeGenerator]
     aliases: tuple[str, ...] = ()
-    interactive: type | None = None  # LanguageInteractiveHandler implementation
     cli_options: tuple[CliOption, ...] = ()
     examples: tuple[tuple[str, str], ...] = ()  # (description, CLI arguments)
     display_name: str = ""

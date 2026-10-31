@@ -13,7 +13,6 @@ from rich.console import Console
 from .cli import CLIHandler
 from .codegen.cli_integration import add_codegen_args, handle_codegen_command
 from .errors import JsonExplorerError
-from .interactive import InteractiveHandler
 from .json_schema import json_schema
 from .logging_config import configure_logging, get_logger
 from .ui import write_raw
@@ -29,7 +28,6 @@ class JSONExplorer:
     source: str
     console: Console
     cli_handler: CLIHandler
-    interactive_handler: InteractiveHandler
 
     def __init__(self) -> None:
         """Initialize the JSON Explorer application."""
@@ -37,7 +35,6 @@ class JSONExplorer:
         self.source = ""
         self.console = Console()
         self.cli_handler = CLIHandler()
-        self.interactive_handler = InteractiveHandler()
 
     def load_data(self, file_path: str | None = None, url: str | None = None) -> bool:
         """
@@ -86,12 +83,22 @@ class JSONExplorer:
         if getattr(args, "json_schema", False):
             return self._export_json_schema(args)
 
-        self.cli_handler.set_data(self.data, self.source)
-        self.interactive_handler.set_data(self.data, self.source)
-
         if getattr(args, "interactive", False) or not self._has_cli_actions(args):
-            return self.interactive_handler.run()
+            return self._run_tui()
+        self.cli_handler.set_data(self.data, self.source)
         return self.cli_handler.run(args)
+
+    def _run_tui(self) -> int:
+        """Open the TUI; it needs a terminal on both ends."""
+        if not (sys.stdin.isatty() and sys.stdout.isatty()):
+            self.console.print(
+                "[red]The interactive UI needs a terminal.[/red] Use --tree, "
+                "--search, --stats, --plot, --generate or --json-schema instead."
+            )
+            return 1
+        from .tui import run_tui  # Textual loads only when the TUI opens
+
+        return run_tui(self.data, self.source)
 
     def _export_json_schema(self, args: argparse.Namespace) -> int:
         """Write the inferred JSON Schema to --output or stdout."""
@@ -135,7 +142,7 @@ def create_parser() -> argparse.ArgumentParser:
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  %(prog)s data.json --interactive
+  %(prog)s data.json                      # open the interactive UI
   %(prog)s data.json --tree compact --stats
   %(prog)s data.json --search "users[*].name"
   %(prog)s data.json --search "users[?age > `30`]"
@@ -174,7 +181,10 @@ JSON Schema:
 
     # Interactive mode
     parser.add_argument(
-        "--interactive", "-i", action="store_true", help="Run in interactive mode"
+        "--interactive",
+        "-i",
+        action="store_true",
+        help="Open the interactive UI (the default when no action is given)",
     )
 
     # Tree operations

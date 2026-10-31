@@ -8,7 +8,6 @@ PLUGIN = LanguagePlugin(
     display_name="TypeScript",
     generator=TypeScriptGenerator,
     aliases=("ts",),
-    interactive=None,  # not in interactive mode yet
     cli_options=(
         CliOption(
             "--ts-style",

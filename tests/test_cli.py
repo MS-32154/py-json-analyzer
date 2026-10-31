@@ -197,3 +197,21 @@ def test_generate_from_null_document(run, tmp_path, capsys):
     """A document that is just `null` is valid JSON: the code wraps one value."""
     assert run(write_json(tmp_path, None), "--generate", "python") == 0
     assert "value: Any" in capsys.readouterr().out
+
+
+class TestTui:
+    @pytest.mark.parametrize("argv", [[], ["--interactive"], ["-i"]])
+    def test_opens_by_default_and_with_flag(self, run, monkeypatch, argv):
+        opened = []
+        monkeypatch.setattr("sys.stdin.isatty", lambda: True)
+        monkeypatch.setattr("sys.stdout.isatty", lambda: True)
+        monkeypatch.setattr(
+            "json_explorer.tui.run_tui", lambda data, source: opened.append(source) or 0
+        )
+        assert run(FLAT_SAMPLE, *argv) == 0
+        assert len(opened) == 1
+        assert str(FLAT_SAMPLE) in opened[0]
+
+    def test_needs_a_terminal(self, run, capsys):
+        assert run(FLAT_SAMPLE) == 1  # pytest captures stdin/stdout: no TTY
+        assert "needs a terminal" in capsys.readouterr().out

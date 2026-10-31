@@ -2,14 +2,12 @@
 
 from ...core.plugin import CliOption, LanguagePlugin
 from .generator import PythonGenerator
-from .interactive import PythonInteractiveHandler
 
 PLUGIN = LanguagePlugin(
     name="python",
     display_name="Python",
     generator=PythonGenerator,
     aliases=("py",),
-    interactive=PythonInteractiveHandler,
     cli_options=(
         CliOption(
             "--python-style",

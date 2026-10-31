@@ -22,6 +22,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `--plot-format interactive` is gone; `html` (the new default) opens the report in the browser
   unless `--no-browser`. The curses terminal view is replaced by text charts (`terminal`).
 - `--generate` without `--output` prints the raw code when piped; messages go to stderr.
+- The prompt-based interactive mode is replaced by a full-screen terminal UI (same entry points:
+  `--interactive`, or no action). It needs a terminal; in scripts use the action flags.
 
 **Generated code**
 - Type names come from keys (`RootUserProfile` -> `Profile`, `RootProjectsItem` -> `Project`); a root
@@ -49,13 +51,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `is_language_supported` -> `is_supported`; `register()` takes a `LanguagePlugin`.
 - Naming: `NameTracker`/`sanitize_name` -> `plan_names()`; per-language `go_identifier`,
   `python_class_name`, `python_field_name`.
-- Prompts: `json_explorer.utils.prompt_input`/`prompt_input_path` -> `json_explorer.ui.ask`/`ask_path`.
+- Prompts and interactive handlers are gone: `prompt_input`, `prompt_input_path`, `InteractiveHandler`,
+  `CodegenInteractiveHandler`, the per-language handlers and `LanguagePlugin.interactive`. Use
+  `json_explorer.tui.run_tui(data)`.
 - Search: `search_multiple()` and `compile_query` are gone; call `search()` per query.
 - All package errors derive from `JsonExplorerError`.
 
 ### Changed
-- The prompt helpers moved from `json_explorer.utils` to `json_explorer.ui` (`prompt_input` ->
-  `ask`, `prompt_input_path` -> `ask_path`); `json_explorer.utils` now only loads JSON.
+- `json_explorer.utils` now only loads JSON.
 - **Breaking:** `analyze_json()` returns a typed `Node` (`kind`, `optional`, `fields`, `items`,
   `kinds`, `format`; `to_dict()` for a plain-dict form) instead of a dict with `type`/`children`/
   `child_type` keys and string markers like `"mixed: int, str"`. `convert_analyzer_output()` and
@@ -80,9 +83,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `Project`, `data` -> `DataItem`); a root array of objects is named after `--root-name`.
 - Word splitting understands acronyms and accents: `XMLHttpRequest` -> `xml_http_request`,
   `café` -> `cafe`. Python field names may contain Unicode letters; Go names are ASCII.
-- Prompt history is stored in the user state directory (`$XDG_STATE_HOME/json_explorer`,
-  `~/Library/Application Support/json_explorer`, or `%LOCALAPPDATA%\json_explorer`) instead of
-  the current directory.
 - `--verbose-logging` is the documented spelling; `--verbose_logging` still works.
 - `RegistryError` is exported from `json_explorer.codegen`.
 - Logging follows library best practice: importing json_explorer no longer prints INFO logs to stderr.
@@ -96,6 +96,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Lint and format with ruff (replaces black, isort and flake8).
 
 ### Added
+- Terminal UI (Textual): `json_explorer data.json` opens tabs for the data (lazy tree), the inferred
+  structure, JMESPath search (validated while typing, with examples), statistics (and the HTML
+  report), and code generation for every language and JSON Schema with a live preview, save and
+  copy. Language options are built from each plugin's CLI flags, so new languages appear
+  without UI code.
 - Rust generator (`--generate rust`/`rs`): structs with serde derives, `Option<T>` for missing or null
   values, renames for non-snake_case keys, raw identifiers for keywords, `serde_json::Value` for mixed
   values, optional `--rust-deny-unknown`. Checked in CI with `cargo check` (warnings as errors),
@@ -111,8 +116,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The package type-checks cleanly with mypy; CI runs mypy on every push.
 - Documentation tests (`tests/test_docs.py`): README and API docs examples must parse, their imports,
   CLI flags and function signatures must match the code, and their config examples must load.
-- Language plugins: each target language is one `LanguagePlugin` (generator, aliases, interactive
-  handler, CLI flags, examples). Third-party languages can be installed through the
+- Language plugins: each target language is one `LanguagePlugin` (generator, aliases, CLI flags,
+  examples). Third-party languages can be installed through the
   `json_explorer.languages` entry-point group. `register()` now takes a plugin.
 - Compile tests for generated code: Python output is executed and its annotations resolved;
   Go output is checked with `go vet` (run in CI on Linux).
@@ -183,10 +188,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Breaking:** `--plot-format interactive` (it was the same as `html`). `html` is now the default; the
   report is opened in the browser unless `--no-browser` is given (also when `--save-path` is set).
 - **Breaking:** `--verbose-logging` / `-vl`; use `--log-level DEBUG`.
-- Interactive mode: the code generation submenu's language/info/template screens (the same
-  information as `--list-languages` and `--language-info`; templates are offered while configuring),
-  and the main menu's "JMESPath help", "Data summary" and "Save last search results" items (the search
-  shows examples and offers saving; statistics cover the summary).
+- **Breaking:** the prompt-based interactive mode (menus, per-language handlers and config
+  templates, prompt history) and the `prompt-toolkit` dependency; replaced by the terminal UI.
 - `JsonSearcher.search_multiple()` and the `compile_query` parameter of `JsonSearcher.search()`.
 - The `dateparser` dependency (and with it `regex`, `pytz`, `tzlocal`, `python-dateutil`): about 10 MB
   installed and ~230 ms import time. Analysis is roughly 5x faster on the test suite's data.

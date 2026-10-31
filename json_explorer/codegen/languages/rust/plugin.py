@@ -8,7 +8,6 @@ PLUGIN = LanguagePlugin(
     display_name="Rust",
     generator=RustGenerator,
     aliases=("rs",),
-    interactive=None,  # not in interactive mode yet
     cli_options=(
         CliOption(
             "--rust-deny-unknown",

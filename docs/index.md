@@ -20,7 +20,6 @@
   - [TypeScript Generator](#6-typescript-generator)
   - [Rust Generator](#7-rust-generator)
   - [Schema System](#8-schema-system)
-  - [Interactive Handler](#9-interactive-handler)
 - [CLI Usage](#cli-usage)
 - [Examples](#examples)
 - [Configuration Best Practices](#configuration-best-practices)
@@ -39,7 +38,8 @@ JSON Explorer is a comprehensive Python library and CLI tool for analyzing, sear
 - **Comprehensive Statistics**: Data quality metrics, depth analysis, and structural insights
 - **Visualization**: text charts in the terminal, an interactive HTML report (Plotly), or both
 - **Code Generation**: Generate Go structs, Python dataclasses/Pydantic/TypedDict from JSON
-- **Interactive Mode**: Full-featured terminal UI for exploration and configuration
+- **Terminal UI**: a full-screen app (Textual) with the data, its structure, live JMESPath search,
+  statistics and code generation with a live preview, side by side in tabs
 - **Extensible Architecture**: Plugin-based generator system for custom languages
 
 ---
@@ -116,8 +116,8 @@ Natural-language dates (`"March"`, `"1 hour ago"`), ISO 8601 forms outside RFC 3
 from json_explorer.analyzer import detect_format
 
 detect_format("2024-01-01T12:00:00Z")  # Format.DATE_TIME
-detect_format("2024-01-01")            # Format.DATE
-detect_format("not a date")            # None
+detect_format("2024-01-01")  # Format.DATE
+detect_format("not a date")  # None
 ```
 
 ---
@@ -239,35 +239,36 @@ Represents a search result with metadata.
 
 ```python
 # Basic access
-"users"                              # Get users array
-"users[0]"                          # First user
-"users[-1]"                         # Last user
-"users[*].name"                     # All user names
+"users"  # Get users array
+
+"users[0]"  # First user
+"users[-1]"  # Last user
+"users[*].name"  # All user names
 
 # Filtering
-"users[?age > `30`]"                # Filter by age
-"users[?active == `true`]"          # Filter by boolean
+"users[?age > `30`]"  # Filter by age
+"users[?active == `true`]"  # Filter by boolean
 "users[?age > `30` && active == `true`]"  # Multiple conditions
 
 # Projections (field selection)
-"users[*].{name: name, email: email}"     # Select specific fields
-"users[?age > `30`].name"                 # Filter then project
+"users[*].{name: name, email: email}"  # Select specific fields
+"users[?age > `30`].name"  # Filter then project
 
 # Functions
-"length(users)"                     # Count items
-"sort_by(users, &age)"              # Sort by field
-"max_by(users, &age)"               # Item with max value
-"min_by(users, &score)"             # Item with min value
-"contains(name, 'John')"            # Check if contains
+"length(users)"  # Count items
+"sort_by(users, &age)"  # Sort by field
+"max_by(users, &age)"  # Item with max value
+"min_by(users, &score)"  # Item with min value
+"contains(name, 'John')"  # Check if contains
 
 # Nested access
-"user.profile.settings.theme"       # Deep nested access
-"users[*].tags[]"                   # Flatten nested arrays
+"user.profile.settings.theme"  # Deep nested access
+"users[*].tags[]"  # Flatten nested arrays
 
 # Slicing
-"users[0:3]"                        # First 3 users
-"users[-2:]"                        # Last 2 users
-"users[::2]"                        # Every other user
+"users[0:3]"  # First 3 users
+"users[-2:]"  # Last 2 users
+"users[::2]"  # Every other user
 ```
 
 **Resources:**
@@ -437,11 +438,7 @@ visualizer.visualize(data, output="terminal", detailed=True)
 
 # Interactive HTML
 visualizer.visualize(
-    data,
-    output="html",
-    save_path="report.html",
-    detailed=True,
-    open_browser=True
+    data, output="html", save_path="report.html", detailed=True, open_browser=True
 )
 
 # Both formats
@@ -482,12 +479,7 @@ Interactive HTML charts with:
 ```python
 from json_explorer import visualize_json
 
-visualize_json(
-    data,
-    output="html",
-    save_path="analysis.html",
-    detailed=True
-)
+visualize_json(data, output="html", save_path="analysis.html", detailed=True)
 ```
 
 ---
@@ -640,48 +632,6 @@ Load JSON from a URL.
 
 - `tuple[str, Any]`: (source, data)
 
-#### Interactive Input Functions (`json_explorer.ui`)
-
-##### `ask(message, default=None, **kwargs)`
-
-User-friendly input with optional choices and autocompletion.
-
-**Parameters:**
-
-- `message` (str): Prompt message
-- `default` (str, optional): Default value
-- `choices` (list, optional): Valid choices for autocompletion
-- `console` (Console, optional): Rich console instance
-
-**Example:**
-
-```python
-from json_explorer.ui import ask
-
-language = ask(
-    "Select language",
-    choices=["go", "python", "typescript"],
-    default="go"
-)
-```
-
-##### `ask_path(message, **kwargs)`
-
-Input for file paths with autocompletion.
-
-**Parameters:**
-
-- `message` (str): Prompt message
-- `default` (str): Default path
-
-**Example:**
-
-```python
-from json_explorer.ui import ask_path
-
-filepath = ask_path("Enter JSON file path", default="data.json")
-```
-
 #### Custom Exception
 
 ##### `JSONLoaderError`
@@ -784,7 +734,7 @@ class MyGenerator(CodeGenerator):
 
 ### 2. Registry and Plugins
 
-Each language is a `LanguagePlugin`: its generator, aliases, interactive handler, CLI flags
+Each language is a `LanguagePlugin`: its generator, aliases, CLI flags
 (`CliOption`) and usage examples. Built-in plugins are registered on first use; other packages can
 provide one through the `json_explorer.languages` entry-point group.
 
@@ -799,8 +749,8 @@ from json_explorer.codegen import (
     register,
 )
 
-list_languages()          # ['go', 'python']
-is_supported("golang")    # True (alias)
+list_languages()  # ['go', 'python']
+is_supported("golang")  # True (alias)
 get_language_info("py")
 # {'name': 'python', 'class': 'PythonGenerator', 'file_extension': '.py',
 #  'aliases': ['py'], 'module': 'json_explorer.codegen.languages.python.generator'}
@@ -851,11 +801,7 @@ from json_explorer.codegen import generate_from_analysis, create_config
 data = {"user_id": 123, "name": "Alice"}
 analysis = analyze_json(data)
 
-config = create_config(
-    language="go",
-    package_name="models",
-    add_comments=True
-)
+config = create_config(language="go", package_name="models", add_comments=True)
 
 result = generate_from_analysis(analysis, "go", config, "User")
 
@@ -890,19 +836,11 @@ from json_explorer.codegen import quick_generate
 data = {"user_id": 123, "name": "Alice", "tags": ["python", "coding"]}
 
 # Generate Go
-go_code = quick_generate(
-    data,
-    language="go",
-    package_name="models",
-    root_name="User"
-)
+go_code = quick_generate(data, language="go", package_name="models", root_name="User")
 
 # Generate Python dataclass
 python_code = quick_generate(
-    data,
-    language="python",
-    style="dataclass",
-    package_name="models"
+    data, language="python", style="dataclass", package_name="models"
 )
 
 # Generate Pydantic model
@@ -967,10 +905,10 @@ config = GeneratorConfig(
     add_comments=True,
     language_config={
         "use_pointers_for_optional": True,
-        "int_type": "int64",      # "int", "int64", "int32"
+        "int_type": "int64",  # "int", "int64", "int32"
         "float_type": "float64",  # "float64", "float32"
-        "time_type": "time.Time", # or "string"
-    }
+        "time_type": "time.Time",  # or "string"
+    },
 )
 ```
 
@@ -1063,7 +1001,7 @@ dataclass_config = GeneratorConfig(
         "dataclass_slots": True,
         "dataclass_frozen": False,
         "dataclass_kw_only": True,
-    }
+    },
 )
 
 # Pydantic configuration
@@ -1074,7 +1012,7 @@ pydantic_config = GeneratorConfig(
         "style": "pydantic",
         "pydantic_config_dict": True,
         "pydantic_extra_forbid": False,
-    }
+    },
 )
 
 # TypedDict configuration
@@ -1083,7 +1021,7 @@ typeddict_config = GeneratorConfig(
     add_comments=True,
     language_config={
         "style": "typeddict",
-    }
+    },
 )
 ```
 
@@ -1092,7 +1030,9 @@ typeddict_config = GeneratorConfig(
 ```python
 from json_explorer.codegen import create_generator
 
-dc_generator = create_generator("python", {"style": "dataclass", "dataclass_frozen": True})
+dc_generator = create_generator(
+    "python", {"style": "dataclass", "dataclass_frozen": True}
+)
 pydantic_generator = create_generator("python", {"style": "pydantic"})
 td_generator = create_generator("python", {"style": "typeddict"})
 ```
@@ -1348,67 +1288,13 @@ user_schema.add_field(
 
 ---
 
-### 9. Interactive Handler
-
-Interactive code generation interface with guided configuration.
-
-#### `CodegenInteractiveHandler` Class
-
-Provides menu-driven interface for code generation.
-
-**Constructor:**
-
-```python
-CodegenInteractiveHandler(data, console=None)
-```
-
-**Parameters:**
-
-- `data` (dict | list): JSON data to generate code from
-- `console` (Console, optional): Rich console instance
-
-**Methods:**
-
-##### `run_interactive()`
-
-Launch interactive code generation interface.
-
-**Features:**
-
-- Language selection
-- Style selection (for Python)
-- Configuration templates
-- Advanced options
-- Real-time code preview
-- Save to file
-
-**Example:**
-
-```python
-from json_explorer.codegen.interactive import CodegenInteractiveHandler
-
-handler = CodegenInteractiveHandler(data)
-handler.run_interactive()
-```
-
-**Interactive Flow:**
-
-1. Select language (Go, Python)
-2. Choose how to configure: quick (defaults), custom (questions, including the Python style),
-   a template, or a JSON config file
-3. Enter the root type name
-4. Preview the code, save it to a file, or both
-5. Generate more code or return to the main menu
-
----
-
 ## CLI Usage
 
 ### Basic Commands
 
 ```bash
-# Interactive mode
-json_explorer data.json --interactive
+# Terminal UI (the default when no action is given)
+json_explorer data.json
 
 # Tree visualization
 json_explorer data.json --tree compact
@@ -1419,6 +1305,22 @@ json_explorer data.json --stats --detailed
 # Visualizations
 json_explorer data.json --plot --plot-format html
 ```
+
+### Terminal UI
+
+`json_explorer data.json` (or `--interactive`) opens a full-screen terminal UI with five tabs:
+
+| Tab | Key | Shows |
+|---|---|---|
+| Data | `1` | The document as a tree; large containers expand on demand |
+| Structure | `2` | The inferred types: optional keys, nullable values, formats, mixed kinds |
+| Search | `3` | JMESPath queries, checked as you type, with the result as JSON and examples |
+| Statistics | `4` | Size, depth, complexity and quality issues; opens the HTML report |
+| Code | `5` | Every language and JSON Schema with a live preview; options come from each language's flags |
+
+Other keys: `/` search, `Esc` leave a text box, `Ctrl+S` save the generated code, `Ctrl+Y` copy it,
+`q` quit.
+The UI needs a terminal; in scripts and pipes use the flags below.
 
 ### JMESPath Search
 
@@ -1516,7 +1418,7 @@ data = {
     "users": [
         {"id": 1, "name": "Alice", "age": 30, "active": True},
         {"id": 2, "name": "Bob", "age": 25, "active": False},
-        {"id": 3, "name": "Charlie", "age": 35, "active": True}
+        {"id": 3, "name": "Charlie", "age": 35, "active": True},
     ]
 }
 
@@ -1524,8 +1426,7 @@ searcher = JsonSearcher()
 
 # Complex filtering
 result = searcher.search(
-    data,
-    "users[?age > `25` && active == `true`].{name: name, age: age}"
+    data, "users[?age > `25` && active == `true`].{name: name, age: age}"
 )
 
 # Sorting and selection
@@ -1543,17 +1444,9 @@ results = {q: searcher.search(data, q) for q in queries}
 
 ```python
 from json_explorer import analyze_json
-from json_explorer.codegen import (
-    GeneratorConfig,
-    generate_from_analysis
-)
+from json_explorer.codegen import GeneratorConfig, generate_from_analysis
 
-data = {
-    "user_profile": {
-        "name": "Alice",
-        "settings": {"theme": "dark"}
-    }
-}
+data = {"user_profile": {"name": "Alice", "settings": {"theme": "dark"}}}
 
 analysis = analyze_json(data)
 
@@ -1561,10 +1454,7 @@ config = GeneratorConfig(
     package_name="api",
     json_tag_omitempty=True,
     add_comments=True,
-    language_config={
-        "use_pointers_for_optional": True,
-        "int_type": "int64"
-    }
+    language_config={"use_pointers_for_optional": True, "int_type": "int64"},
 )
 
 result = generate_from_analysis(analysis, "go", config, "UserProfile")
@@ -1580,41 +1470,29 @@ if result.success:
 
 ```python
 from json_explorer import analyze_json
-from json_explorer.codegen import (
-    GeneratorConfig,
-    generate_from_analysis
-)
+from json_explorer.codegen import GeneratorConfig, generate_from_analysis
 
-data = {
-    "user_id": 123,
-    "name": "Alice",
-    "email": None,
-    "tags": ["python"]
-}
+data = {"user_id": 123, "name": "Alice", "email": None, "tags": ["python"]}
 
 analysis = analyze_json(data)
 
 # Dataclass
 dc_config = GeneratorConfig(
     package_name="models",
-    language_config={"style": "dataclass", "dataclass_slots": True}
+    language_config={"style": "dataclass", "dataclass_slots": True},
 )
 dc_result = generate_from_analysis(analysis, "python", dc_config, "User")
 
 # Pydantic
 pydantic_config = GeneratorConfig(
     package_name="models",
-    language_config={
-        "style": "pydantic",
-        "pydantic_config_dict": True
-    }
+    language_config={"style": "pydantic", "pydantic_config_dict": True},
 )
 pydantic_result = generate_from_analysis(analysis, "python", pydantic_config, "User")
 
 # TypedDict
 td_config = GeneratorConfig(
-    package_name="types",
-    language_config={"style": "typeddict"}
+    package_name="types", language_config={"style": "typeddict"}
 )
 td_result = generate_from_analysis(analysis, "python", td_config, "User")
 ```
@@ -1626,7 +1504,7 @@ from json_explorer.codegen import quick_generate
 
 data = [
     {"name": "John", "email": None, "age": 30},
-    {"name": "Jane", "email": "jane@example.com", "age": 25}
+    {"name": "Jane", "email": "jane@example.com", "age": 25},
 ]
 
 # Go with pointers
