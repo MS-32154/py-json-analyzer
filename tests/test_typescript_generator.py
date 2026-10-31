@@ -43,6 +43,16 @@ class TestNaming:
     def test_property_keys(self, key, rendered):
         assert property_key(key) == rendered
 
+    def test_unicode_identifiers_unquoted(self):
+        """Prettier leaves identifiers unquoted, including Unicode ones."""
+        assert property_key("名前") == "名前"
+
+    def test_proto_key_is_computed_in_object_literals(self):
+        """`__proto__:` in an object literal sets the prototype, not a key."""
+        assert property_key("__proto__") == "__proto__"
+        assert property_key("__proto__", object_literal=True) == '["__proto__"]'
+        assert '  ["__proto__"]: z.string(),' in zod({"__proto__": "x"})
+
     def test_js_string_escapes(self):
         assert js_string("line\nbreak") == '"line\\nbreak"'
 

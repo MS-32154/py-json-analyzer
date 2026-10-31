@@ -38,6 +38,14 @@ CASES: dict[str, typing.Any] = {
         "grid": [[1, None]],
         "objs": [{"a": 1}, None],
     },
+    "odd_keys": {
+        "__proto__": "x",
+        "名前": "n",
+        "constructor": 1,
+        "123": 2,
+        "a b": 3,
+        "$ref": 4,
+    },
     "timestamps": [{"at": "2024-01-01T10:00:00Z", "tags": ["2024-01-02"]}, {}],
     "formats": [
         {

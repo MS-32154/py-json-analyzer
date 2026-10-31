@@ -150,7 +150,7 @@ class TypeScriptGenerator(CodeGenerator):
             if fld.description and self.config.add_comments:
                 fields.append(f"  /** {fld.description} */")
             fields.append(
-                f"  {property_key(fld.original_name)}: {self._zod(fld, names)},"
+                f"  {property_key(fld.original_name, object_literal=True)}: {self._zod(fld, names)},"
             )
         body = (
             "z.object({})"

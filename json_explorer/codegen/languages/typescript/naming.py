@@ -1,7 +1,6 @@
 """TypeScript identifier and property-key rules."""
 
 import json
-import re
 
 from ...core.naming import to_pascal_case
 
@@ -34,8 +33,6 @@ GLOBAL_TYPES = frozenset(
     }
 )
 
-_PLAIN_KEY = re.compile(r"[A-Za-z_$][A-Za-z0-9_$]*")
-
 
 def ts_type_name(name: str) -> str:
     """PascalCase type name: ``user_address`` -> ``UserAddress``."""
@@ -47,9 +44,20 @@ def ts_type_name(name: str) -> str:
     return ident + "_" if ident in GLOBAL_TYPES else ident
 
 
-def property_key(key: str) -> str:
-    """A JSON key as a property name: bare if it's an identifier, else quoted."""
-    return key if _PLAIN_KEY.fullmatch(key) else js_string(key)
+def is_identifier(key: str) -> bool:
+    """Whether a key is a JavaScript identifier (Unicode letters allowed)."""
+    return key.replace("$", "_").isidentifier()
+
+
+def property_key(key: str, *, object_literal: bool = False) -> str:
+    """A JSON key as a property name: bare if it's an identifier, else quoted.
+
+    In an object literal (Zod schemas) ``__proto__`` sets the prototype
+    instead of creating a key, quoted or not; a computed key avoids that.
+    """
+    if object_literal and key == "__proto__":
+        return '["__proto__"]'
+    return key if is_identifier(key) else js_string(key)
 
 
 def js_string(text: str) -> str:
