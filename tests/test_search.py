@@ -164,31 +164,6 @@ class TestProjections:
         assert all("username" in item and "user_age" in item for item in result.value)
 
 
-class TestMultipleQueries:
-    """Test multiple query execution."""
-
-    def test_search_multiple(self, searcher, sample_data):
-        """Test executing multiple queries."""
-        queries = ["users[*].name", "length(users)", "metadata.total"]
-        results = searcher.search_multiple(sample_data, queries)
-
-        assert len(results) == 3
-        assert results["users[*].name"].value == ["Alice", "Bob", "Charlie"]
-        assert results["length(users)"].value == 3
-        assert results["metadata.total"].value == 3
-
-    def test_search_multiple_with_invalid(self, searcher, sample_data):
-        """Test multiple queries with some invalid ones."""
-        queries = ["users[*].name", "invalid[syntax", "metadata.total"]
-        results = searcher.search_multiple(sample_data, queries)
-
-        # Only valid queries should be in results
-        assert len(results) == 2
-        assert "users[*].name" in results
-        assert "metadata.total" in results
-        assert "invalid[syntax" not in results
-
-
 class TestValidation:
     """Test query validation."""
 
@@ -276,18 +251,3 @@ class TestEdgeCases:
         result = searcher.search(data, "mixed[4].key")
         assert result is not None
         assert result.value == "value"
-
-
-class TestCompileQuery:
-    """Test query compilation for performance."""
-
-    def test_compile_query_flag(self, searcher, sample_data):
-        """Test using compile_query flag."""
-        result = searcher.search(sample_data, "users[*].name", compile_query=True)
-        assert result is not None
-        assert result.value == ["Alice", "Bob", "Charlie"]
-
-    def test_compile_invalid_query(self, searcher, sample_data):
-        """Test compiling invalid query."""
-        result = searcher.search(sample_data, "invalid[syntax", compile_query=True)
-        assert result is None

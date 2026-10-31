@@ -9,36 +9,22 @@ import webbrowser
 from pathlib import Path
 from typing import Literal
 
-try:
-    import curses
-
-    CURSES_AVAILABLE = True
-except ImportError:
-    CURSES_AVAILABLE = False
-
-try:
-    import plotly.graph_objects as go
-    from plotly.subplots import make_subplots
-
-    PLOTLY_AVAILABLE = True
-except ImportError:
-    PLOTLY_AVAILABLE = False
+import plotly.graph_objects as go
+from plotly.subplots import make_subplots
 
 from .logging_config import get_logger
 from .stats import DataStatsAnalyzer
 
 logger = get_logger(__name__)
 
-OutputFormat = Literal["terminal", "interactive", "html", "all"]
+OutputFormat = Literal["terminal", "html", "all"]
 
 
 class JSONVisualizer:
     """Multi-format visualizer using Plotly for modern, interactive charts.
 
-    This visualizer supports:
-    - Terminal ASCII charts (using curses)
-    - Interactive browser-based charts (Plotly)
-    - Static HTML exports
+    Outputs: text charts in the terminal, and an interactive HTML report
+    (Plotly) opened in the browser.
     """
 
     def __init__(self) -> None:
@@ -67,13 +53,11 @@ class JSONVisualizer:
 
         Args:
             data: JSON data to analyze and visualize.
-            output: Output format ('terminal', 'interactive', 'html', 'all').
+            output: 'terminal', 'html' or 'all' (both).
             save_path: Path to save files (for HTML outputs).
             detailed: Whether to show detailed visualizations.
             open_browser: Whether to automatically open browser for HTML output.
 
-        Raises:
-            RuntimeError: If required dependencies are not available.
         """
         logger.info("Creating %s visualization (detailed=%s)", output, detailed)
 
@@ -81,41 +65,18 @@ class JSONVisualizer:
         analyzer = DataStatsAnalyzer()
         self.stats = analyzer.generate_stats(data)
 
-        if output == "all":
-            if CURSES_AVAILABLE:
-                self._visualize_terminal(detailed)
-            else:
-                self._terminal_fallback(detailed)
-
-            if PLOTLY_AVAILABLE:
-                self._visualize_plotly(save_path, detailed, open_browser, mode="html")
-            else:
-                logger.warning("Plotly not available. Install with: pip install plotly")
-
-        elif output == "terminal":
-            if CURSES_AVAILABLE:
-                self._visualize_terminal(detailed)
-            else:
-                self._terminal_fallback(detailed)
-
-        elif output in ("html", "interactive"):
-            # html: write the report (open it only when no save path is given);
-            # interactive: write it and always open it in the browser.
-            if not PLOTLY_AVAILABLE:
-                raise RuntimeError(
-                    "Plotly not available. Install with: pip install plotly"
-                )
-            self._visualize_plotly(save_path, detailed, open_browser, mode=output)
-
-        else:
+        if output not in ("terminal", "html", "all"):
             raise ValueError(f"Unknown output format: {output}")
+        if output in ("terminal", "all"):
+            self._terminal_view(detailed)
+        if output in ("html", "all"):
+            self._visualize_plotly(save_path, detailed, open_browser)
 
     def _visualize_plotly(
         self,
         save_path: str | Path | None,
         detailed: bool,
         open_browser: bool,
-        mode: Literal["interactive", "html"],
     ) -> None:
         """Create Plotly visualizations.
 
@@ -123,9 +84,7 @@ class JSONVisualizer:
             save_path: Optional path to save HTML file.
             detailed: Whether to create detailed visualizations.
             open_browser: Whether to open in browser.
-            mode: 'interactive' for auto-open, 'html' for static save.
         """
-        logger.info("Generating Plotly visualization (mode=%s)", mode)
 
         # Create subplots
         if detailed:
@@ -202,25 +161,16 @@ class JSONVisualizer:
             template="plotly_white",
         )
 
-        # Save or show
+        # Write the report (to save_path or a temporary file) and open it
         if save_path:
-            output_path = Path(save_path)
-            if output_path.suffix != ".html":
-                output_path = output_path.with_suffix(".html")
-            fig.write_html(str(output_path))
-            logger.info("Plotly chart saved to: %s", output_path)
+            output_path = Path(save_path).with_suffix(".html")
             print(f"📊 HTML report saved to: {output_path}")
-
-            if open_browser and mode == "interactive":
-                webbrowser.open(f"file://{output_path.absolute()}")
         else:
-            temp_path = Path(tempfile.gettempdir()) / "json_analysis.html"
-            fig.write_html(str(temp_path))
-            logger.info("Plotly chart saved to temporary file: %s", temp_path)
-
-            if open_browser:
-                webbrowser.open(f"file://{temp_path.absolute()}")
-                print("🌐 Opening visualization in browser...")
+            output_path = Path(tempfile.gettempdir()) / "json_analysis.html"
+        fig.write_html(str(output_path))
+        if open_browser:
+            webbrowser.open(output_path.absolute().as_uri())
+            print("🌐 Opening visualization in browser...")
 
     def _add_data_types_chart(self, fig: go.Figure, row: int, col: int) -> None:
         """Add data types pie chart to figure."""
@@ -374,221 +324,8 @@ class JSONVisualizer:
             col=col,
         )
 
-    def _visualize_terminal(self, detailed: bool = False) -> None:
-        """Create terminal-based visualizations using curses."""
-        logger.debug("Creating terminal visualization with curses")
-        try:
-            curses.wrapper(self._curses_main, detailed)
-        except Exception as e:
-            logger.warning("Curses visualization failed: %s", e)
-            self._terminal_fallback(detailed)
-
-    def _curses_main(self, stdscr, detailed: bool) -> None:
-        """Main curses interface for terminal visualization."""
-        curses.curs_set(0)
-        stdscr.clear()
-
-        curses.start_color()
-        curses.init_pair(1, curses.COLOR_CYAN, curses.COLOR_BLACK)
-        curses.init_pair(2, curses.COLOR_GREEN, curses.COLOR_BLACK)
-        curses.init_pair(3, curses.COLOR_YELLOW, curses.COLOR_BLACK)
-        curses.init_pair(4, curses.COLOR_RED, curses.COLOR_BLACK)
-        curses.init_pair(5, curses.COLOR_MAGENTA, curses.COLOR_BLACK)
-        curses.init_pair(6, curses.COLOR_WHITE, curses.COLOR_BLACK)
-
-        height, width = stdscr.getmaxyx()
-        current_page = 0
-        max_pages = 3 if detailed else 2
-
-        while True:
-            stdscr.clear()
-
-            # Header
-            title = "🎨 JSON DATA VISUALIZATION - TERMINAL VIEW"
-            stdscr.addstr(
-                0,
-                max(0, (width - len(title)) // 2),
-                title,
-                curses.color_pair(1) | curses.A_BOLD,
-            )
-            stdscr.addstr(1, 0, "=" * min(width - 1, 60), curses.color_pair(1))
-
-            if current_page == 0:
-                self._draw_data_types_chart(stdscr, 3, width, height)
-            elif current_page == 1:
-                self._draw_depth_histogram(stdscr, 3, width, height)
-            elif current_page == 2 and detailed:
-                self._draw_quality_metrics(stdscr, 3, width, height)
-
-            # Navigation
-            nav_text = f"Page {current_page + 1}/{max_pages} | SPACE: Next | q: Quit"
-            stdscr.addstr(height - 2, 0, nav_text, curses.color_pair(6))
-
-            stdscr.refresh()
-
-            key = stdscr.getch()
-            if key == ord("q"):
-                break
-            if key == ord(" "):
-                current_page = (current_page + 1) % max_pages
-
-    def _draw_data_types_chart(
-        self, stdscr, start_y: int, width: int, height: int
-    ) -> None:
-        """Draw data types chart using curses."""
-        stdscr.addstr(
-            start_y,
-            2,
-            "📊 DATA TYPES DISTRIBUTION",
-            curses.color_pair(2) | curses.A_BOLD,
-        )
-
-        data_types = self.stats["data_types"]
-        if not data_types:
-            stdscr.addstr(start_y + 2, 4, "No data types found.", curses.color_pair(4))
-            return
-
-        total = sum(data_types.values())
-        max_count = max(data_types.values())
-        bar_width = min(40, width - 30)
-
-        y = start_y + 2
-        colors = [curses.color_pair(i) for i in range(2, 6)]
-
-        for i, (dtype, count) in enumerate(data_types.most_common()):
-            if y >= height - 4:
-                break
-
-            percentage = (count / total) * 100
-            bar_length = int((count / max_count) * bar_width)
-
-            stdscr.addstr(y, 2, f"{dtype:12}", curses.color_pair(6))
-            stdscr.addstr(y, 16, "│", curses.color_pair(6))
-
-            color = colors[i % len(colors)]
-            stdscr.addstr(y, 17, "█" * bar_length, color)
-            stdscr.addstr(
-                y, 17 + bar_length, "░" * (bar_width - bar_length), curses.color_pair(6)
-            )
-            stdscr.addstr(y, 17 + bar_width, "│", curses.color_pair(6))
-
-            stats_text = f" {count:>6} ({percentage:4.1f}%)"
-            stdscr.addstr(y, 18 + bar_width, stats_text, curses.color_pair(6))
-            y += 1
-
-    def _draw_depth_histogram(
-        self, stdscr, start_y: int, width: int, height: int
-    ) -> None:
-        """Draw depth histogram using curses."""
-        stdscr.addstr(
-            start_y, 2, "📏 DEPTH DISTRIBUTION", curses.color_pair(3) | curses.A_BOLD
-        )
-
-        depth_hist = self.stats["depth_histogram"]
-        if not depth_hist:
-            stdscr.addstr(start_y + 2, 4, "No depth data found.", curses.color_pair(4))
-            return
-
-        max_count = max(depth_hist.values())
-        bar_height = min(15, height - start_y - 8)
-
-        y = start_y + 2
-        for depth in sorted(depth_hist.keys()):
-            if y >= height - 4:
-                break
-
-            count = depth_hist[depth]
-            bar_length = int((count / max_count) * bar_height)
-
-            stdscr.addstr(y, 2, f"Depth {depth:2d}", curses.color_pair(6))
-            stdscr.addstr(y, 12, "│", curses.color_pair(6))
-            stdscr.addstr(y, 13, "▌" * bar_length, curses.color_pair(3))
-            stdscr.addstr(y, 13 + bar_length, f"│ {count}", curses.color_pair(6))
-            y += 1
-
-    def _draw_quality_metrics(
-        self, stdscr, start_y: int, width: int, height: int
-    ) -> None:
-        """Draw quality metrics using curses."""
-        stdscr.addstr(
-            start_y, 2, "🎯 QUALITY METRICS", curses.color_pair(5) | curses.A_BOLD
-        )
-
-        patterns = self.stats["value_patterns"]
-        total = self.stats["total_values"]
-
-        if total == 0:
-            stdscr.addstr(
-                start_y + 2, 4, "No data for quality analysis.", curses.color_pair(4)
-            )
-            return
-
-        y = start_y + 2
-
-        null_rate = (patterns["null_count"] / total) * 100
-        stdscr.addstr(
-            y,
-            4,
-            f"Null values:        {null_rate:5.1f}%",
-            curses.color_pair(4) if null_rate > 10 else curses.color_pair(2),
-        )
-        y += 1
-
-        empty_str_rate = (patterns["empty_strings"] / total) * 100
-        stdscr.addstr(
-            y,
-            4,
-            f"Empty strings:      {empty_str_rate:5.1f}%",
-            curses.color_pair(4) if empty_str_rate > 10 else curses.color_pair(2),
-        )
-        y += 1
-
-        empty_col_rate = (patterns["empty_collections"] / total) * 100
-        stdscr.addstr(
-            y,
-            4,
-            f"Empty collections:  {empty_col_rate:5.1f}%",
-            curses.color_pair(4) if empty_col_rate > 10 else curses.color_pair(2),
-        )
-        y += 2
-
-        if patterns["string_lengths"]["avg"] > 0:
-            stdscr.addstr(
-                y,
-                4,
-                f"Avg string length:  {patterns['string_lengths']['avg']:5.1f}",
-                curses.color_pair(6),
-            )
-            y += 1
-
-        numeric_ranges = patterns["numeric_ranges"]
-        if numeric_ranges["min"] is not None:
-            stdscr.addstr(
-                y,
-                4,
-                f"Numeric range:      {numeric_ranges['min']} - {numeric_ranges['max']}",
-                curses.color_pair(6),
-            )
-            y += 1
-
-        insights = self.stats["computed_insights"]
-        stdscr.addstr(
-            y + 1,
-            4,
-            f"Complexity Score:   {insights['complexity_score']}/100",
-            curses.color_pair(3),
-        )
-        y += 1
-        stdscr.addstr(
-            y + 1,
-            4,
-            f"Uniformity:         {insights['structure_uniformity'].replace('_', ' ').title()}",
-            curses.color_pair(6),
-        )
-
-    def _terminal_fallback(self, detailed: bool = False) -> None:
-        """Fallback terminal visualization without curses."""
-        logger.info("Using terminal fallback (no curses)")
+    def _terminal_view(self, detailed: bool = False) -> None:
+        """Text charts in the terminal."""
         print("\n" + "=" * 60)
         print("🎨 JSON DATA VISUALIZATION - TERMINAL VIEW")
         print("=" * 60)
@@ -675,7 +412,7 @@ def visualize_json(
 
     Args:
         data: JSON data to analyze and visualize.
-        output: Output format ('terminal', 'interactive', 'html', 'all').
+        output: 'terminal', 'html' or 'all' (both).
         save_path: Path to save files (for HTML outputs).
         detailed: Whether to show detailed visualizations.
         open_browser: Whether to automatically open browser for HTML output.

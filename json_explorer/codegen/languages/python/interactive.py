@@ -3,7 +3,6 @@
 from typing import Any
 
 from rich.console import Console
-from rich.panel import Panel
 from rich.prompt import Confirm
 
 from json_explorer.utils import prompt_input
@@ -32,30 +31,6 @@ class PythonInteractiveHandler:
     """Interactive handler for Python-specific code generation options."""
 
     __slots__ = ()
-
-    def get_language_info(self) -> dict[str, str]:
-        return {
-            "description": "Generates Python dataclasses, Pydantic models, or TypedDict",
-            "features": "Three styles, modern type hints (list[T], T | None)",
-            "use_cases": "REST APIs, data validation, type checking, configuration",
-            "maturity": "Full support",
-        }
-
-    def show_configuration_examples(self, console: Console) -> None:
-        console.print()
-        console.print(
-            Panel(
-                "[green]Dataclass:[/green] slots, frozen and keyword-only options\n"
-                "[green]Pydantic:[/green] runtime validation; aliases map fields to JSON keys;\n"
-                "  extra keys ignored or forbidden\n"
-                "[green]TypedDict:[/green] describes the dict as-is (original keys;\n"
-                "  NotRequired for optional keys)\n\n"
-                "[bold]Always:[/bold] PascalCase classes, snake_case fields (dataclass,\n"
-                "Pydantic), T | None for optional values",
-                title="⚙️ Python Configuration Options",
-                border_style="blue",
-            )
-        )
 
     def get_template_choices(self) -> dict[str, str]:
         return {name: description for name, (description, _) in TEMPLATES.items()}

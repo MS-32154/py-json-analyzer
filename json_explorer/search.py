@@ -64,15 +64,12 @@ class JsonSearcher:
         self,
         data: Any,
         query: str,
-        compile_query: bool = False,
     ) -> SearchResult | None:
         """Search JSON data using JMESPath query.
 
         Args:
             data: JSON data to search.
             query: JMESPath query expression.
-            compile_query: If True, compile query for better performance
-                          when running same query multiple times.
 
         Returns:
             SearchResult object or None if query fails.
@@ -96,11 +93,7 @@ class JsonSearcher:
         logger.info("Executing JMESPath query: %s", query)
 
         try:
-            if compile_query:
-                compiled = jmespath.compile(query)
-                result_value = compiled.search(data)
-            else:
-                result_value = jmespath.search(query, data)
+            result_value = jmespath.search(query, data)
 
             if result_value is None:
                 logger.info("Query returned no results")
@@ -118,39 +111,6 @@ class JsonSearcher:
             logger.debug("Unexpected error during search: %s", e, exc_info=True)
             self.console.print(f"[red]Unexpected error: {e}[/red]")
             return None
-
-    def search_multiple(
-        self,
-        data: Any,
-        queries: list[str],
-    ) -> dict[str, SearchResult]:
-        """Execute multiple JMESPath queries on the same data.
-
-        Args:
-            data: JSON data to search.
-            queries: List of JMESPath query expressions.
-
-        Returns:
-            Dictionary mapping query strings to SearchResult objects.
-
-        Example:
-            >>> queries = [
-            ...     "users[*].name",
-            ...     "users[?age > `30`]",
-            ...     "metadata.total"
-            ... ]
-            >>> results = searcher.search_multiple(data, queries)
-        """
-        logger.info("Executing %s JMESPath queries", len(queries))
-        results = {}
-
-        for query in queries:
-            result = self.search(data, query)
-            if result is not None:
-                results[query] = result
-
-        logger.info("Completed %s/%s queries successfully", len(results), len(queries))
-        return results
 
     def validate_query(self, query: str) -> tuple[bool, str | None]:
         """Validate a JMESPath query without executing it.

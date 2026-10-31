@@ -24,7 +24,6 @@ from . import (
     GeneratorError,
     generate_from_analysis,
     get_language_info,
-    list_all_language_info,
     list_languages,
     load_config,
 )
@@ -39,14 +38,6 @@ logger = get_logger(__name__)
 
 class LanguageInteractiveHandler(Protocol):
     """Protocol for language-specific interactive handlers."""
-
-    def get_language_info(self) -> dict[str, str]:
-        """Get language-specific information for display."""
-        ...
-
-    def show_configuration_examples(self, console: Console) -> None:
-        """Show language-specific configuration examples."""
-        ...
 
     def get_template_choices(self) -> dict[str, str]:
         """Get available configuration templates."""
@@ -101,20 +92,9 @@ class CodegenInteractiveHandler:
 
         try:
             while True:
-                action = self._show_main_menu()
-
-                match action:
-                    case "back":
-                        logger.info("User exited code generation")
-                        return True
-                    case "generate":
-                        self._interactive_generation()
-                    case "languages":
-                        self._show_languages_menu()
-                    case "info":
-                        self._show_general_info()
-                    case "templates":
-                        self._show_templates_menu()
+                self._interactive_generation()
+                if not Confirm.ask("\nGenerate more code?", default=False):
+                    return True
 
         except KeyboardInterrupt:
             self.console.print("\n[yellow]👋 Code generation cancelled[/yellow]")
@@ -143,39 +123,6 @@ class CodegenInteractiveHandler:
     # ========================================================================
     # Main Menu
     # ========================================================================
-
-    def _show_main_menu(self) -> str:
-        """Show the main codegen menu and get user choice."""
-        menu_panel = Panel.fit(
-            """[bold blue]⚡ Code Generation Menu[/bold blue]
-
-[cyan]1.[/cyan] 🚀 Generate Code
-[cyan]2.[/cyan] 📋 Available Languages
-[cyan]3.[/cyan] 📖 General Information
-[cyan]4.[/cyan] 🎨 Configuration Templates
-[cyan]b.[/cyan] 🔙 Back to Main Menu""",
-            border_style="blue",
-            title="⚡ Code Generator",
-        )
-
-        self.console.print()
-        self.console.print(menu_panel)
-
-        choice = Prompt.ask(
-            "\n[bold]Choose an option[/bold]",
-            choices=["1", "2", "3", "4", "b"],
-            default="1",
-        )
-
-        choice_map = {
-            "1": "generate",
-            "2": "languages",
-            "3": "info",
-            "4": "templates",
-            "b": "back",
-        }
-
-        return choice_map.get(choice, "back")
 
     # ========================================================================
     # Code Generation Flow
@@ -227,21 +174,17 @@ class CodegenInteractiveHandler:
         for i, lang in enumerate(languages, 1):
             self.console.print(f"  [cyan]{i}.[/cyan] {lang}")
 
-        self.console.print("  [cyan]i.[/cyan] Show detailed info")
         self.console.print("  [cyan]b.[/cyan] Back")
 
         choice = Prompt.ask(
             "\n[bold]Select language[/bold]",
-            choices=[str(i) for i in range(1, len(languages) + 1)] + ["i", "b"],
+            choices=[str(i) for i in range(1, len(languages) + 1)] + ["b"],
             default="1",
         )
 
         match choice:
             case "b":
                 return None
-            case "i":
-                self._show_detailed_language_info()
-                return self._select_language()
             case _:
                 return languages[int(choice) - 1]
 
@@ -565,189 +508,6 @@ class CodegenInteractiveHandler:
 
     # ========================================================================
     # Information Displays
-    # ========================================================================
-
-    def _show_languages_menu(self) -> None:
-        """Show detailed languages information menu."""
-        while True:
-            choice = self._input(
-                "\n[bold]Language Information[/bold]",
-                choices=["list", "details", "specific", "back"],
-                default="list",
-            )
-
-            match choice:
-                case "back":
-                    break
-                case "list":
-                    self._show_language_list()
-                case "details":
-                    self._show_detailed_language_info()
-                case "specific":
-                    self._show_specific_language_info()
-
-    def _show_language_list(self) -> None:
-        """Show simple language list."""
-        languages = list_languages()
-
-        self.console.print("\n[bold]📋 Supported Languages:[/bold]")
-        for lang in languages:
-            self.console.print(f"  [green]•[/green] {lang}")
-
-    def _show_detailed_language_info(self) -> None:
-        """Show detailed information about all languages."""
-        try:
-            language_info = list_all_language_info()
-
-            if not language_info:
-                self.console.print("[yellow]⚠️ No generators available[/yellow]")
-                return
-
-            table = Table(
-                title="🔧 Detailed Language Information",
-                box=box.ROUNDED,
-                show_header=True,
-                header_style="bold cyan",
-            )
-
-            table.add_column("Language", style="bold green", no_wrap=True)
-            table.add_column("Extension", style="cyan", no_wrap=True)
-            table.add_column("Generator Class", style="dim", no_wrap=True)
-            table.add_column("Aliases", style="blue")
-
-            for lang_name, info in sorted(language_info.items()):
-                aliases = (
-                    ", ".join(info["aliases"]) if info["aliases"] else "[dim]none[/dim]"
-                )
-
-                table.add_row(
-                    f"🔧 {lang_name}",
-                    info["file_extension"],
-                    info["class"],
-                    aliases,
-                )
-
-            self.console.print()
-            self.console.print(table)
-
-        except Exception as e:
-            self.console.print(f"[red]Error loading language info: {e}[/red]")
-            logger.debug("Failed to load language info: %s", e)
-
-    def _show_specific_language_info(self) -> None:
-        """Show information about a specific language."""
-        languages = list_languages()
-
-        if not languages:
-            self.console.print("[red]No languages available[/red]")
-            return
-
-        language = self._input(
-            "Select language for detailed info",
-            choices=[*languages, "back"],
-            default=languages[0],
-        )
-
-        if language == "back":
-            return
-
-        try:
-            info = get_language_info(language)
-            self._display_specific_language_info(language, info)
-        except Exception as e:
-            self.console.print(f"[red]Error getting language info: {e}[/red]")
-            logger.debug("Failed to get language info: %s", e)
-
-    def _display_specific_language_info(
-        self,
-        language: str,
-        info: dict[str, Any],
-    ) -> None:
-        """Display detailed information about a specific language."""
-        info_panel = Panel(
-            f"""[bold]Language:[/bold] {info["name"]}
-[bold]File Extension:[/bold] {info["file_extension"]}
-[bold]Generator Class:[/bold] {info["class"]}
-[bold]Module:[/bold] {info["module"]}
-[bold]Aliases:[/bold] {", ".join(info["aliases"]) if info["aliases"] else "none"}""",
-            title=f"🔧 {info['name'].title()} Generator Info",
-            border_style="green",
-        )
-
-        self.console.print()
-        self.console.print(info_panel)
-
-        # Show language-specific information
-        lang_handler = self._get_language_handler(language)
-        if lang_handler:
-            lang_handler.show_configuration_examples(self.console)
-
-    def _show_general_info(self) -> None:
-        """Show general code generation information."""
-        info_panel = Panel(
-            """[bold blue]📖 Code Generation Overview[/bold blue]
-
-[bold]What it does:[/bold]
-• Analyzes JSON data structure
-• Generates strongly-typed data structures
-• Supports multiple programming languages
-• Handles nested objects and arrays
-• Preserves field names and types
-• Detects optional vs required fields
-
-[bold]Key Features:[/bold]
-• Smart type detection and conflict resolution
-• Configurable naming conventions (PascalCase, camelCase, snake_case)
-• JSON serialization tags and annotations
-• Template-based generation for consistency
-• Custom configuration profiles
-• Detailed validation and warnings
-
-[bold]Current Status:[/bold]
-• Go - Full support with multiple templates ✅
-• Python - Full support (dataclass, pydantic, typeddict) ✅
-• TypeScript - Coming soon 🚧
-• Rust - Coming soon 🚧
-
-[bold]Use Cases:[/bold]
-• API client/server model generation
-• Configuration file structures
-• Data transfer objects (DTOs)
-• Database schema representations
-• Type-safe JSON processing""",
-            border_style="blue",
-        )
-
-        self.console.print()
-        self.console.print(info_panel)
-
-    def _show_templates_menu(self) -> None:
-        """Show configuration templates information."""
-        languages = list_languages()
-
-        if not languages:
-            self.console.print("[red]No languages available[/red]")
-            return
-
-        self.console.print("\n[bold blue]🎨 Configuration Templates[/bold blue]")
-
-        for language in languages:
-            lang_handler = self._get_language_handler(language)
-            if lang_handler:
-                templates = lang_handler.get_template_choices()
-                if templates:
-                    self.console.print(f"\n[bold]{language.title()} Templates:[/bold]")
-                    for template_name, description in templates.items():
-                        self.console.print(
-                            f"  [green]•[/green] {template_name}: {description}"
-                        )
-            else:
-                self.console.print(
-                    f"\n[yellow]{language.title()}: No templates available[/yellow]"
-                )
-
-    # ========================================================================
-    # Language Handler Management
     # ========================================================================
 
     def _get_language_handler(

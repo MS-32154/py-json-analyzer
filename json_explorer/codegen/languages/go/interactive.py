@@ -3,7 +3,6 @@
 from typing import Any
 
 from rich.console import Console
-from rich.panel import Panel
 from rich.prompt import Confirm
 
 from json_explorer.utils import prompt_input
@@ -31,31 +30,6 @@ class GoInteractiveHandler:
     """Interactive handler for Go-specific code generation options."""
 
     __slots__ = ()
-
-    def get_language_info(self) -> dict[str, str]:
-        return {
-            "description": "Generates Go structs with JSON tags",
-            "features": "Exported fields, json tags, pointers for optional fields",
-            "use_cases": "REST APIs, configuration, data models, JSON processing",
-            "maturity": "Full support",
-        }
-
-    def show_configuration_examples(self, console: Console) -> None:
-        console.print()
-        console.print(
-            Panel(
-                "[bold]Go options:[/bold]\n"
-                "• Pointers for optional fields (tell missing values from zero values)\n"
-                "• omitempty on optional fields\n"
-                "• Integer type: int, int32 or int64\n"
-                "• Float type: float32 or float64\n"
-                "• Timestamps: time.Time or string\n\n"
-                "[bold]Always:[/bold] exported PascalCase fields, json tags with the\n"
-                "original keys, `any` for unknown or mixed values (Go 1.18+)",
-                title="⚙️ Go Configuration Options",
-                border_style="blue",
-            )
-        )
 
     def get_template_choices(self) -> dict[str, str]:
         return {name: description for name, (description, _) in TEMPLATES.items()}

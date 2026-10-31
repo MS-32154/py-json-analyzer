@@ -134,20 +134,12 @@ Code Generation:
 
     # Logging arguments
     logging_group = parser.add_argument_group("logging options")
-    logging_group.add_argument(
-        "--verbose-logging",
-        "--verbose_logging",  # old spelling, kept for compatibility
-        "-vl",
-        dest="verbose_logging",
-        action="store_true",
-        help="Enable verbose (DEBUG) logging",
-    )
     logging_group.add_argument("--log-file", type=Path, help="Write logs to file")
     logging_group.add_argument(
         "--log-level",
         choices=["DEBUG", "INFO", "WARNING", "ERROR"],
         default="WARNING",
-        help="Set logging level",
+        help="Logging level (default: WARNING; DEBUG shows tracebacks)",
     )
 
     # Data source
@@ -198,9 +190,9 @@ Code Generation:
     )
     viz_group.add_argument(
         "--plot-format",
-        choices=["terminal", "interactive", "html", "all"],
-        default="interactive",
-        help="Visualization format",
+        choices=["terminal", "html", "all"],
+        default="html",
+        help="terminal: text charts; html: report opened in the browser; all: both",
     )
     viz_group.add_argument("--save-path", type=str, help="Path to save visualizations")
     viz_group.add_argument(
@@ -221,12 +213,7 @@ def main() -> int:
     args = parser.parse_args()
 
     # Configure logging
-    log_level = (
-        "DEBUG"
-        if getattr(args, "verbose_logging", False)
-        else getattr(args, "log_level", "INFO")
-    )
-    configure_logging(level=log_level, log_file=getattr(args, "log_file", None))
+    configure_logging(level=args.log_level, log_file=args.log_file)
     logger.info("JSON Explorer starting")
 
     # If no arguments, show help

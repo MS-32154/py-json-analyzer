@@ -140,9 +140,8 @@ def test_missing_input_is_reported_on_stderr(run, capsys, argv, message):
     assert message not in out.out
 
 
-@pytest.mark.parametrize("flag", ["--verbose-logging", "--verbose_logging", "-vl"])
-def test_verbose_logging_flag_spellings(run, flag):
-    assert run(FLAT_SAMPLE, "--stats", flag) == 0
+def test_log_level_debug(run):
+    assert run(FLAT_SAMPLE, "--stats", "--log-level", "DEBUG") == 0
     assert logging.getLogger(PACKAGE_LOGGER_NAME).level == logging.DEBUG
 
 

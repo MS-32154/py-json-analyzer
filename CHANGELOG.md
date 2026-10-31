@@ -103,6 +103,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   (snake_case fields for Python) and rejects unsupported languages.
 
 ### Removed
+- **Breaking:** the curses terminal view and the `windows-curses` dependency. `--plot-format terminal`
+  prints text charts, which work in any terminal and on every platform.
+- **Breaking:** `--plot-format interactive` (it was the same as `html`). `html` is now the default; the
+  report is opened in the browser unless `--no-browser` is given (also when `--save-path` is set).
+- **Breaking:** `--verbose-logging` / `-vl`; use `--log-level DEBUG`.
+- Interactive mode: the code generation submenu's language/info/template screens (the same
+  information as `--list-languages` and `--language-info`; templates are offered while configuring),
+  and the main menu's "JMESPath help", "Data summary" and "Save last search results" items (the search
+  shows examples and offers saving; statistics cover the summary).
+- `JsonSearcher.search_multiple()` and the `compile_query` parameter of `JsonSearcher.search()`.
 - The `dateparser` dependency (and with it `regex`, `pytz`, `tzlocal`, `python-dateutil`): about 10 MB
   installed and ~230 ms import time. Analysis is roughly 5x faster on the test suite's data.
 - `detect_timestamp()` (use `detect_format()`), `map_analyzer_type()`.

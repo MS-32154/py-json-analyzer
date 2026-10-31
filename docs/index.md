@@ -34,7 +34,7 @@ JSON Explorer is a comprehensive Python library and CLI tool for analyzing, sear
 - **Deep Structural Analysis**: Type detection, optional field inference, and conflict resolution
 - **JMESPath Search**: Industry-standard query language for powerful JSON querying
 - **Comprehensive Statistics**: Data quality metrics, depth analysis, and structural insights
-- **Multi-Format Visualization**: Terminal (curses/ASCII), interactive HTML (Plotly), or combined
+- **Visualization**: text charts in the terminal, an interactive HTML report (Plotly), or both
 - **Code Generation**: Generate Go structs, Python dataclasses/Pydantic/TypedDict from JSON
 - **Interactive Mode**: Full-featured terminal UI for exploration and configuration
 - **Extensible Architecture**: Plugin-based generator system for custom languages
@@ -442,10 +442,9 @@ Create visualizations for JSON data statistics.
 
 - `data` (dict | list): JSON data to visualize
 - `output` (str): Output format:
-  - `"terminal"`: ASCII/curses visualization
-  - `"html"`: Interactive Plotly charts saved to file
-  - `"interactive"`: Same as "html" (legacy alias)
-  - `"all"`: Both terminal and HTML
+  - `"terminal"`: text bar charts in the terminal
+  - `"html"`: interactive Plotly report (saved to `save_path` or a temporary file, opened in the browser unless `open_browser=False`)
+  - `"all"`: both
 - `save_path` (str | Path, optional): Path to save HTML file
 - `detailed` (bool): Generate detailed visualizations
 - `open_browser` (bool): Auto-open browser for HTML output
@@ -489,15 +488,8 @@ visualizer.visualize(data, output="all", detailed=True)
 
 #### Terminal Output
 
-Terminal mode uses:
-
-- **curses** (when available): Interactive, paginated display with navigation
-- **ASCII fallback**: Static ASCII bar charts when curses unavailable
-
-**Terminal Controls:**
-
-- `SPACE`: Next page
-- `q`: Quit
+Terminal mode prints text bar charts (data types, depth distribution and, with
+`detailed=True`, quality metrics). It works in any terminal, including on Windows.
 
 #### HTML Output (Plotly)
 

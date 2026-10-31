@@ -8,7 +8,6 @@ from typing import Any
 from rich.console import Console
 from rich.panel import Panel
 from rich.prompt import Confirm, Prompt
-from rich.table import Table
 
 from .codegen.interactive import CodegenInteractiveHandler
 from .logging_config import get_logger
@@ -58,35 +57,25 @@ class InteractiveHandler:
         self.console.print("\n🎯 [bold green]Interactive JSON Explorer[/bold green]")
         self.console.print(f"📄 [cyan]Loaded: {self.source}[/cyan]\n")
 
+        actions = {
+            "1": self._interactive_tree_view,
+            "2": self._interactive_jmespath_search,
+            "3": self._interactive_stats,
+            "4": self._interactive_visualization,
+            "5": self._interactive_codegen,
+            "6": self._load_new_data,
+        }
         while True:
             self._show_main_menu()
             choice = Prompt.ask(
                 "\n[bold]Choose an option[/bold]",
-                choices=["1", "2", "3", "4", "5", "6", "7", "8", "9", "q"],
+                choices=[*actions, "q"],
                 default="q",
             )
-
             if choice == "q":
                 self.console.print("👋 [yellow]Goodbye![/yellow]")
                 break
-            if choice == "1":
-                self._interactive_tree_view()
-            elif choice == "2":
-                self._interactive_jmespath_search()
-            elif choice == "3":
-                self._show_jmespath_help()
-            elif choice == "4":
-                self._interactive_stats()
-            elif choice == "5":
-                self._interactive_visualization()
-            elif choice == "6":
-                self._load_new_data()
-            elif choice == "7":
-                self._show_data_summary()
-            elif choice == "8":
-                self._interactive_codegen()
-            elif choice == "9":
-                self._save_query_results()
+            actions[choice]()
 
         return 0
 
@@ -108,13 +97,10 @@ class InteractiveHandler:
 
 [cyan]1.[/cyan] 🌳 Tree View (Structure Analysis)
 [cyan]2.[/cyan] 🔍 JMESPath Search
-[cyan]3.[/cyan] ❓ JMESPath Query Help
-[cyan]4.[/cyan] 📊 Statistics & Analysis
-[cyan]5.[/cyan] 📈 Visualizations
+[cyan]3.[/cyan] 📊 Statistics & Analysis
+[cyan]4.[/cyan] 📈 Visualizations
+[cyan]5.[/cyan] ⚡ Code Generation
 [cyan]6.[/cyan] 📂 Load New Data
-[cyan]7.[/cyan] 📋 Data Summary
-[cyan]8.[/cyan] ⚡ Code Generation
-[cyan]9.[/cyan] 💾 Save Last Search Results
 [cyan]q.[/cyan] 🚪 Quit""",
             border_style="blue",
         )
@@ -167,9 +153,6 @@ class InteractiveHandler:
         if result:
             show_tree = Confirm.ask("Display results as tree?", default=False)
             self.searcher.print_result(result, show_tree=show_tree)
-
-            # Store last result for potential saving
-            self._last_search_result = result
 
             if Confirm.ask("\nSave results to file?"):
                 self._save_search_result(result)
@@ -229,45 +212,6 @@ class InteractiveHandler:
         codegen_handler.run_interactive()
         logger.info("Interactive code generation completed")
 
-    def _show_jmespath_help(self) -> None:
-        """Show comprehensive help for JMESPath queries."""
-        help_panel = Panel.fit(
-            """[bold blue]🔧 JMESPath Query Reference[/bold blue]
-
-[bold]Basic Expressions:[/bold]
-• [cyan]users[/cyan] - Get the 'users' key
-• [cyan]users[0][/cyan] - Get first item in users array
-• [cyan]users[-1][/cyan] - Get last item in users array
-• [cyan]users[*][/cyan] - Get all items in users array
-
-[bold]Nested Access:[/bold]
-• [cyan]users[0].name[/cyan] - Get name of first user
-• [cyan]users[*].name[/cyan] - Get all user names (projection)
-• [cyan]metadata.created_at[/cyan] - Access nested fields
-
-[bold]Filtering:[/bold]
-• [cyan]users[?age > `30`][/cyan] - Filter users by age
-• [cyan]users[?active == `true`][/cyan] - Filter by boolean
-• [cyan]users[?age > `30` && active == `true`][/cyan] - Multiple conditions
-
-[bold]Functions:[/bold]
-• [cyan]length(users)[/cyan] - Count items
-• [cyan]sort_by(users, &age)[/cyan] - Sort by field
-• [cyan]max_by(users, &age)[/cyan] - Get item with max value
-• [cyan]contains(name, 'John')[/cyan] - Check if contains string
-
-[bold]Projections:[/bold]
-• [cyan]users[*].{name: name, email: email}[/cyan] - Select fields
-• [cyan]users[?age > `30`].name[/cyan] - Filter then project
-
-[bold]Learn More:[/bold]
-• Tutorial: https://jmespath.org/tutorial.html
-• Specification: https://jmespath.org/specification.html
-• Try it online: https://jmespath.org/""",
-            border_style="blue",
-        )
-        self.console.print(help_panel)
-
     def _load_new_data(self) -> None:
         """Load new JSON data from file or URL."""
         self.console.print("\n📂 [bold]Load New Data[/bold]")
@@ -286,30 +230,6 @@ class InteractiveHandler:
             self.console.print(f"✅ [green]Successfully loaded: {self.source}[/green]")
         except Exception as e:
             self.console.print(f"⚠️ [red]Failed to load data: {e}[/red]")
-
-    def _show_data_summary(self) -> None:
-        """Show a quick summary of the loaded data."""
-        if self.data is None:
-            self.console.print("⚠️ [red]No data loaded[/red]")
-            return
-
-        self.console.print("\n📋 [bold]Data Summary[/bold]")
-        summary_table = Table(title="Quick Overview")
-        summary_table.add_column("Property", style="cyan")
-        summary_table.add_column("Value", style="green")
-
-        summary_table.add_row("Data Type", type(self.data).__name__)
-        summary_table.add_row("Source", str(self.source))
-
-        if isinstance(self.data, (dict, list)):
-            summary_table.add_row("Length", str(len(self.data)))
-        if isinstance(self.data, dict):
-            summary_table.add_row("Top-level Keys", str(len(self.data.keys())))
-            if self.data:
-                sample_keys = ", ".join(str(k) for k in list(self.data.keys())[:5])
-                summary_table.add_row("Sample Keys", sample_keys)
-
-        self.console.print(summary_table)
 
     def _save_search_result(self, result: Any) -> None:
         """Save a single search result to a JSON file.
@@ -333,13 +253,3 @@ class InteractiveHandler:
             self.console.print(f"✅ [green]Result saved to: {filename}[/green]")
         except Exception as e:
             self.console.print(f"⚠️ [red]Error saving result: {e}[/red]")
-
-    def _save_query_results(self) -> None:
-        """Save the last search results if available."""
-        if not hasattr(self, "_last_search_result"):
-            self.console.print(
-                "[yellow]No search results to save. Run a search first.[/yellow]"
-            )
-            return
-
-        self._save_search_result(self._last_search_result)

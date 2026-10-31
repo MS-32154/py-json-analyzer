@@ -16,7 +16,7 @@
 - **JMESPath Search**: Industry-standard query language for powerful JSON searching and filtering
 - **Tree Visualization**: Multiple view modes (compact, analytical, raw) with rich terminal output
 - **Statistical Analysis**: Comprehensive data quality metrics and structural insights
-- **Multi-Format Visualization**: Terminal (curses/ASCII), interactive HTML (Plotly), or combined output
+- **Visualization**: text charts in the terminal, an interactive HTML report (Plotly), or both
 - **Interactive Mode**: Full-featured terminal UI for exploration and analysis
 
 ### Code Generation
@@ -41,7 +41,6 @@
 ## Requirements
 
 - **Python**: 3.15 or higher (Linux/macOS); 3.14 or higher on Windows
-  - On Windows, the curses terminal view needs Python 3.14, since `windows-curses` has no 3.15 wheels yet. On 3.15 the other output formats still work.
 
 ### Core Dependencies
 
@@ -52,7 +51,6 @@ plotly>=5.0.0            # Interactive, browser-based graphing
 prompt-toolkit>=3.0.0    # Interactive input with autocomplete
 requests>=2.32.0         # HTTP requests for URL loading
 rich>=13.0.0             # Rich terminal formatting
-windows-curses>=2.4.0    # Terminal UI on Windows (auto-installed on Python 3.14)
 ```
 
 ### Development Dependencies (`dev` dependency group)
@@ -237,7 +235,7 @@ json_explorer data.json --generate python \
 ### Visualization
 
 ```bash
-# Terminal visualization (ASCII/curses)
+# Terminal visualization (text charts)
 json_explorer data.json --plot --plot-format terminal
 
 # Interactive HTML (Plotly)
@@ -257,7 +255,6 @@ json_explorer data.json --plot --plot-format all
 ```bash
 --log-level {DEBUG,INFO,WARNING,ERROR}
 --log-file output.log
---verbose-logging, -vl
 ```
 
 ---
@@ -534,7 +531,7 @@ json_explorer/
 ├── search.py                # JMESPath-based search
 ├── stats.py                 # Statistical analysis
 ├── tree_view.py             # Tree visualization
-├── visualizer.py            # Multi-format charts (Plotly/curses)
+├── visualizer.py            # Terminal text charts and Plotly HTML report
 ├── utils.py                 # File/URL loading utilities
 ├── logging_config.py        # Centralized logging
 │
