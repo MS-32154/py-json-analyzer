@@ -124,7 +124,7 @@ class TestLanguagePlugins:
     """Each plugin owns its CLI flags; the CLI maps them to config options."""
 
     def test_builtin_plugins(self):
-        assert [p.name for p in all_plugins()] == ["go", "python", "typescript"]
+        assert [p.name for p in all_plugins()] == ["go", "python", "rust", "typescript"]
 
     def test_flags_map_to_config(self):
         import argparse

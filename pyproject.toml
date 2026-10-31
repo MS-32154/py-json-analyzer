@@ -91,6 +91,7 @@ include = ["json_explorer*"]
 "json_explorer" = ["py.typed"]
 "json_explorer.codegen.languages.go" = ["templates/*.j2"]
 "json_explorer.codegen.languages.python" = ["templates/*.j2"]
+"json_explorer.codegen.languages.rust" = ["templates/*.j2"]
 "json_explorer.codegen.languages.typescript" = ["templates/*.j2"]
 
 [tool.pytest.ini_options]

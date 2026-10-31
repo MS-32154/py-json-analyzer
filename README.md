@@ -31,6 +31,8 @@
   `timedelta`) or TypedDicts (original keys); ruff/black-formatted output
 - **TypeScript**: interfaces, or Zod 4 schemas with inferred types; keys kept as in the JSON,
   `key?:` for missing keys, `| null` for null values, unions for mixed values; Prettier-formatted
+- **Rust**: structs with serde derives; `Option<T>` for missing or null values, `rename` for keys that
+  aren't snake_case, raw identifiers for keywords, `serde_json::Value` for mixed values; rustfmt-clean
 - **Correct names**: types named after their keys (`TeamLead`, `Project`), every name planned once so
   declarations and references agree, keys escaped or mapped with aliases
 - **Verified output**: the test suite compiles the generated code and decodes the source data with it
@@ -238,6 +240,9 @@ json_explorer data.json --generate python \
 
 # TypeScript-specific options
 --ts-style {interface,zod}           # Interfaces (default) or Zod schemas
+
+# Rust-specific options
+--rust-deny-unknown                  # #[serde(deny_unknown_fields)]
 
 # Common options
 --config config.json                 # Load configuration from file
@@ -592,6 +597,13 @@ json_explorer/
         │   ├── interactive.py
         │   └── templates/   # Jinja2 templates
         │
+        ├── rust/            # serde structs
+        │   ├── plugin.py
+        │   ├── generator.py
+        │   ├── config.py
+        │   ├── naming.py
+        │   └── templates/
+        │
         └── typescript/      # Interfaces and Zod schemas
             ├── plugin.py
             ├── generator.py
@@ -642,6 +654,7 @@ Test categories:
 | **Go**         | ✅ Full Support | Structs, JSON tags, pointers, configurable int/float/time types |
 | **Python**     | ✅ Full Support | Dataclasses, Pydantic v2, TypedDict, modern type hints   |
 | **TypeScript** | ✅ Full Support | Interfaces, Zod 4 schemas, optional/nullable keys, unions |
+| **Rust**       | ✅ Full Support | serde structs, `Option<T>`, renames, raw identifiers      |
 
 Other languages can be added as plugins (see below).
 

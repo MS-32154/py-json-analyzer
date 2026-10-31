@@ -96,6 +96,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Lint and format with ruff (replaces black, isort and flake8).
 
 ### Added
+- Rust generator (`--generate rust`/`rs`): structs with serde derives, `Option<T>` for missing or null
+  values, renames for non-snake_case keys, raw identifiers for keywords, `serde_json::Value` for mixed
+  values, optional `--rust-deny-unknown`. Checked in CI with `cargo check` (warnings as errors),
+  rustfmt, and serde decoding of the source data.
 - TypeScript generator (`--generate typescript`/`ts`): interfaces, or Zod 4 schemas with inferred types
   (`--ts-style zod`). Keys kept as in the JSON, `key?:` / `| null` for missing and null values, unions
   for mixed values, Zod validators for date/time formats. Checked in CI with `tsc --strict`,

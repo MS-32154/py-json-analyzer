@@ -18,8 +18,9 @@
   - [Go Generator](#4-go-generator)
   - [Python Generator](#5-python-generator)
   - [TypeScript Generator](#6-typescript-generator)
-  - [Schema System](#7-schema-system)
-  - [Interactive Handler](#8-interactive-handler)
+  - [Rust Generator](#7-rust-generator)
+  - [Schema System](#8-schema-system)
+  - [Interactive Handler](#9-interactive-handler)
 - [CLI Usage](#cli-usage)
 - [Examples](#examples)
 - [Configuration Best Practices](#configuration-best-practices)
@@ -1238,7 +1239,39 @@ quick_generate(data, "typescript", style="zod")
 # export type Root = z.infer<typeof Root>;
 ```
 
-### 7. Schema System
+### 7. Rust Generator
+
+Structs with serde derives (`--generate rust`, alias `rs`). Add `serde` (with the `derive` feature)
+and, when mixed or unknown values occur, `serde_json` to your crate.
+
+#### Features
+
+- Fields are ASCII snake_case; `#[serde(rename = "...")]` keeps the JSON key when it differs
+- Keywords become raw identifiers (`r#type`); `self`, `super` and `crate` get a `_` suffix
+- A key that can be missing or a value that can be `null` is `Option<T>`; keys that can be missing
+  are also skipped when serializing `None`, so serializing reproduces the input's shape
+- Mixed and unknown values are `serde_json::Value`; nullable array elements are `Vec<Option<T>>`
+- Date/time strings stay `String`, with a doc comment naming the format
+- `--rust-deny-unknown` / `{"deny_unknown_fields": true}` adds `#[serde(deny_unknown_fields)]`
+- Output is rustfmt-clean
+
+For `[{"userId": 1, "email": null, "type": "admin", "nick": "a"}, {"userId": 2, "email": "b@x.io", "type": "user"}]`:
+
+```rust
+use serde::{Deserialize, Serialize};
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct Root {
+    #[serde(rename = "userId")]
+    pub user_id: i64,
+    pub email: Option<String>,
+    pub r#type: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub nick: Option<String>,
+}
+```
+
+### 8. Schema System
 
 Internal schema representation for code generation.
 
@@ -1315,7 +1348,7 @@ user_schema.add_field(
 
 ---
 
-### 8. Interactive Handler
+### 9. Interactive Handler
 
 Interactive code generation interface with guided configuration.
 
