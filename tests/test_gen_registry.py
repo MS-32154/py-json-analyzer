@@ -9,15 +9,18 @@ from json_explorer.codegen.core import (
     CodeGenerator,
     GeneratorConfig,
 )
+from json_explorer.codegen.core.plugin import CliOption, LanguagePlugin
 from json_explorer.codegen.languages.go import GoGenerator
 from json_explorer.codegen.languages.python import PythonGenerator
 from json_explorer.codegen.registry import (
     _ALIASES,
-    _GENERATORS,
+    _PLUGINS,
     RegistryError,
+    all_plugins,
     create_generator,
     get_generator_class,
     get_language_info,
+    get_plugin,
     is_supported,
     list_languages,
     register,
@@ -85,28 +88,68 @@ class TestRegistry:
     def test_register_custom_generator(self):
         # Create mock generator
         class MockGenerator(CodeGenerator):
-            @property
-            def language_name(self):
-                return "mock"
-
-            @property
-            def file_extension(self):
-                return ".mock"
-
-            def get_template_directory(self):
-                return Path()
+            language_name = "mock"
+            file_extension = ".mock"
+            template_dir = Path()
 
             def generate(self, schemas, root_schema_name):
                 return "mock code"
 
-        register("mock", MockGenerator, aliases=["test"])
+        register(
+            LanguagePlugin(name="mock", generator=MockGenerator, aliases=("test",))
+        )
+        try:
+            assert is_supported("mock")
+            assert is_supported("test")
+            assert get_plugin("TEST").generator is MockGenerator
+            assert get_language_info("mock")["file_extension"] == ".mock"
+        finally:
+            del _PLUGINS["mock"]
+            del _ALIASES["test"]
 
-        assert is_supported("mock")
-        assert is_supported("test")
+    def test_duplicate_registration_rejected(self):
+        with pytest.raises(RegistryError):
+            register(get_plugin("go"))
 
-        # Cleanup
-        del _GENERATORS["mock"]
-        del _ALIASES["test"]
+    def test_alias_conflict_rejected(self):
+        plugin = LanguagePlugin(
+            name="other", generator=get_plugin("go").generator, aliases=("py",)
+        )
+        with pytest.raises(RegistryError):
+            register(plugin)
+        assert "other" not in _PLUGINS
+
+
+class TestLanguagePlugins:
+    """Each plugin owns its CLI flags; the CLI maps them to config options."""
+
+    def test_builtin_plugins(self):
+        assert [p.name for p in all_plugins()] == ["go", "python"]
+
+    def test_flags_map_to_config(self):
+        import argparse
+
+        plugin = LanguagePlugin(
+            name="demo",
+            generator=get_plugin("go").generator,
+            cli_options=(
+                CliOption("--no-thing", "thing", "help", value=False),
+                CliOption("--style", "style", "help", choices=("a", "b")),
+            ),
+        )
+        parser = argparse.ArgumentParser()
+        plugin.add_cli_arguments(parser)
+        assert plugin.config_from_args(parser.parse_args([])) == {}
+        args = parser.parse_args(["--no-thing", "--style", "b"])
+        assert plugin.config_from_args(args) == {"thing": False, "style": "b"}
+
+    def test_every_flag_targets_a_real_option(self):
+        """A flag must set an option the language's generator accepts."""
+        for plugin in all_plugins():
+            for opt in plugin.cli_options:
+                value = opt.choices[0] if opt.choices else opt.value
+                if opt.option not in GeneratorConfig.__dataclass_fields__:
+                    create_generator(plugin.name, {opt.option: value})
 
 
 class TestCreateConfig:

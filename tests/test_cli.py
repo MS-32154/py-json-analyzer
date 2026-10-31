@@ -160,3 +160,25 @@ def test_generated_code_is_utf8_on_non_utf8_pipe(monkeypatch):
     monkeypatch.setattr(sys, "stdout", io.TextIOWrapper(raw, encoding="cp1252"))
     _display_to_stdout("// ◉ Generated\n", "go")
     assert raw.getvalue().decode("utf-8") == "// ◉ Generated\n"
+
+
+# ---------------------------------------------------------------------------
+# #22: informational codegen commands need no input file; aliases work
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize("language", ["go", "golang", "python", "py"])
+def test_language_info_without_input(run, capsys, language):
+    assert run("--language-info", language) == 0
+    out = capsys.readouterr().out
+    assert "Usage Examples" in out
+
+
+def test_language_info_unknown_language(run, capsys):
+    assert run("--language-info", "cobol") == 1
+    assert "not supported" in capsys.readouterr().err
+
+
+def test_generate_accepts_alias(run, capsys):
+    assert run(FLAT_SAMPLE, "--generate", "py") == 0
+    assert "@dataclass" in capsys.readouterr().out

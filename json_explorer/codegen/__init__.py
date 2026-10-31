@@ -31,12 +31,15 @@ from .core import (
 )
 
 # Import registry functions
+from .core.plugin import CliOption, LanguagePlugin
 from .registry import (
     RegistryError,
+    all_plugins,
     create_generator,
     get_aliases,
     get_generator_class,
     get_language_info,
+    get_plugin,
     is_supported,
     list_all_language_info,
     list_languages,
@@ -180,17 +183,20 @@ def create_config(language: str = "go", **kwargs) -> GeneratorConfig:
 
 
 __all__ = [
+    "CliOption",
     "CodeGenerator",
     "Field",
     "FieldType",
     "GenerationResult",
     "GeneratorConfig",
     "GeneratorError",
+    "LanguagePlugin",
     "NamePlan",
     "RegistryError",
     "Schema",
     "TemplateError",
     "TemplateManager",
+    "all_plugins",
     "convert_analyzer_output",
     "create_config",
     "create_generator",
@@ -200,6 +206,7 @@ __all__ = [
     "get_aliases",
     "get_generator_class",
     "get_language_info",
+    "get_plugin",
     "is_supported",
     "list_all_language_info",
     "list_languages",

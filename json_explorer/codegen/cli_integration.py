@@ -27,6 +27,8 @@ from . import (
     list_all_language_info,
     list_languages,
 )
+from .core.plugin import LanguagePlugin
+from .registry import all_plugins, get_plugin, is_supported
 
 logger = get_logger(__name__)
 # Generated code is the program's output and goes to stdout; status messages,
@@ -119,55 +121,9 @@ def add_codegen_args(parser: argparse.ArgumentParser) -> None:
         help="Show generation result metadata",
     )
 
-    # Go-specific options
-    go_group = parser.add_argument_group("Go-specific options")
-
-    go_group.add_argument(
-        "--no-pointers",
-        action="store_true",
-        help="Don't use pointers for optional fields in Go",
-    )
-
-    go_group.add_argument(
-        "--no-omitempty",
-        action="store_true",
-        help="Don't add omitempty to JSON tags in Go",
-    )
-
-    # Python-specific options
-    python_group = parser.add_argument_group("Python-specific options")
-
-    python_group.add_argument(
-        "--python-style",
-        choices=["dataclass", "pydantic", "typeddict"],
-        help="Python code style (default: dataclass)",
-    )
-
-    python_group.add_argument(
-        "--no-slots",
-        action="store_true",
-        help="Don't use __slots__ in dataclasses",
-    )
-
-    python_group.add_argument(
-        "--frozen",
-        action="store_true",
-        help="Make dataclasses frozen (immutable)",
-    )
-
-    python_group.add_argument(
-        "--kw-only",
-        action="store_true",
-        help="Make dataclass fields keyword-only",
-    )
-
-    python_group.add_argument(
-        "--pydantic-forbid-extra",
-        action="store_true",
-        help="Forbid extra fields in Pydantic models",
-    )
-
-    logger.debug("Code generation arguments added to parser")
+    # Language-specific flags come from each language plugin
+    for plugin in all_plugins():
+        plugin.add_cli_arguments(parser)
 
 
 # ============================================================================
@@ -320,12 +276,7 @@ def _show_language_info(language: str) -> int:
             )
         )
 
-        # Show language-specific examples
-        match language.lower():
-            case "python" | "py":
-                _show_python_examples()
-            case "go" | "golang":
-                _show_go_examples()
+        _show_examples(get_plugin(language))
 
         logger.info("Displayed info for language: %s", language)
         return 0
@@ -336,43 +287,17 @@ def _show_language_info(language: str) -> int:
         return 1
 
 
-def _show_python_examples() -> None:
-    """Show Python-specific CLI examples."""
-    examples_text = """Generate dataclass:
-[cyan]json_explorer data.json --generate python --python-style dataclass[/cyan]
-
-Generate Pydantic model:
-[cyan]json_explorer data.json --generate python --python-style pydantic[/cyan]
-
-Generate TypedDict:
-[cyan]json_explorer data.json --generate python --python-style typeddict[/cyan]
-
-Frozen dataclass with slots:
-[cyan]json_explorer data.json --generate python --frozen[/cyan]"""
-
-    console.print()
-    console.print(
-        Panel(examples_text, title="💡 Python Usage Examples", border_style="blue")
+def _show_examples(plugin: LanguagePlugin) -> None:
+    """Show the language's CLI examples."""
+    if not plugin.examples:
+        return
+    text = "\n\n".join(
+        f"{description}:\n[cyan]json_explorer data.json {arguments}[/cyan]"
+        for description, arguments in plugin.examples
     )
-
-
-def _show_go_examples() -> None:
-    """Show Go-specific CLI examples."""
-    examples_text = """Generate basic structure:
-[cyan]json_explorer data.json --generate go[/cyan]
-
-Generate to file:
-[cyan]json_explorer data.json --generate go --output output.go[/cyan]
-
-Custom package name:
-[cyan]json_explorer data.json --generate go --package-name mypackage[/cyan]
-
-No pointers (strict mode):
-[cyan]json_explorer data.json --generate go --no-pointers[/cyan]"""
-
     console.print()
     console.print(
-        Panel(examples_text, title="💡 Go Usage Examples", border_style="blue")
+        Panel(text, title=f"💡 {plugin.title} Usage Examples", border_style="blue")
     )
 
 
@@ -382,20 +307,15 @@ No pointers (strict mode):
 
 
 def _validate_language(language: str, silent: bool = False) -> bool:
-    """Validate that a language is supported."""
-    try:
-        supported = list_languages()
-        if language.lower() not in [lang.lower() for lang in supported]:
-            if not silent:
-                err_console.print(f"[red]✗ Unsupported language '{language}'[/red]")
-                console.print(f"[dim]Supported languages: {', '.join(supported)}[/dim]")
-            return False
+    """Whether a language name or alias is supported (reports it if not)."""
+    if is_supported(language):
         return True
-    except Exception:
-        if not silent:
-            err_console.print("[red]✗ Failed to validate language[/red]")
-        return False
-
+    if not silent:
+        err_console.print(f"[red]✗ Unsupported language '{language}'[/red]")
+        err_console.print(
+            f"[dim]Supported languages: {', '.join(list_languages())}[/dim]"
+        )
+    return False
 
 def _get_input_data(args: argparse.Namespace) -> dict | list | None:
     """Get JSON input data from various sources."""
@@ -456,41 +376,10 @@ def _build_config(args: argparse.Namespace, language: str) -> dict:
         config_dict["add_comments"] = False
 
     # Language-specific options
-    match language.lower():
-        case "go" | "golang":
-            _add_go_config(args, config_dict)
-        case "python" | "py":
-            _add_python_config(args, config_dict)
+    config_dict.update(get_plugin(language).config_from_args(args))
 
     logger.debug("Built config with %s options", len(config_dict))
     return config_dict
-
-
-def _add_go_config(args: argparse.Namespace, config_dict: dict) -> None:
-    """Add Go-specific configuration options."""
-    if hasattr(args, "no_pointers") and args.no_pointers:
-        config_dict["use_pointers_for_optional"] = False
-
-    if hasattr(args, "no_omitempty") and args.no_omitempty:
-        config_dict["json_tag_omitempty"] = False
-
-
-def _add_python_config(args: argparse.Namespace, config_dict: dict) -> None:
-    """Add Python-specific configuration options."""
-    if hasattr(args, "python_style") and args.python_style:
-        config_dict["style"] = args.python_style
-
-    if hasattr(args, "no_slots") and args.no_slots:
-        config_dict["dataclass_slots"] = False
-
-    if hasattr(args, "frozen") and args.frozen:
-        config_dict["dataclass_frozen"] = True
-
-    if hasattr(args, "kw_only") and args.kw_only:
-        config_dict["dataclass_kw_only"] = True
-
-    if hasattr(args, "pydantic_forbid_extra") and args.pydantic_forbid_extra:
-        config_dict["pydantic_extra_forbid"] = True
 
 
 def _load_config_file(config_path: str) -> dict:

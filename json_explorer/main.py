@@ -65,7 +65,10 @@ class JSONExplorer:
         """
         # Handle codegen commands first
         if self._is_codegen_command(args):
-            if getattr(args, "list_languages", False):
+            # Informational commands need no input data
+            if getattr(args, "list_languages", False) or getattr(
+                args, "language_info", None
+            ):
                 return handle_codegen_command(args, None)
             if not self.load_data(args.file, getattr(args, "url", None)):
                 return 1

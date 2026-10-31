@@ -1,10 +1,12 @@
-"""
-Generator registry system.
+"""Registry of target languages.
 
-Manages available code generators and provides lookup by language name.
-Uses a simple dict-based approach instead of complex singleton pattern.
+Built-in languages and those installed through the ``json_explorer.languages``
+entry-point group (each entry point loads a :class:`LanguagePlugin`) are
+registered on first use.
 """
 
+from importlib import import_module
+from importlib.metadata import entry_points
 from pathlib import Path
 from typing import Any
 
@@ -13,321 +15,134 @@ from json_explorer.logging_config import get_logger
 
 from .core.config import GeneratorConfig, load_config
 from .core.generator import CodeGenerator
+from .core.plugin import LanguagePlugin
 
 logger = get_logger(__name__)
 
-
-# ============================================================================
-# Exceptions
-# ============================================================================
+ENTRY_POINT_GROUP = "json_explorer.languages"
+_BUILTIN_PLUGINS = (
+    "json_explorer.codegen.languages.go",
+    "json_explorer.codegen.languages.python",
+)
 
 
 class RegistryError(JsonExplorerError):
-    """Raised for registry-related errors."""
+    """Raised for unknown languages or invalid registrations."""
 
 
-# ============================================================================
-# Generator Registry (Module-Level)
-# ============================================================================
-
-
-# Generator registry: language name -> generator class
-_GENERATORS: dict[str, type[CodeGenerator]] = {}
-
-# Language aliases: alias -> primary language name
+_PLUGINS: dict[str, LanguagePlugin] = {}
 _ALIASES: dict[str, str] = {}
-
-# Track if auto-registration has run
-_AUTO_REGISTERED = False
+_loaded = False
 
 
-def _auto_register_generators() -> None:
-    """
-    Auto-register known generators with their aliases.
-
-    This runs once on first registry access to discover and register
-    all available language generators.
-    """
-    global _AUTO_REGISTERED
-
-    if _AUTO_REGISTERED:
+def _ensure_loaded() -> None:
+    global _loaded
+    if _loaded:
         return
-
-    logger.info("Auto-registering available generators...")
-    registered_count = 0
-
-    # Register Go generator
-    try:
-        from .languages.go import GoGenerator
-
-        register("go", GoGenerator, aliases=["golang"])
-        registered_count += 1
-        logger.debug("Registered Go generator")
-    except ImportError as e:
-        logger.debug("Go generator not available: %s", e)
-
-    # Register Python generator
-    try:
-        from .languages.python import PythonGenerator
-
-        register("python", PythonGenerator, aliases=["py"])
-        registered_count += 1
-        logger.debug("Registered Python generator")
-    except ImportError as e:
-        logger.debug("Python generator not available: %s", e)
-
-    # Future generators can be added here:
-    # try:
-    #     from .languages.typescript import TypeScriptGenerator
-    #     register("typescript", TypeScriptGenerator, aliases=["ts"])
-    # except ImportError:
-    #     pass
-
-    _AUTO_REGISTERED = True
-    logger.info("Auto-registration complete: %s generators available", registered_count)
+    _loaded = True
+    for module in _BUILTIN_PLUGINS:
+        register(import_module(module).PLUGIN)
+    for entry_point in entry_points(group=ENTRY_POINT_GROUP):
+        try:
+            register(entry_point.load())
+        except Exception:
+            logger.warning(
+                "Could not load language plugin %r", entry_point.name, exc_info=True
+            )
 
 
-def _ensure_registry_initialized() -> None:
-    """Ensure auto-registration has run."""
-    if not _AUTO_REGISTERED:
-        _auto_register_generators()
-
-
-# ============================================================================
-# Registration Functions
-# ============================================================================
-
-
-def register(
-    language: str,
-    generator_class: type[CodeGenerator],
-    aliases: list[str] | None = None,
-    replace: bool = False,
-) -> None:
-    """
-    Register a generator for a language.
-
-    Args:
-        language: Primary language name (e.g., 'go', 'python')
-        generator_class: Generator class (subclass of CodeGenerator)
-        aliases: Alternative names for this language
-        replace: If True, replace existing; if False, skip if exists
-
-    Raises:
-        RegistryError: If generator_class is invalid or alias conflicts
-    """
-    if not issubclass(generator_class, CodeGenerator):
+def register(plugin: LanguagePlugin, *, replace: bool = False) -> None:
+    """Register a language plugin (and its aliases)."""
+    if not issubclass(plugin.generator, CodeGenerator):
         raise RegistryError(
-            f"{generator_class.__name__} must inherit from CodeGenerator"
+            f"{plugin.generator.__name__} must inherit from CodeGenerator"
         )
-
-    language_key = language.lower()
-
-    # Check if already registered
-    if language_key in _GENERATORS and not replace:
-        logger.debug("Generator already registered for '%s', skipping", language)
-        return
-
-    # Register primary name
-    _GENERATORS[language_key] = generator_class
-    logger.info("Registered generator: %s → %s", language, generator_class.__name__)
-
-    # Register aliases
-    if aliases:
-        for alias in aliases:
-            alias_key = alias.lower()
-
-            if alias_key == language_key:
-                continue  # Skip if alias is same as primary
-
-            if not replace:
-                # Check for conflicts
-                if alias_key in _GENERATORS:
-                    raise RegistryError(
-                        f"Alias '{alias}' conflicts with existing primary language"
-                    )
-                if alias_key in _ALIASES and _ALIASES[alias_key] != language_key:
-                    raise RegistryError(
-                        f"Alias '{alias}' already points to '{_ALIASES[alias_key]}'"
-                    )
-
-            _ALIASES[alias_key] = language_key
-            logger.debug("Registered alias: %s → %s", alias, language)
+    key = plugin.name.lower()
+    if key in _PLUGINS and not replace:
+        raise RegistryError(f"Language {plugin.name!r} is already registered")
+    for alias in plugin.aliases:
+        owner = _ALIASES.get(alias.lower())
+        if alias.lower() in _PLUGINS or (owner and owner != key):
+            raise RegistryError(f"Alias {alias!r} is already in use")
+    _PLUGINS[key] = plugin
+    for alias in plugin.aliases:
+        _ALIASES[alias.lower()] = key
 
 
-# ============================================================================
-# Lookup Functions
-# ============================================================================
+def get_plugin(language: str) -> LanguagePlugin:
+    """Plugin for a language name or alias."""
+    _ensure_loaded()
+    key = language.lower()
+    key = _ALIASES.get(key, key)
+    if key not in _PLUGINS:
+        raise RegistryError(
+            f"No generator for language: {language}. "
+            f"Available: {', '.join(list_languages())}"
+        )
+    return _PLUGINS[key]
+
+
+def all_plugins() -> list[LanguagePlugin]:
+    _ensure_loaded()
+    return [_PLUGINS[name] for name in sorted(_PLUGINS)]
 
 
 def get_generator_class(language: str) -> type[CodeGenerator]:
-    """
-    Get generator class for language.
-
-    Args:
-        language: Language name or alias
-
-    Returns:
-        Generator class
-
-    Raises:
-        RegistryError: If language not found
-    """
-    _ensure_registry_initialized()
-
-    language_key = language.lower()
-
-    # Check direct registration
-    if language_key in _GENERATORS:
-        return _GENERATORS[language_key]
-
-    # Check aliases
-    if language_key in _ALIASES:
-        target = _ALIASES[language_key]
-        return _GENERATORS[target]
-
-    # Not found
-    available = list_languages()
-    raise RegistryError(
-        f"No generator for language: {language}. Available: {', '.join(available)}"
-    )
+    return get_plugin(language).generator
 
 
 def create_generator(
     language: str,
     config: GeneratorConfig | dict[str, Any] | str | Path | None = None,
 ) -> CodeGenerator:
-    """
-    Create generator instance for language.
-
-    Args:
-        language: Language name or alias
-        config: Configuration (GeneratorConfig, dict, file path, or None)
-
-    Returns:
-        Configured generator instance
-
-    Raises:
-        RegistryError: If generator creation fails
-    """
-    try:
-        # Get generator class
-        generator_class = get_generator_class(language)
-
-        # Load/convert config
-        if isinstance(config, GeneratorConfig):
+    """Generator for a language, configured from a GeneratorConfig, an options
+    dict, a JSON config file path, or the defaults."""
+    generator_class = get_generator_class(language)
+    match config:
+        case GeneratorConfig():
             final_config = config
-        elif isinstance(config, (str, Path)):
+        case str() | Path():
             final_config = load_config(config_file=config)
-        elif isinstance(config, dict):
+        case dict():
             final_config = load_config(custom_config=config)
-        elif config is None:
+        case None:
             final_config = load_config()
-        else:
-            raise RegistryError(f"Invalid config type: {type(config)}")
-
-        # Create generator
-        generator = generator_class(final_config)
-        logger.info("Created %s generator", language)
-        return generator
-
+        case _:
+            raise RegistryError(f"Invalid config type: {type(config).__name__}")
+    try:
+        return generator_class(final_config)
+    except JsonExplorerError:
+        raise
     except Exception as e:
         raise RegistryError(f"Failed to create {language} generator: {e}") from e
 
 
-# ============================================================================
-# Query Functions
-# ============================================================================
-
-
 def list_languages() -> list[str]:
-    """
-    Get list of registered primary language names.
-
-    Returns:
-        Sorted list of language names
-    """
-    _ensure_registry_initialized()
-    return sorted(_GENERATORS.keys())
+    """Registered language names (without aliases), sorted."""
+    _ensure_loaded()
+    return sorted(_PLUGINS)
 
 
 def is_supported(language: str) -> bool:
-    """
-    Check if language is supported.
-
-    Args:
-        language: Language name or alias
-
-    Returns:
-        True if supported (either primary or alias)
-    """
-    _ensure_registry_initialized()
-    language_key = language.lower()
-    return language_key in _GENERATORS or language_key in _ALIASES
+    _ensure_loaded()
+    key = language.lower()
+    return key in _PLUGINS or key in _ALIASES
 
 
 def get_aliases(language: str) -> list[str]:
-    """
-    Get all aliases for a specific language.
-
-    Args:
-        language: Primary language name
-
-    Returns:
-        Sorted list of aliases
-    """
-    _ensure_registry_initialized()
-    language_key = language.lower()
-
-    return sorted(
-        [alias for alias, target in _ALIASES.items() if target == language_key]
-    )
+    return sorted(get_plugin(language).aliases)
 
 
 def get_language_info(language: str) -> dict[str, Any]:
-    """
-    Get information about a registered language.
-
-    Args:
-        language: Language name or alias
-
-    Returns:
-        Dictionary with language information
-
-    Raises:
-        RegistryError: If language not found
-    """
-    generator_class = get_generator_class(language)
-
-    # Resolve to primary name if alias was provided
-    language_key = language.lower()
-    if language_key in _ALIASES:
-        language_key = _ALIASES[language_key]
-
+    plugin = get_plugin(language)
     return {
-        "name": generator_class.language_name,
-        "class": generator_class.__name__,
-        "file_extension": generator_class.file_extension,
-        "aliases": get_aliases(language_key),
-        "module": generator_class.__module__,
+        "name": plugin.name,
+        "class": plugin.generator.__name__,
+        "file_extension": plugin.generator.file_extension,
+        "aliases": sorted(plugin.aliases),
+        "module": plugin.generator.__module__,
     }
 
 
 def list_all_language_info() -> dict[str, dict[str, Any]]:
-    """
-    Get information about all registered languages.
-
-    Returns:
-        Dictionary mapping language name to info dict
-    """
-    _ensure_registry_initialized()
-
-    result = {}
-    for language in list_languages():
-        try:
-            result[language] = get_language_info(language)
-        except Exception as e:
-            logger.warning("Failed to get info for %s: %s", language, e)
-            continue
-
-    return result
+    return {plugin.name: get_language_info(plugin.name) for plugin in all_plugins()}

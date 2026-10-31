@@ -16,6 +16,7 @@ from rich.syntax import Syntax
 from rich.table import Table
 
 from json_explorer.analyzer import analyze_json
+from json_explorer.codegen.registry import get_plugin
 from json_explorer.logging_config import get_logger
 from json_explorer.utils import prompt_input, prompt_input_path
 
@@ -754,29 +755,9 @@ class CodegenInteractiveHandler:
         language: str,
     ) -> LanguageInteractiveHandler | None:
         """Get language-specific interactive handler."""
-        # Check cache
-        if language in self._language_handlers:
-            return self._language_handlers[language]
-
-        try:
-            # Try to import language-specific handler
-            module_name = (
-                f"json_explorer.codegen.languages.{language.lower()}.interactive"
-            )
-            module = __import__(module_name, fromlist=[""])
-
-            # Look for handler class
-            handler_class_name = f"{language.title()}InteractiveHandler"
-            if hasattr(module, handler_class_name):
-                handler_class = getattr(module, handler_class_name)
-                handler = handler_class()
-                self._language_handlers[language] = handler
-                logger.debug("Loaded interactive handler for %s", language)
-                return handler
-
-        except ImportError:
-            logger.debug("No interactive handler available for %s", language)
-        except Exception as e:
-            logger.warning("Failed to load handler for %s: %s", language, e)
-
-        return None
+        if language not in self._language_handlers:
+            plugin = get_plugin(language)
+            if plugin.interactive is None:
+                return None
+            self._language_handlers[language] = plugin.interactive()
+        return self._language_handlers[language]

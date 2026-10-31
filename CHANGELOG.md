@@ -32,6 +32,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Lint and format with ruff (replaces black, isort and flake8).
 
 ### Added
+- Language plugins: each target language is one `LanguagePlugin` (generator, aliases, interactive
+  handler, CLI flags, examples). Third-party languages can be installed through the
+  `json_explorer.languages` entry-point group. `register()` now takes a plugin.
 - Compile tests for generated code: Python output is executed and its annotations resolved;
   Go output is checked with `go vet` (run in CI on Linux).
 - `JsonExplorerError` base class (exported from `json_explorer`): all package errors (`JSONLoaderError`,
@@ -41,6 +44,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `py.typed` marker: type information is now shipped with the package.
 
 ### Fixed
+- `--language-info` failed without a data file and rejected aliases such as `py`.
 - Nested arrays lost a dimension: `[[1, 2]]` was generated as `[]int64` / `list[int]`. All levels are
   kept now (`[][]int64`, `list[list[int]]`), and their element types are named after the key.
 - Generated code for nested data referenced types that didn't exist (`RootAddress_1`) and renamed
