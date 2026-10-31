@@ -63,6 +63,21 @@ jobs:
           go-version: stable
           cache: false
 
+      # Generated TypeScript is checked with tsc, prettier and zod
+      # (tests skip without JSON_EXPLORER_TS_TOOLS)
+      - uses: actions/setup-node@v7
+        if: runner.os == 'Linux'
+        with:
+          node-version: lts/*
+
+      - name: Install TypeScript tools
+        if: runner.os == 'Linux'
+        run: |
+          mkdir -p "$RUNNER_TEMP/ts-tools"
+          npm install --prefix "$RUNNER_TEMP/ts-tools" --no-audit --no-fund \
+            typescript@7 zod@4 prettier@3
+          echo "JSON_EXPLORER_TS_TOOLS=$RUNNER_TEMP/ts-tools" >> "$GITHUB_ENV"
+
       - name: Install (fails if uv.lock is out of date)
         run: uv sync --locked
 

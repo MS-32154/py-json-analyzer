@@ -29,6 +29,8 @@
   gofmt-clean output
 - **Python**: dataclasses, Pydantic v2 models (aliases for renamed keys, `datetime`/`date`/`time`/
   `timedelta`) or TypedDicts (original keys); ruff/black-formatted output
+- **TypeScript**: interfaces, or Zod 4 schemas with inferred types; keys kept as in the JSON,
+  `key?:` for missing keys, `| null` for null values, unions for mixed values; Prettier-formatted
 - **Correct names**: types named after their keys (`TeamLead`, `Project`), every name planned once so
   declarations and references agree, keys escaped or mapped with aliases
 - **Verified output**: the test suite compiles the generated code and decodes the source data with it
@@ -233,6 +235,9 @@ json_explorer data.json --generate python \
 --no-slots                           # Don't use __slots__
 --no-kw-only                         # Positional fields (default: keyword-only)
 --pydantic-forbid-extra              # Forbid extra fields in Pydantic
+
+# TypeScript-specific options
+--ts-style {interface,zod}           # Interfaces (default) or Zod schemas
 
 # Common options
 --config config.json                 # Load configuration from file
@@ -579,13 +584,20 @@ json_explorer/
         │   ├── interactive.py
         │   └── templates/   # Jinja2 templates
         │
-        └── python/
+        ├── python/
+        │   ├── plugin.py
+        │   ├── generator.py
+        │   ├── config.py
+        │   ├── naming.py
+        │   ├── interactive.py
+        │   └── templates/   # Jinja2 templates
+        │
+        └── typescript/      # Interfaces and Zod schemas
             ├── plugin.py
             ├── generator.py
             ├── config.py
             ├── naming.py
-            ├── interactive.py
-            └── templates/   # Jinja2 templates
+            └── templates/
 ```
 
 ### Key Design Patterns
@@ -629,6 +641,7 @@ Test categories:
 | -------------- | --------------- | -------------------------------------------------------- |
 | **Go**         | ✅ Full Support | Structs, JSON tags, pointers, configurable int/float/time types |
 | **Python**     | ✅ Full Support | Dataclasses, Pydantic v2, TypedDict, modern type hints   |
+| **TypeScript** | ✅ Full Support | Interfaces, Zod 4 schemas, optional/nullable keys, unions |
 
 Other languages can be added as plugins (see below).
 

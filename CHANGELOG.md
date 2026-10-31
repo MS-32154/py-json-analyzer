@@ -96,6 +96,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Lint and format with ruff (replaces black, isort and flake8).
 
 ### Added
+- TypeScript generator (`--generate typescript`/`ts`): interfaces, or Zod 4 schemas with inferred types
+  (`--ts-style zod`). Keys kept as in the JSON, `key?:` / `| null` for missing and null values, unions
+  for mixed values, Zod validators for date/time formats. Checked in CI with `tsc --strict`,
+  Prettier, and decoding of the source data.
 - JSON Schema export (draft 2020-12): `json_explorer data.json --json-schema`, or
   `json_schema(data)` / `to_json_schema(node)` in Python. The schema describes the whole document,
   allows `null` only where it was seen, marks keys `required` only when always present, and uses

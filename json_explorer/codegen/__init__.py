@@ -15,6 +15,7 @@ from json_explorer.logging_config import get_logger
 # Import core interfaces
 from .core import (
     CodeGenerator,
+    ConfigError,
     Field,
     FieldType,
     GenerationResult,
@@ -186,6 +187,7 @@ def create_config(language: str = "go", **kwargs) -> GeneratorConfig:
 __all__ = [
     "CliOption",
     "CodeGenerator",
+    "ConfigError",
     "Field",
     "FieldType",
     "GenerationResult",

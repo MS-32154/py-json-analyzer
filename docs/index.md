@@ -17,8 +17,9 @@
   - [High-Level API](#3-high-level-api)
   - [Go Generator](#4-go-generator)
   - [Python Generator](#5-python-generator)
-  - [Schema System](#6-schema-system)
-  - [Interactive Handler](#7-interactive-handler)
+  - [TypeScript Generator](#6-typescript-generator)
+  - [Schema System](#7-schema-system)
+  - [Interactive Handler](#8-interactive-handler)
 - [CLI Usage](#cli-usage)
 - [Examples](#examples)
 - [Configuration Best Practices](#configuration-best-practices)
@@ -1201,7 +1202,43 @@ class User(TypedDict):
 
 ---
 
-### 6. Schema System
+### 6. TypeScript Generator
+
+Interfaces (default) or Zod 4 schemas with inferred types (`--ts-style zod`,
+`{"style": "zod"}`).
+
+#### Features
+
+- Keys stay exactly as in the JSON; keys that aren't identifiers are quoted
+- A key that can be missing is `key?: T` (Zod: `.optional()`); a value that can be `null` is
+  `T | null` (Zod: `.nullable()`)
+- Mixed values become unions (`number | string`; Zod: `z.union([...])`)
+- Date/time strings stay `string` in interfaces (`JSON.parse` doesn't convert them) with a doc
+  comment; Zod validates them: `z.iso.datetime({ offset: true })`, `z.iso.datetime({ local: true })`,
+  `z.iso.date()`, `z.iso.duration()` (times stay `z.string()`: `z.iso.time()` rejects offsets)
+- Integers are `z.number().int()` in Zod
+- Output is Prettier-formatted (long lines are not wrapped)
+
+```python
+from json_explorer.codegen import quick_generate
+
+data = [{"id": 1, "email": None, "nick": "a"}, {"id": 2, "email": "b@x.io"}]
+quick_generate(data, "typescript")
+# export interface Root {
+#   id: number;
+#   email: string | null;
+#   nick?: string;
+# }
+quick_generate(data, "typescript", style="zod")
+# export const Root = z.object({
+#   id: z.number().int(),
+#   email: z.string().nullable(),
+#   nick: z.string().optional(),
+# });
+# export type Root = z.infer<typeof Root>;
+```
+
+### 7. Schema System
 
 Internal schema representation for code generation.
 
@@ -1278,7 +1315,7 @@ user_schema.add_field(
 
 ---
 
-### 7. Interactive Handler
+### 8. Interactive Handler
 
 Interactive code generation interface with guided configuration.
 

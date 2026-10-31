@@ -23,6 +23,7 @@ ENTRY_POINT_GROUP = "json_explorer.languages"
 _BUILTIN_PLUGINS = (
     "json_explorer.codegen.languages.go",
     "json_explorer.codegen.languages.python",
+    "json_explorer.codegen.languages.typescript",
 )
 
 
