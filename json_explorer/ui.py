@@ -149,3 +149,20 @@ def print_metadata(console: Console, metadata: dict[str, Any], title: str) -> No
         table.add_row(key.replace("_", " ").title(), str(value))
     console.print()
     console.print(table)
+
+
+def write_raw(text: str) -> None:
+    """Write text to stdout unchanged, as UTF-8, ending with one newline.
+
+    For output meant to be redirected to a file (generated code, schemas):
+    independent of the console code page (e.g. cp1252 on Windows when
+    piping), which can't encode every character.
+    """
+    text = text if text.endswith("\n") else text + "\n"
+    if buffer := getattr(sys.stdout, "buffer", None):
+        sys.stdout.flush()
+        buffer.write(text.encode("utf-8"))
+        buffer.flush()
+    else:
+        sys.stdout.write(text)
+        sys.stdout.flush()

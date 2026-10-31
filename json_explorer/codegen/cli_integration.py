@@ -19,7 +19,7 @@ from rich.table import Table
 from json_explorer.analyzer import analyze_json
 from json_explorer.errors import JsonExplorerError
 from json_explorer.logging_config import get_logger
-from json_explorer.ui import print_metadata
+from json_explorer.ui import print_metadata, write_raw
 
 from . import (
     GeneratorError,
@@ -73,7 +73,7 @@ def add_codegen_args(parser: argparse.ArgumentParser) -> None:
         "--output",
         "-o",
         metavar="FILE",
-        help="Output file for generated code (default: stdout)",
+        help="Output file for generated code or --json-schema (default: stdout)",
     )
 
     codegen_group.add_argument(
@@ -453,16 +453,7 @@ def _display_to_stdout(code: str, language: str) -> None:
     # isatty, not console.is_terminal: Rich treats FORCE_COLOR as a terminal,
     # which would decorate piped output again.
     if not sys.stdout.isatty():
-        text = code if code.endswith("\n") else code + "\n"
-        # Source files are UTF-8; don't depend on the console code page
-        # (e.g. cp1252 on Windows when piping), which can't encode every char.
-        if buffer := getattr(sys.stdout, "buffer", None):
-            sys.stdout.flush()
-            buffer.write(text.encode("utf-8"))
-            buffer.flush()
-        else:
-            sys.stdout.write(text)
-            sys.stdout.flush()
+        write_raw(code)
         return
 
     console.print(f"\n[green]📄 Generated {language.title()} Code\n[/green]")

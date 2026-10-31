@@ -19,6 +19,8 @@
 - **Tree Visualization**: Multiple view modes (compact, analytical, raw) with rich terminal output
 - **Statistical Analysis**: Comprehensive data quality metrics and structural insights
 - **Visualization**: text charts in the terminal, an interactive HTML report (Plotly), or both
+- **JSON Schema export**: a draft 2020-12 schema of the data (`--json-schema`) for validation or for
+  other code generators
 - **Interactive Mode**: Full-featured terminal UI for exploration and analysis
 
 ### Code Generation
@@ -238,6 +240,14 @@ json_explorer data.json --generate python \
 --verbose                            # Show detailed generation info
 ```
 
+### JSON Schema
+
+```bash
+# Print a JSON Schema (draft 2020-12) of the data
+json_explorer data.json --json-schema > data.schema.json
+json_explorer data.json --json-schema --output data.schema.json --root-name Users
+```
+
 ### Visualization
 
 ```bash
@@ -307,6 +317,14 @@ if valid:
 # Get example queries
 examples = searcher.get_query_examples()
 searcher.print_examples()
+```
+
+### JSON Schema
+
+```python
+from json_explorer import json_schema
+
+schema = json_schema(data, title="Users")  # dict, draft 2020-12
 ```
 
 ### Statistics & Analysis

@@ -3,6 +3,7 @@
 """Entry point for the JSON Explorer CLI tool."""
 
 import argparse
+import json
 import sys
 from pathlib import Path
 from typing import Any
@@ -13,7 +14,9 @@ from .cli import CLIHandler
 from .codegen.cli_integration import add_codegen_args, handle_codegen_command
 from .errors import JsonExplorerError
 from .interactive import InteractiveHandler
+from .json_schema import json_schema
 from .logging_config import configure_logging, get_logger
+from .ui import write_raw
 from .utils import load_json
 
 logger = get_logger(__name__)
@@ -80,12 +83,30 @@ class JSONExplorer:
         if not self.load_data(args.file, getattr(args, "url", None)):
             return 1
 
+        if getattr(args, "json_schema", False):
+            return self._export_json_schema(args)
+
         self.cli_handler.set_data(self.data, self.source)
         self.interactive_handler.set_data(self.data, self.source)
 
         if getattr(args, "interactive", False) or not self._has_cli_actions(args):
             return self.interactive_handler.run()
         return self.cli_handler.run(args)
+
+    def _export_json_schema(self, args: argparse.Namespace) -> int:
+        """Write the inferred JSON Schema to --output or stdout."""
+        title = args.root_name if args.root_name != "Root" else None
+        if title is None and args.file:
+            title = Path(args.file).stem
+        text = json.dumps(json_schema(self.data, title), indent=2, ensure_ascii=False)
+        if args.output:
+            Path(args.output).write_text(text + "\n", encoding="utf-8")
+            Console(stderr=True).print(
+                f"[green]✓[/green] JSON Schema saved to {args.output}"
+            )
+        else:
+            write_raw(text)
+        return 0
 
     def _is_codegen_command(self, args: argparse.Namespace) -> bool:
         """Check if the current command is related to code generation."""
@@ -131,6 +152,9 @@ Code Generation:
   %(prog)s data.json --generate go --output user.go --root-name User
   %(prog)s data.json --generate python --package-name models
   %(prog)s --list-languages
+
+JSON Schema:
+  %(prog)s data.json --json-schema > data.schema.json
         """,
     )
 
@@ -181,6 +205,11 @@ Code Generation:
     # Analysis options
     analysis_group = parser.add_argument_group("analysis options")
     analysis_group.add_argument("--stats", action="store_true", help="Show statistics")
+    analysis_group.add_argument(
+        "--json-schema",
+        action="store_true",
+        help="Print a JSON Schema (draft 2020-12) of the data (or write it to --output)",
+    )
     analysis_group.add_argument(
         "--detailed", action="store_true", help="Show detailed analysis/statistics"
     )

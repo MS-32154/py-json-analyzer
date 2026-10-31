@@ -6,6 +6,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- JSON Schema export (draft 2020-12): `json_explorer data.json --json-schema`, or
+  `json_schema(data)` / `to_json_schema(node)` in Python. The schema describes the whole document,
+  allows `null` only where it was seen, marks keys `required` only when always present, and uses
+  `format` for `date-time`, `date` and `duration`.
+
 ## [0.5.0] - 2026-10-31
 
 ### Upgrading from 0.4

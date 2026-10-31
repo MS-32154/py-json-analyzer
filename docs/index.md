@@ -10,6 +10,7 @@
   - [Visualization Module](#4-visualization-module)
   - [Tree View Module](#5-tree-view-module)
   - [Utils Module](#6-utils-module)
+- [JSON Schema Export](#json-schema-export)
 - [Code Generation](#code-generation)
   - [Core Generator Interface](#1-core-generator-interface)
   - [Registry and Plugins](#2-registry-and-plugins)
@@ -692,6 +693,43 @@ try:
     source, data = load_json("invalid.json")
 except JSONLoaderError as e:
     print(f"Failed to load JSON: {e}")
+```
+
+---
+
+## JSON Schema Export
+
+`json_explorer.json_schema` turns the analysis into a JSON Schema (draft 2020-12) that describes the
+whole document (an array root stays an array).
+
+#### `json_schema(data, title=None)`
+
+Analyze `data` and return its schema as a dict.
+
+#### `to_json_schema(node, title=None)`
+
+Schema for an existing `analyze_json()` result.
+
+**What the schema says:**
+
+- keys present in every object are `required`; a value seen as `null` allows `"null"`
+- integers merged with floats are `"number"`; mixed values list every type
+- `format` is set for `date-time`, `date` and `duration` strings; times and date-times without a
+  UTC offset (which JSON Schema's `time`/`date-time` formats require) get a `description` instead
+- additional properties stay allowed: a sample shows which keys exist, not which may never appear
+
+```python
+from json_explorer import json_schema
+
+json_schema([{"id": 1, "email": None}, {"id": 2, "email": "a@b.c"}], title="Users")
+# {'$schema': 'https://json-schema.org/draft/2020-12/schema', 'title': 'Users',
+#  'type': 'array', 'items': {'type': 'object',
+#   'properties': {'id': {'type': 'integer'}, 'email': {'type': ['string', 'null']}},
+#   'required': ['id', 'email']}}
+```
+
+```bash
+json_explorer data.json --json-schema > data.schema.json
 ```
 
 ---

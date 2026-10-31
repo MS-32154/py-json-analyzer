@@ -4,6 +4,7 @@ from importlib import metadata as _metadata
 
 from .analyzer import analyze_json
 from .errors import JsonExplorerError
+from .json_schema import json_schema, to_json_schema
 from .logging_config import configure_logging, get_logger
 from .search import JsonSearcher, SearchResult
 from .stats import DataStatsAnalyzer, generate_stats
@@ -26,6 +27,8 @@ __all__ = [
     "configure_logging",
     "generate_stats",
     "get_logger",
+    "json_schema",
     "load_json",
+    "to_json_schema",
     "visualize_json",
 ]
