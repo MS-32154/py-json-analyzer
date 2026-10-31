@@ -3,12 +3,8 @@ Tests for Python generator.
 """
 
 import pytest
-from json_explorer.codegen import quick_generate
-from json_explorer.codegen.languages.python import (
-    PythonConfig,
-    PythonStyle,
-    create_dataclass_generator,
-)
+from json_explorer.codegen import create_generator, quick_generate
+from json_explorer.codegen.languages.python import PythonConfig, PythonStyle
 
 
 class TestPythonConfig:
@@ -18,7 +14,7 @@ class TestPythonConfig:
         config = PythonConfig()
 
         assert config.style == PythonStyle.DATACLASS
-        assert config.use_optional is True
+        assert config.datetime_type == "datetime"
 
     def test_dataclass_config(self):
         config = PythonConfig(
@@ -32,20 +28,17 @@ class TestPythonConfig:
         assert config.dataclass_frozen is True
 
     def test_pydantic_config(self):
-        config = PythonConfig(
-            style="pydantic",
-            pydantic_use_field=True,
-        )
+        config = PythonConfig(style="pydantic", pydantic_extra_forbid=True)
 
         assert config.style == PythonStyle.PYDANTIC
-        assert config.pydantic_use_field is True
+        assert config.pydantic_extra_forbid is True
 
 
 class TestPythonGenerator:
     """Test Python code generator."""
 
     def test_create_generator(self):
-        gen = create_dataclass_generator()
+        gen = create_generator("python", {"style": "dataclass"})
 
         assert gen.language_name == "python"
         assert gen.file_extension == ".py"

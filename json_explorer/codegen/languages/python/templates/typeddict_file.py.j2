@@ -19,14 +19,10 @@
         {{ field.key }}: {{ field.type }},
 {%- endfor %}
     },
-{%- if not class.total %}
-    total=False,
-{%- endif %}
 )
 {%- else %}
 
-class {{ class.class_name }}(TypedDict
-{%- if not class.total %}, total=False{% endif %}):
+class {{ class.class_name }}(TypedDict):
 {%- if class.description %}
     """{{ class.description }}"""
 {%- endif %}

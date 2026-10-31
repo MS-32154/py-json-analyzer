@@ -218,7 +218,6 @@ json_explorer data.json --generate go \
 
 # Go-specific options
 --no-pointers                        # Don't use pointers for optional fields
---no-json-tags                       # Don't generate JSON tags
 
 # Generate Python code
 json_explorer data.json --generate python \
@@ -382,7 +381,7 @@ from json_explorer.codegen import (
     quick_generate,
     generate_from_analysis,
     create_config,
-    list_supported_languages,
+    list_languages,
     get_language_info
 )
 
@@ -422,7 +421,7 @@ else:
     print(f"Error: {result.error_message}")
 
 # Discover capabilities
-languages = list_supported_languages()
+languages = list_languages()
 print(f"Supported: {languages}")
 
 info = get_language_info("python")
@@ -451,7 +450,6 @@ JSON Explorer uses JSON configuration files for code generation:
 {
   "package_name": "models",
   "add_comments": true,
-  "generate_json_tags": true,
   "json_tag_omitempty": true,
   "language_config": {
     "use_pointers_for_optional": true,
@@ -469,7 +467,6 @@ JSON Explorer uses JSON configuration files for code generation:
 {
   "package_name": "api",
   "add_comments": true,
-  "generate_json_tags": true,
   "json_tag_omitempty": true,
   "language_config": {
     "use_pointers_for_optional": true,
@@ -489,8 +486,7 @@ JSON Explorer uses JSON configuration files for code generation:
     "style": "dataclass",
     "dataclass_slots": true,
     "dataclass_frozen": false,
-    "dataclass_kw_only": false,
-    "use_optional": true
+    "dataclass_kw_only": false
   }
 }
 ```
@@ -503,11 +499,8 @@ JSON Explorer uses JSON configuration files for code generation:
   "add_comments": true,
   "language_config": {
     "style": "pydantic",
-    "pydantic_use_field": true,
-    "pydantic_use_alias": true,
     "pydantic_config_dict": true,
-    "pydantic_extra_forbid": false,
-    "use_optional": true
+    "pydantic_extra_forbid": false
   }
 }
 ```

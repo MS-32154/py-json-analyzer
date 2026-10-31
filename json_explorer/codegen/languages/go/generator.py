@@ -14,7 +14,7 @@ from ...core.config import GeneratorConfig
 from ...core.generator import CodeGenerator
 from ...core.naming import NamePlan, plan_names
 from ...core.schema import Field, FieldType, Schema
-from .config import GoConfig
+from .config import UNKNOWN_TYPE, GoConfig
 from .naming import go_identifier, go_json_tag, is_valid_json_tag_name
 
 logger = get_logger(__name__)
@@ -131,9 +131,7 @@ class GoGenerator(CodeGenerator):
 
         # encoding/json can't map keys like `a,b` or `q"k` with a tag: leave
         # the field out (with a note) rather than map it to the wrong key.
-        if self.config.generate_json_tags and not is_valid_json_tag_name(
-            field.original_name
-        ):
+        if not is_valid_json_tag_name(field.original_name):
             return {
                 "skipped": (
                     f"JSON key {json.dumps(field.original_name, ensure_ascii=False)}"
@@ -155,9 +153,7 @@ class GoGenerator(CodeGenerator):
         if self.config.add_comments and field.description:
             field_data["comment"] = field.description
 
-        # Generate JSON tag if enabled
-        if self.config.generate_json_tags:
-            field_data["json_tag"] = self._generate_json_tag(field)
+        field_data["json_tag"] = self._generate_json_tag(field)
 
         return field_data
 
@@ -181,13 +177,9 @@ class GoGenerator(CodeGenerator):
             element_type = self.names.type_name(field.array_element_schema)
         elif field.array_element_type and field.array_element_type != FieldType.UNKNOWN:
             # Array of primitives
-            element_type = self.go_config.type_map.get(
-                field.array_element_type,
-                self.go_config.unknown_type,
-            )
+            element_type = self.go_config.type_map[field.array_element_type]
         else:
-            # Unknown array element type
-            element_type = self.go_config.unknown_type
+            element_type = UNKNOWN_TYPE
 
         return f"[]{element_type}"
 
@@ -202,7 +194,7 @@ class GoGenerator(CodeGenerator):
 
             return struct_name
 
-        return self.go_config.unknown_type
+        return UNKNOWN_TYPE
 
     def _generate_json_tag(self, field: Field) -> str:
         """Struct tag mapping the field to its JSON key."""
@@ -271,57 +263,3 @@ class GoGenerator(CodeGenerator):
 
         logger.debug("Generation order determined: %s schemas", len(ordered))
         return ordered
-
-
-# ============================================================================
-# Factory Functions
-# ============================================================================
-
-
-def create_go_generator(config: GeneratorConfig | None = None) -> GoGenerator:
-    """
-    Create a Go generator with default configuration.
-
-    Args:
-        config: Optional configuration (uses defaults if None)
-
-    Returns:
-        Configured GoGenerator instance
-    """
-    if config is None:
-        config = GeneratorConfig(
-            package_name="main",
-            generate_json_tags=True,
-            json_tag_omitempty=True,
-            add_comments=True,
-        )
-
-    return GoGenerator(config)
-
-
-def create_web_api_generator() -> GoGenerator:
-    """Create generator optimized for web API models."""
-    from .config import get_web_api_config
-
-    config = GeneratorConfig(
-        package_name="models",
-        generate_json_tags=True,
-        json_tag_omitempty=True,
-        add_comments=True,
-        language_config=get_web_api_config().to_dict(),
-    )
-    return GoGenerator(config)
-
-
-def create_strict_generator() -> GoGenerator:
-    """Create generator with strict types (no pointers)."""
-    from .config import get_strict_config
-
-    config = GeneratorConfig(
-        package_name="types",
-        generate_json_tags=True,
-        json_tag_omitempty=False,
-        add_comments=True,
-        language_config=get_strict_config().to_dict(),
-    )
-    return GoGenerator(config)

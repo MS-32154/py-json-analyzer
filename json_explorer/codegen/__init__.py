@@ -35,14 +35,11 @@ from .registry import (
     RegistryError,
     create_generator,
     get_aliases,
-    get_generator,
     get_generator_class,
     get_language_info,
-    is_language_supported,
     is_supported,
     list_all_language_info,
     list_languages,
-    list_supported_languages,
     register,
 )
 
@@ -86,7 +83,7 @@ def generate_from_analysis(
     logger.debug("Converted to %s schemas", len(all_schemas))
 
     # Get generator instance
-    generator = get_generator(language, config)
+    generator = create_generator(language, config)
 
     # Generate code
     return generate_code(generator, all_schemas, root_name)
@@ -201,14 +198,11 @@ __all__ = [
     "generate_code",
     "generate_from_analysis",
     "get_aliases",
-    "get_generator",
     "get_generator_class",
     "get_language_info",
-    "is_language_supported",
     "is_supported",
     "list_all_language_info",
     "list_languages",
-    "list_supported_languages",
     "load_config",
     "plan_names",
     "quick_generate",

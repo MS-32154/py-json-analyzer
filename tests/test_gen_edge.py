@@ -1,21 +1,35 @@
-"""
-Additional tests for generator factory functions.
-
-Tests for:
-- Go: create_web_api_generator(), create_strict_generator()
-- Python: create_typeddict_generator()
-"""
+"""Generator configurations: Go with/without pointers, Python TypedDict."""
 
 from json_explorer.analyzer import analyze_json
+from json_explorer.codegen import create_generator
 from json_explorer.codegen.core import convert_analyzer_output, extract_all_schemas
-from json_explorer.codegen.languages.go import (
-    create_strict_generator,
-    create_web_api_generator,
-)
-from json_explorer.codegen.languages.python import (
-    PythonStyle,
-    create_typeddict_generator,
-)
+from json_explorer.codegen.languages.python import PythonStyle
+
+
+def create_web_api_generator():
+    """Go with pointers and omitempty (the defaults)."""
+    return create_generator("go", {"package_name": "models"})
+
+
+def create_strict_generator():
+    """Go with value types only and no omitempty."""
+    return create_generator(
+        "go",
+        {
+            "package_name": "types",
+            "json_tag_omitempty": False,
+            "use_pointers_for_optional": False,
+        },
+    )
+
+
+def create_typeddict_generator():
+    return create_generator("python", {"package_name": "models", "style": "typeddict"})
+
+
+def create_dataclass_generator():
+    return create_generator("python", {"package_name": "models", "style": "dataclass"})
+
 
 # ============================================================================
 # Go Factory Function Tests
@@ -32,8 +46,6 @@ class TestGoFactoryFunctions:
         # Check package name
         assert generator.config.package_name == "models"
 
-        # Check JSON tags enabled
-        assert generator.config.generate_json_tags is True
         assert generator.config.json_tag_omitempty is True
 
         # Check comments enabled
@@ -94,8 +106,6 @@ class TestGoFactoryFunctions:
         # Check package name
         assert generator.config.package_name == "types"
 
-        # Check JSON tags
-        assert generator.config.generate_json_tags is True
         assert generator.config.json_tag_omitempty is False  # No omitempty in strict
 
         # Check comments
@@ -193,8 +203,6 @@ class TestPythonTypedDictGenerator:
 
         # Check Python-specific config
         assert generator.python_config.style == PythonStyle.TYPEDDICT
-        assert generator.python_config.use_optional is True
-        assert generator.python_config.typeddict_total is False
 
     def test_create_typeddict_generator_output(self):
         """Test TypedDict generator produces correct output."""
@@ -235,23 +243,16 @@ class TestPythonTypedDictGenerator:
         assert "NotRequired" in result or "str | None" in result
         assert "email" in result
 
-    def test_typeddict_total_false(self):
-        """Test TypedDict with total=False configuration."""
+    def test_typeddict_required_and_optional_keys(self):
+        """Required keys stay required; only optional keys use NotRequired."""
         generator = create_typeddict_generator()
+        data = [{"name": "Alice", "age": 30}, {"name": "Bob"}]
+        root_schema = convert_analyzer_output(analyze_json(data), "User")
+        result = generator.generate(extract_all_schemas(root_schema), "User")
 
-        # Default should be total=False
-        assert generator.python_config.typeddict_total is False
-
-        data = {"name": "Alice", "age": 30}
-        analysis = analyze_json(data)
-
-        root_schema = convert_analyzer_output(analysis, "User")
-        all_schemas = extract_all_schemas(root_schema)
-
-        result = generator.generate(all_schemas, "User")
-
-        # Should have total=False in class definition
-        assert "total=False" in result
+        assert "total=False" not in result
+        assert "    name: str" in result
+        assert "    age: NotRequired[int]" in result
 
     def test_typeddict_nested_structures(self):
         """Test TypedDict with nested objects."""
@@ -330,8 +331,6 @@ class TestPythonTypedDictGenerator:
         typeddict_result = typeddict_gen.generate(all_schemas, "User")
 
         # Dataclass generator
-        from json_explorer.codegen.languages.python import create_dataclass_generator
-
         dataclass_gen = create_dataclass_generator()
         dataclass_result = dataclass_gen.generate(all_schemas, "User")
 

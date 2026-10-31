@@ -67,6 +67,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   (snake_case fields for Python) and rejects unsupported languages.
 
 ### Removed
+- **Breaking:** options that could only produce broken or never-varying output:
+  - `generate_json_tags` / `--no-json-tags` (Go structs without tags mis-map keys such as `first_name`)
+  - Go `string_type`, `bool_type`, `unknown_type` (unknown values are now always `any`, Go 1.18+),
+    and the `int64` choice for `time_type` (timestamps are strings in JSON)
+  - Python `int_type`, `float_type`, `string_type`, `bool_type`, `unknown_type`, `use_optional`
+  - `pydantic_use_field`, `pydantic_use_alias` / `--no-pydantic-field` (without aliases renamed fields
+    can't parse the JSON)
+  - `typeddict_total` (its default `total=False` made required keys optional; TypedDicts now keep
+    required keys required and mark optional ones `NotRequired`)
+
+  Config files that still set them load with a warning.
+- **Breaking:** factory and preset functions that duplicated `create_generator(language, config)`:
+  `create_go_generator`, `create_web_api_generator`, `create_strict_generator`,
+  `create_python_generator`, `create_dataclass_generator`, `create_pydantic_generator`,
+  `create_typeddict_generator`, `get_web_api_config`, `get_strict_config`, `get_modern_config`,
+  `get_minimal_config`, `get_dataclass_config`, `get_pydantic_config`, `get_typeddict_config`,
+  `get_strict_dataclass_config`, `get_python_generator_config`, `create_minimal_config`,
+  `create_verbose_config`, `create_strict_config`, `validate_language_config`.
+- **Breaking:** registry duplicates `get_generator` (use `create_generator`),
+  `list_supported_languages` (use `list_languages`), `is_language_supported` (use `is_supported`),
+  `get_registry` and `unregister`.
 - `NameTracker`, `sanitize_name`, `create_go_name_tracker` and `create_python_name_tracker`,
   replaced by `plan_names()` / `NamePlan` and the per-language `go_identifier`,
   `python_class_name` and `python_field_name`. The Go and Python builtin/keyword lists went with

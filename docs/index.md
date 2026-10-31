@@ -137,7 +137,7 @@ The analyzer intelligently handles mixed types:
   # Result: value: int (optional)
   ```
 
-- **None + Multiple Types** → Conflict (uses `Any`/`interface{}`)
+- **None + Multiple Types** → Conflict (uses `Any`/`any`)
 
   ```python
   [{"value": None}, {"value": 42}, {"value": "text"}]
@@ -879,17 +879,17 @@ Get information about a generator.
 ```python
 from json_explorer.codegen import (
     register,
-    get_generator,
-    list_supported_languages,
+    create_generator,
+    list_languages,
     get_language_info
 )
 
 # List available languages
-languages = list_supported_languages()
+languages = list_languages()
 print(languages)  # ['go', 'python']
 
 # Get generator
-generator = get_generator("go", config)
+generator = create_generator("go", config)
 
 # Get language info
 info = get_language_info("python")
@@ -989,7 +989,6 @@ pydantic_code = quick_generate(
     data,
     language="python",
     style="pydantic",
-    pydantic_use_field=True
 )
 ```
 
@@ -1031,7 +1030,7 @@ Specialized Go struct generation with JSON tags and pointer handling.
 - JSON tag generation with customizable cases
 - Package and import management
 - Naming convention handling (PascalCase, camelCase, snake_case)
-- Conflict resolution with `interface{}`
+- Conflict resolution with `any`
 
 #### Configuration Options
 
@@ -1040,7 +1039,6 @@ from json_explorer.codegen import GeneratorConfig
 
 config = GeneratorConfig(
     package_name="models",
-    generate_json_tags=True,
     json_tag_omitempty=True,
     add_comments=True,
     language_config={
@@ -1051,23 +1049,18 @@ config = GeneratorConfig(
 )
 ```
 
-#### Factory Functions
+#### Creating generators
 
 ```python
-from json_explorer.codegen.languages.go import (
-    create_go_generator,
-    create_web_api_generator,
-    create_strict_generator
+from json_explorer.codegen import create_generator
+
+# Defaults: pointers for optional fields, omitempty
+generator = create_generator("go")
+
+# Value types only, no omitempty
+strict_generator = create_generator(
+    "go", {"json_tag_omitempty": False, "use_pointers_for_optional": False}
 )
-
-# Default Go generator
-generator = create_go_generator()
-
-# Optimized for web APIs (pointers, omitempty)
-api_generator = create_web_api_generator()
-
-# Strict types (no pointers)
-strict_generator = create_strict_generator()
 ```
 
 #### Pointer Handling
@@ -1085,12 +1078,12 @@ Age   *int64  `json:"age,omitempty"`
 
 **Never add pointer for:**
 
-- `interface{}` or `any` (already accepts nil)
+- `any` (already accepts nil)
 - Arrays/slices
 - Non-optional fields
 
 ```go
-UnknownField interface{} `json:"unknown_field"`  // No pointer
+UnknownField any `json:"unknown_field"`  // No pointer
 Tags         []string    `json:"tags"`            // No pointer
 Name         string      `json:"name"`            // Required, no pointer
 ```
@@ -1135,7 +1128,6 @@ dataclass_config = GeneratorConfig(
         "dataclass_slots": True,
         "dataclass_frozen": False,
         "dataclass_kw_only": False,
-        "use_optional": True
     }
 )
 
@@ -1145,11 +1137,8 @@ pydantic_config = GeneratorConfig(
     add_comments=True,
     language_config={
         "style": "pydantic",
-        "pydantic_use_field": True,
-        "pydantic_use_alias": True,
         "pydantic_config_dict": True,
         "pydantic_extra_forbid": False,
-        "use_optional": True
     }
 )
 
@@ -1159,29 +1148,18 @@ typeddict_config = GeneratorConfig(
     add_comments=True,
     language_config={
         "style": "typeddict",
-        "typeddict_total": False,
-        "use_optional": True
     }
 )
 ```
 
-#### Factory Functions
+#### Creating generators
 
 ```python
-from json_explorer.codegen.languages.python import (
-    create_python_generator,
-    create_dataclass_generator,
-    create_pydantic_generator,
-    create_typeddict_generator
-)
+from json_explorer.codegen import create_generator
 
-# Default Python generator (dataclass)
-generator = create_python_generator()
-
-# Specific style generators
-dc_generator = create_dataclass_generator(slots=True, frozen=False)
-pydantic_generator = create_pydantic_generator(use_field=True)
-td_generator = create_typeddict_generator(total=False)
+dc_generator = create_generator("python", {"style": "dataclass", "dataclass_frozen": True})
+pydantic_generator = create_generator("python", {"style": "pydantic"})
+td_generator = create_generator("python", {"style": "typeddict"})
 ```
 
 #### Field Case Convention
@@ -1563,7 +1541,6 @@ analysis = analyze_json(data)
 
 config = GeneratorConfig(
     package_name="api",
-    generate_json_tags=True,
     json_tag_omitempty=True,
     add_comments=True,
     language_config={
@@ -1611,7 +1588,6 @@ pydantic_config = GeneratorConfig(
     package_name="models",
     language_config={
         "style": "pydantic",
-        "pydantic_use_field": True,
         "pydantic_config_dict": True
     }
 )
@@ -1620,7 +1596,7 @@ pydantic_result = generate_from_analysis(analysis, "python", pydantic_config, "U
 # TypedDict
 td_config = GeneratorConfig(
     package_name="types",
-    language_config={"style": "typeddict", "typeddict_total": False}
+    language_config={"style": "typeddict"}
 )
 td_result = generate_from_analysis(analysis, "python", td_config, "User")
 ```
@@ -1692,7 +1668,6 @@ python_code = quick_generate(data, language="python")
   "package_name": "models",
   "language_config": {
     "style": "pydantic",
-    "pydantic_use_field": true,
     "pydantic_extra_forbid": true
   }
 }

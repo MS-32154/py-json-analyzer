@@ -12,35 +12,35 @@ from json_explorer.codegen.core import (
 from json_explorer.codegen.languages.go import GoGenerator
 from json_explorer.codegen.languages.python import PythonGenerator
 from json_explorer.codegen.registry import (
+    _ALIASES,
+    _GENERATORS,
     RegistryError,
     create_generator,
     get_generator_class,
     get_language_info,
-    is_language_supported,
     is_supported,
-    list_supported_languages,
+    list_languages,
     register,
-    unregister,
 )
 
 
 class TestRegistry:
     """Test generator registry functions."""
 
-    def test_list_supported_languages(self):
-        languages = list_supported_languages()
+    def test_list_languages(self):
+        languages = list_languages()
 
         assert isinstance(languages, list)
         assert len(languages) > 0
         assert "go" in languages
         assert "python" in languages
 
-    def test_is_language_supported(self):
-        assert is_language_supported("go") is True
-        assert is_language_supported("python") is True
-        assert is_language_supported("golang") is True  # alias
-        assert is_language_supported("py") is True  # alias
-        assert is_language_supported("nonexistent") is False
+    def test_is_supported(self):
+        assert is_supported("go") is True
+        assert is_supported("python") is True
+        assert is_supported("golang") is True  # alias
+        assert is_supported("py") is True  # alias
+        assert is_supported("nonexistent") is False
 
     def test_get_language_info(self):
         info = get_language_info("go")
@@ -105,7 +105,8 @@ class TestRegistry:
         assert is_supported("test")
 
         # Cleanup
-        unregister("mock")
+        del _GENERATORS["mock"]
+        del _ALIASES["test"]
 
 
 class TestCreateConfig:

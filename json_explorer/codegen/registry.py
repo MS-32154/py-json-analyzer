@@ -155,30 +155,6 @@ def register(
             logger.debug("Registered alias: %s → %s", alias, language)
 
 
-def unregister(language: str) -> None:
-    """
-    Unregister a generator and its aliases.
-
-    Args:
-        language: Language name to unregister
-    """
-    language_key = language.lower()
-
-    # Remove from generators
-    if language_key in _GENERATORS:
-        del _GENERATORS[language_key]
-        logger.info("Unregistered generator: %s", language)
-
-    # Remove all aliases pointing to this language
-    aliases_to_remove = [
-        alias for alias, target in _ALIASES.items() if target == language_key
-    ]
-
-    for alias in aliases_to_remove:
-        del _ALIASES[alias]
-        logger.debug("Removed alias: %s", alias)
-
-
 # ============================================================================
 # Lookup Functions
 # ============================================================================
@@ -359,37 +335,3 @@ def list_all_language_info() -> dict[str, dict[str, Any]]:
             continue
 
     return result
-
-
-# ============================================================================
-# Public API (for backward compatibility and convenience)
-# ============================================================================
-
-
-def get_generator(
-    language: str,
-    config: GeneratorConfig | dict[str, Any] | str | Path | None = None,
-) -> CodeGenerator:
-    """Get generator instance (alias for create_generator)."""
-    return create_generator(language, config)
-
-
-def list_supported_languages() -> list[str]:
-    """List supported languages (alias for list_languages)."""
-    return list_languages()
-
-
-def is_language_supported(language: str) -> bool:
-    """Check if language is supported (alias for is_supported)."""
-    return is_supported(language)
-
-
-def get_registry() -> dict[str, type[CodeGenerator]]:
-    """
-    Get the registry dictionary (for inspection/debugging).
-
-    Returns:
-        Copy of the generators registry
-    """
-    _ensure_registry_initialized()
-    return _GENERATORS.copy()

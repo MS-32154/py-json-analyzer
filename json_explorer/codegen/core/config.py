@@ -26,6 +26,14 @@ REMOVED_OPTIONS: dict[str, str] = {
     "indent_size": "was never applied",
     "use_tabs": "was never applied",
     "line_ending": "was never applied",
+    "generate_json_tags": "Go structs without tags mis-map keys; tags are always generated",
+    "string_type": "JSON strings are always string/str",
+    "bool_type": "JSON booleans are always bool",
+    "unknown_type": "unknown values are always any (Go) / Any (Python)",
+    "use_optional": "optional fields are always typed as optional",
+    "pydantic_use_field": "Field() is used whenever a field needs an alias or default",
+    "pydantic_use_alias": "aliases are always generated for renamed fields",
+    "typeddict_total": "required keys are required; optional keys use NotRequired",
 }
 
 
@@ -45,7 +53,6 @@ class GeneratorConfig:
 
     Attributes:
         package_name: Package/namespace name for generated code
-        generate_json_tags: Whether to generate JSON tags/annotations
         json_tag_omitempty: Add omitempty to JSON tags
         add_comments: Include comments/documentation in output
         language_config: Language-specific configuration options
@@ -55,7 +62,6 @@ class GeneratorConfig:
     package_name: str = "main"
 
     # JSON serialization
-    generate_json_tags: bool = True
     json_tag_omitempty: bool = True
 
     # Documentation
@@ -217,88 +223,3 @@ def save_config(config: GeneratorConfig, output_path: str | Path) -> None:
 
     except OSError as e:
         raise ConfigError(f"Failed to save configuration to {path}: {e}") from e
-
-
-# ============================================================================
-# Preset Configurations
-# ============================================================================
-
-
-def create_minimal_config() -> GeneratorConfig:
-    """
-    Create minimal configuration (no comments, basic settings).
-
-    Useful for generating compact code without documentation.
-    """
-    return GeneratorConfig(
-        add_comments=False,
-        generate_json_tags=True,
-        json_tag_omitempty=False,
-    )
-
-
-def create_verbose_config() -> GeneratorConfig:
-    """
-    Create verbose configuration with all documentation.
-
-    Useful for learning or when documentation is critical.
-    """
-    return GeneratorConfig(
-        add_comments=True,
-        generate_json_tags=True,
-        json_tag_omitempty=True,
-    )
-
-
-def create_strict_config() -> GeneratorConfig:
-    """
-    Create strict configuration (no optional handling).
-
-    Useful for schemas where all fields are required.
-    """
-    return GeneratorConfig(
-        json_tag_omitempty=False,
-        language_config={"use_pointers_for_optional": False},
-    )
-
-
-# ============================================================================
-# Configuration Validation Helpers
-# ============================================================================
-
-
-def validate_language_config(
-    config: GeneratorConfig,
-    required_keys: set[str] | None = None,
-    optional_keys: set[str] | None = None,
-) -> list[str]:
-    """
-    Validate language-specific configuration.
-
-    Args:
-        config: Configuration to validate
-        required_keys: Keys that must be present in language_config
-        optional_keys: Keys that are allowed but not required
-
-    Returns:
-        List of warning messages (empty if valid)
-    """
-    warnings = []
-    required = required_keys or set()
-    optional = optional_keys or set()
-
-    lang_config = config.language_config
-
-    # Check required keys
-    missing = required - lang_config.keys()
-    if missing:
-        warnings.append(f"Missing required language config: {', '.join(missing)}")
-
-    # Check for unknown keys
-    if optional:
-        known = required | optional
-        unknown = lang_config.keys() - known
-        if unknown:
-            warnings.append(f"Unknown language config keys: {', '.join(unknown)}")
-
-    return warnings

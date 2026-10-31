@@ -3,12 +3,9 @@ Tests for Go generator.
 """
 
 import pytest
-from json_explorer.codegen import quick_generate
+from json_explorer.codegen import create_generator, quick_generate
 from json_explorer.codegen.core import FieldType, GeneratorConfig, Schema
-from json_explorer.codegen.languages.go import (
-    GoConfig,
-    create_go_generator,
-)
+from json_explorer.codegen.languages.go import GoConfig
 
 
 class TestGoConfig:
@@ -25,18 +22,12 @@ class TestGoConfig:
         """Test Go type mapping including None handling."""
         config = GoConfig()
 
-        # None field_type should return interface{}
-        assert config.get_go_type(None, is_optional=False) == "interface{}"
+        # Unknown values are `any`; an optional `any` gets no pointer (nil fits)
+        assert config.get_go_type(FieldType.UNKNOWN) == "any"
+        assert config.get_go_type(FieldType.UNKNOWN, is_optional=True) == "any"
+        assert config.get_go_type(FieldType.CONFLICT, is_optional=True) == "any"
 
-        # Optional interface{} should NOT get a pointer (interface{} already accepts nil)
-        assert config.get_go_type(None, is_optional=True) == "interface{}"
-
-        # Array of interface{}
-        assert config.get_go_type(None, is_array=True) == "[]interface{}"
-
-        # Regular types should get pointers when optional
-        from json_explorer.codegen.core.schema import FieldType
-
+        # Regular types get pointers when optional
         assert config.get_go_type(FieldType.STRING, is_optional=True) == "*string"
         assert config.get_go_type(FieldType.INTEGER, is_optional=True) == "*int64"
 
@@ -45,7 +36,7 @@ class TestGoGenerator:
     """Test Go code generator."""
 
     def test_create_generator(self):
-        gen = create_go_generator()
+        gen = create_generator("go")
 
         assert gen.language_name == "go"
         assert gen.file_extension == ".go"
@@ -100,9 +91,7 @@ class TestGoGenerator:
         assert "Age" in code
 
     def test_array_types(self):
-        config = GoConfig()
-        go_type = config.get_go_type(FieldType.STRING, is_array=True)
-        assert go_type == "[]string"
+        assert "Tags []string" in quick_generate({"tags": ["a"]}, "go")
 
     def test_array_generation(self):
         data = {
@@ -114,16 +103,6 @@ class TestGoGenerator:
 
         assert "[]string" in code
         assert "[]int64" in code or "[]int" in code
-
-    def test_get_go_type_with_none(self):
-        """Test handling of None field type."""
-        config = GoConfig()
-
-        # None should return unknown type
-        assert config.get_go_type(None, is_optional=False) == "interface{}"
-
-        # Optional None should not add pointer to interface{}
-        assert config.get_go_type(None, is_optional=True) == "interface{}"
 
     def test_optional_fields_with_pointers(self):
         """Test optional field handling with proper type detection."""
@@ -155,21 +134,16 @@ class TestGoGenerator:
 
         assert "package models" in code
 
-    def test_no_json_tags(self):
-        data = {"id": 1}
+    def test_removed_no_json_tags_option_is_ignored(self):
+        """generate_json_tags was removed: tags are always generated."""
+        code = quick_generate({"id": 1}, language="go", generate_json_tags=False)
 
-        code = quick_generate(
-            data,
-            language="go",
-            generate_json_tags=False,
-        )
-
-        assert "json:" not in code
+        assert 'json:"id"' in code
 
     def test_validation_warnings(self):
 
         config = GeneratorConfig()
-        gen = create_go_generator(config)
+        gen = create_generator("go", config)
 
         # Empty schema should generate warning
         empty_schema = Schema(name="Empty", original_name="Empty")

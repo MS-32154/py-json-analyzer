@@ -25,7 +25,7 @@ from . import (
     generate_from_analysis,
     get_language_info,
     list_all_language_info,
-    list_supported_languages,
+    list_languages,
 )
 
 logger = get_logger(__name__)
@@ -129,12 +129,6 @@ def add_codegen_args(parser: argparse.ArgumentParser) -> None:
     )
 
     go_group.add_argument(
-        "--no-json-tags",
-        action="store_true",
-        help="Don't generate JSON struct tags in Go",
-    )
-
-    go_group.add_argument(
         "--no-omitempty",
         action="store_true",
         help="Don't add omitempty to JSON tags in Go",
@@ -165,12 +159,6 @@ def add_codegen_args(parser: argparse.ArgumentParser) -> None:
         "--kw-only",
         action="store_true",
         help="Make dataclass fields keyword-only",
-    )
-
-    python_group.add_argument(
-        "--no-pydantic-field",
-        action="store_true",
-        help="Don't use Field() in Pydantic models",
     )
 
     python_group.add_argument(
@@ -396,7 +384,7 @@ No pointers (strict mode):
 def _validate_language(language: str, silent: bool = False) -> bool:
     """Validate that a language is supported."""
     try:
-        supported = list_supported_languages()
+        supported = list_languages()
         if language.lower() not in [lang.lower() for lang in supported]:
             if not silent:
                 err_console.print(f"[red]✗ Unsupported language '{language}'[/red]")
@@ -483,9 +471,6 @@ def _add_go_config(args: argparse.Namespace, config_dict: dict) -> None:
     if hasattr(args, "no_pointers") and args.no_pointers:
         config_dict["use_pointers_for_optional"] = False
 
-    if hasattr(args, "no_json_tags") and args.no_json_tags:
-        config_dict["generate_json_tags"] = False
-
     if hasattr(args, "no_omitempty") and args.no_omitempty:
         config_dict["json_tag_omitempty"] = False
 
@@ -503,9 +488,6 @@ def _add_python_config(args: argparse.Namespace, config_dict: dict) -> None:
 
     if hasattr(args, "kw_only") and args.kw_only:
         config_dict["dataclass_kw_only"] = True
-
-    if hasattr(args, "no_pydantic_field") and args.no_pydantic_field:
-        config_dict["pydantic_use_field"] = False
 
     if hasattr(args, "pydantic_forbid_extra") and args.pydantic_forbid_extra:
         config_dict["pydantic_extra_forbid"] = True

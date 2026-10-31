@@ -24,7 +24,7 @@ from . import (
     generate_from_analysis,
     get_language_info,
     list_all_language_info,
-    list_supported_languages,
+    list_languages,
     load_config,
 )
 
@@ -215,7 +215,7 @@ class CodegenInteractiveHandler:
 
     def _select_language(self) -> str | None:
         """Interactive language selection."""
-        languages = list_supported_languages()
+        languages = list_languages()
 
         if not languages:
             self.console.print("[red]⚠️ No code generators available[/red]")
@@ -587,7 +587,7 @@ class CodegenInteractiveHandler:
 
     def _show_language_list(self) -> None:
         """Show simple language list."""
-        languages = list_supported_languages()
+        languages = list_languages()
 
         self.console.print("\n[bold]📋 Supported Languages:[/bold]")
         for lang in languages:
@@ -635,7 +635,7 @@ class CodegenInteractiveHandler:
 
     def _show_specific_language_info(self) -> None:
         """Show information about a specific language."""
-        languages = list_supported_languages()
+        languages = list_languages()
 
         if not languages:
             self.console.print("[red]No languages available[/red]")
@@ -722,7 +722,7 @@ class CodegenInteractiveHandler:
 
     def _show_templates_menu(self) -> None:
         """Show configuration templates information."""
-        languages = list_supported_languages()
+        languages = list_languages()
 
         if not languages:
             self.console.print("[red]No languages available[/red]")
