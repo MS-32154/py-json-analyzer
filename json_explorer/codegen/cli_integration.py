@@ -29,7 +29,10 @@ from . import (
 )
 
 logger = get_logger(__name__)
+# Generated code is the program's output and goes to stdout; status messages,
+# warnings and metadata go to stderr so `--generate ... > file` stays clean.
 console = Console()
+err_console = Console(stderr=True)
 
 
 # ============================================================================
@@ -248,11 +251,11 @@ def handle_codegen_command(
         return _generate_and_output(json_data, language, config, args)
 
     except CLIError as e:
-        console.print(f"[red]✗ Error:[/red] {e}")
+        err_console.print(f"[red]✗ Error:[/red] {e}")
         logger.debug("CLI error: %s", e)
         return 1
     except Exception as e:
-        console.print(f"[red]✗ Unexpected error:[/red] {e}")
+        err_console.print(f"[red]✗ Unexpected error:[/red] {e}")
         logger.exception("Unexpected error in CLI handler")
         return 1
 
@@ -314,7 +317,7 @@ def _list_languages() -> int:
         return 0
 
     except Exception as e:
-        console.print(f"[red]✗ Error listing languages:[/red] {e}")
+        err_console.print(f"[red]✗ Error listing languages:[/red] {e}")
         logger.debug("Failed to list languages: %s", e)
         return 1
 
@@ -323,7 +326,7 @@ def _show_language_info(language: str) -> int:
     """Show detailed information about a specific language."""
     try:
         if not _validate_language(language, silent=True):
-            console.print(f"[red]✗ Language '{language}' is not supported[/red]")
+            err_console.print(f"[red]✗ Language '{language}' is not supported[/red]")
             console.print("[dim]Use --list-languages to see available options[/dim]")
             return 1
 
@@ -358,7 +361,7 @@ def _show_language_info(language: str) -> int:
         return 0
 
     except Exception as e:
-        console.print(f"[red]✗ Error getting language info:[/red] {e}")
+        err_console.print(f"[red]✗ Error getting language info:[/red] {e}")
         logger.debug("Failed to get language info: %s", e)
         return 1
 
@@ -414,13 +417,13 @@ def _validate_language(language: str, silent: bool = False) -> bool:
         supported = list_supported_languages()
         if language.lower() not in [lang.lower() for lang in supported]:
             if not silent:
-                console.print(f"[red]✗ Unsupported language '{language}'[/red]")
+                err_console.print(f"[red]✗ Unsupported language '{language}'[/red]")
                 console.print(f"[dim]Supported languages: {', '.join(supported)}[/dim]")
             return False
         return True
     except Exception:
         if not silent:
-            console.print("[red]✗ Failed to validate language[/red]")
+            err_console.print("[red]✗ Failed to validate language[/red]")
         return False
 
 
@@ -439,11 +442,11 @@ def _get_input_data(args: argparse.Namespace) -> dict | list | None:
         logger.debug("Reading JSON from stdin")
         return json.load(sys.stdin)
     except json.JSONDecodeError as e:
-        console.print(f"[red]✗ Invalid JSON input:[/red] {e}")
+        err_console.print(f"[red]✗ Invalid JSON input:[/red] {e}")
         logger.debug("JSON decode error: %s", e)
         return None
     except Exception as e:
-        console.print(f"[red]✗ Failed to load input:[/red] {e}")
+        err_console.print(f"[red]✗ Failed to load input:[/red] {e}")
         logger.debug("Failed to load input: %s", e)
         return None
 
@@ -575,11 +578,11 @@ def _generate_and_output(
         result = generate_from_analysis(analysis, language, config, root_name)
 
         if not result.success:
-            console.print(
+            err_console.print(
                 f"[red]✗ Code generation failed:[/red] {result.error_message}"
             )
             if hasattr(result, "exception") and result.exception:
-                console.print(f"[dim]Details: {result.exception}[/dim]")
+                err_console.print(f"[dim]Details: {result.exception}[/dim]")
             logger.debug("Generation failed: %s", result.error_message)
             return 1
 
@@ -592,9 +595,9 @@ def _generate_and_output(
 
         # Show warnings if any
         if result.warnings:
-            console.print("\n[yellow]⚠️ Warnings:[/yellow]")
+            err_console.print("\n[yellow]⚠️ Warnings:[/yellow]")
             for warning in result.warnings:
-                console.print(f"  [yellow]•[/yellow] {warning}")
+                err_console.print(f"  [yellow]•[/yellow] {warning}")
 
         # Show metadata if verbose
         if hasattr(args, "verbose") and args.verbose and result.metadata:
@@ -604,11 +607,11 @@ def _generate_and_output(
         return 0
 
     except GeneratorError as e:
-        console.print(f"[red]✗[/red] {e}")
+        err_console.print(f"[red]✗[/red] {e}")
         logger.debug("Generator error: %s", e)
         return 1
     except Exception as e:
-        console.print(f"[red]✗ Unexpected failure:[/red] {e}")
+        err_console.print(f"[red]✗ Unexpected failure:[/red] {e}")
         logger.exception("Unexpected failure during generation")
         return 1
 
@@ -618,18 +621,28 @@ def _save_to_file(code: str, output_path: str, language: str) -> None:
     try:
         path = Path(output_path)
         path.write_text(code, encoding="utf-8")
-        console.print(
+        err_console.print(
             f"[green]✓[/green] Generated {language} code saved to [cyan]{path}[/cyan]"
         )
         logger.info("Code saved to: %s", path)
     except OSError as e:
-        console.print(f"[red]✗ Failed to write to {output_path}:[/red] {e}")
+        err_console.print(f"[red]✗ Failed to write to {output_path}:[/red] {e}")
         logger.debug("Failed to write file: %s", e)
         raise
 
 
 def _display_to_stdout(code: str, language: str) -> None:
-    """Display generated code to stdout with syntax highlighting."""
+    """Write generated code to stdout.
+
+    On a terminal the code is shown with a header and syntax highlighting.
+    When stdout is redirected or piped, the raw code is written unchanged so
+    `json_explorer data.json --generate go > models.go` produces a valid file.
+    """
+    if not console.is_terminal:
+        sys.stdout.write(code if code.endswith("\n") else code + "\n")
+        sys.stdout.flush()
+        return
+
     console.print(f"\n[green]📄 Generated {language.title()} Code\n[/green]")
 
     try:
@@ -663,5 +676,5 @@ def _display_metadata(metadata: dict) -> None:
         display_key = key.replace("_", " ").title()
         metadata_table.add_row(display_key, str(value))
 
-    console.print()
-    console.print(metadata_table)
+    err_console.print()
+    err_console.print(metadata_table)

@@ -8,6 +8,7 @@ from collections import Counter
 from typing import Any
 
 import dateparser
+from rich.console import Console
 from rich.progress import Progress, SpinnerColumn, TextColumn
 
 from .logging_config import get_logger
@@ -57,11 +58,15 @@ def analyze_json(data: Any) -> dict[str, Any]:
     """
     logger.info("Starting JSON analysis")
 
+    # Progress is diagnostics: keep it off stdout (piped output must stay clean),
+    # and only show it on an interactive terminal (no stray output otherwise).
+    progress_console = Console(stderr=True)
     with Progress(
         SpinnerColumn(),
         TextColumn("[progress.description]{task.description}"),
-        console=None,
+        console=progress_console,
         transient=True,
+        disable=not progress_console.is_terminal,
     ) as progress:
         task = progress.add_task("[cyan]Analyzing JSON...", total=None)
 
