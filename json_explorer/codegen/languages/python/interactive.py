@@ -5,7 +5,7 @@ from typing import Any
 from rich.console import Console
 from rich.prompt import Confirm
 
-from json_explorer.utils import prompt_input
+from json_explorer.ui import ask
 
 from ...core.config import GeneratorConfig
 
@@ -42,7 +42,7 @@ class PythonInteractiveHandler:
 
     def configure_language_specific(self, console: Console) -> dict[str, Any]:
         console.print("\n[bold]Python-Specific Options:[/bold]")
-        style = self._input(
+        style = ask(
             "Select Python style",
             choices=["dataclass", "pydantic", "typeddict"],
             default="dataclass",
@@ -70,11 +70,3 @@ class PythonInteractiveHandler:
 
     def get_default_config(self) -> dict[str, Any]:
         return {"style": "dataclass"}
-
-    def _input(self, message: str, default: str | None = None, **kwargs) -> str:
-        return prompt_input(
-            message,
-            default=default,
-            choices=kwargs.get("choices"),
-            console=kwargs.get("console"),
-        )

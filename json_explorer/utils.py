@@ -5,18 +5,11 @@ proper error handling and validation.
 """
 
 import json
-import os
-import sys
 from pathlib import Path
 from typing import Any
 from urllib.parse import urlparse
 
 import requests
-from prompt_toolkit import prompt
-from prompt_toolkit.completion import FuzzyCompleter, PathCompleter, WordCompleter
-from prompt_toolkit.history import FileHistory, History, InMemoryHistory
-from rich.console import Console
-from rich.prompt import Prompt
 
 from json_explorer.errors import JsonExplorerError
 
@@ -151,118 +144,3 @@ def load_json(
     if file_path:
         return load_json_from_file(file_path)
     return load_json_from_url(url, timeout)
-
-
-def user_state_dir() -> Path:
-    """Per-user directory for json_explorer state (prompt history).
-
-    - Linux/BSD: ``$XDG_STATE_HOME/json_explorer`` (default ``~/.local/state``)
-    - macOS: ``~/Library/Application Support/json_explorer``
-    - Windows: ``%LOCALAPPDATA%\\json_explorer``
-    """
-    if sys.platform == "win32":
-        base = Path(os.environ.get("LOCALAPPDATA") or Path.home() / "AppData" / "Local")
-    elif sys.platform == "darwin":
-        base = Path.home() / "Library" / "Application Support"
-    else:
-        base = Path(
-            os.environ.get("XDG_STATE_HOME") or Path.home() / ".local" / "state"
-        )
-    return base / "json_explorer"
-
-
-def _history(name: str) -> History:
-    """Prompt history stored in the user state directory, not the current one.
-
-    Falls back to in-memory history if the directory can't be created.
-    """
-    try:
-        state_dir = user_state_dir()
-        state_dir.mkdir(parents=True, exist_ok=True)
-        return FileHistory(str(state_dir / name))
-    except OSError as e:
-        logger.debug("Prompt history not persisted: %s", e)
-        return InMemoryHistory()
-
-
-def prompt_input(message: str, default: str | None = None, **kwargs) -> str:
-    """
-    User friendly input with optional choices and autocompletion.
-    Falls back to Prompt.ask if prompt_toolkit is unavailable.
-
-    Args:
-        message: Prompt message.
-        default: Default value if user enters nothing.
-        kwargs: May include:
-                    - 'choices' (list of strings) for tab completion,
-                    - `console` (rich console object) for rich Console instance to print messages.
-
-    Returns:
-        User input as string (or default if empty).
-    """
-    choices = kwargs.get("choices")
-    console = kwargs.get("console") or Console()
-    try:
-        history = _history("input_history")
-
-        if choices:
-            str_choices = [str(c) for c in choices]
-            completer = FuzzyCompleter(WordCompleter(str_choices, ignore_case=True))
-            display_message = f"{message} ({'/'.join(str_choices)})"
-
-            while True:
-                text = prompt(
-                    f"{display_message} > ",
-                    default=default or "",
-                    history=history,
-                    completer=completer,
-                    complete_while_typing=True,
-                ).strip()
-
-                if not text and default is not None:
-                    return default
-
-                if text in str_choices:
-                    return text
-                lowered = text.lower()
-                ci_matches = [c for c in str_choices if c.lower() == lowered]
-                if ci_matches:
-                    return ci_matches[0]
-
-                prefix_matches = [
-                    c for c in str_choices if c.lower().startswith(lowered)
-                ]
-                if len(prefix_matches) == 1:
-                    return prefix_matches[0]
-
-                console.print(f"[red]Invalid choice: {text}[/red]")
-
-        # Free text input
-        return prompt(
-            f"{message} > ", default=default or "", history=history
-        ).strip() or (default or "")
-
-    except Exception:
-        return Prompt.ask(message, default=default, **kwargs)
-
-
-def prompt_input_path(message: str, **kwargs) -> str:
-    """
-    Input for file paths with autocompletion.
-    Falls back to Prompt.ask if prompt_toolkit is unavailable.
-    """
-    default = kwargs.get("default") or ""
-    try:
-        history = _history("path_history")
-        completer = PathCompleter(expanduser=True)
-
-        return prompt(
-            f"{message} > ",
-            default=default,
-            history=history,
-            completer=completer,
-            complete_while_typing=True,
-        ).strip()
-
-    except Exception:
-        return Prompt.ask(message)

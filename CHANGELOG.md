@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Changed
+- The prompt helpers moved from `json_explorer.utils` to `json_explorer.ui` (`prompt_input` ->
+  `ask`, `prompt_input_path` -> `ask_path`); `json_explorer.utils` now only loads JSON.
 - **Breaking:** `analyze_json()` returns a typed `Node` (`kind`, `optional`, `fields`, `items`,
   `kinds`, `format`; `to_dict()` for a plain-dict form) instead of a dict with `type`/`children`/
   `child_type` keys and string markers like `"mixed: int, str"`. `convert_analyzer_output()` and

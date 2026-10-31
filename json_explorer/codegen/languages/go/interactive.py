@@ -5,7 +5,7 @@ from typing import Any
 from rich.console import Console
 from rich.prompt import Confirm
 
-from json_explorer.utils import prompt_input
+from json_explorer.ui import ask
 
 from ...core.config import GeneratorConfig
 
@@ -56,19 +56,19 @@ class GoInteractiveHandler:
             ),
         }
         if Confirm.ask("Configure types?", default=False):
-            config["int_type"] = self._input(
+            config["int_type"] = ask(
                 "Integer type",
                 choices=["int", "int32", "int64"],
                 default="int64",
                 console=console,
             )
-            config["float_type"] = self._input(
+            config["float_type"] = ask(
                 "Float type",
                 choices=["float32", "float64"],
                 default="float64",
                 console=console,
             )
-            config["time_type"] = self._input(
+            config["time_type"] = ask(
                 "Timestamp type",
                 choices=["time.Time", "string"],
                 default="time.Time",
@@ -78,11 +78,3 @@ class GoInteractiveHandler:
 
     def get_default_config(self) -> dict[str, Any]:
         return {"json_tag_omitempty": True, "use_pointers_for_optional": True}
-
-    def _input(self, message: str, default: str | None = None, **kwargs) -> str:
-        return prompt_input(
-            message,
-            default=default,
-            choices=kwargs.get("choices"),
-            console=kwargs.get("console"),
-        )

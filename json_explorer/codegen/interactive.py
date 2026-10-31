@@ -8,17 +8,15 @@ with delegation to language-specific handlers for customization.
 from pathlib import Path
 from typing import Any, Protocol
 
-from rich import box
 from rich.console import Console
 from rich.panel import Panel
 from rich.prompt import Confirm, Prompt
 from rich.syntax import Syntax
-from rich.table import Table
 
 from json_explorer.analyzer import Node, analyze_json
 from json_explorer.codegen.registry import get_plugin
 from json_explorer.logging_config import get_logger
-from json_explorer.utils import prompt_input, prompt_input_path
+from json_explorer.ui import ask, ask_path, print_metadata
 
 from . import (
     GeneratorError,
@@ -109,25 +107,6 @@ class CodegenInteractiveHandler:
     # prompt_toolkit integration
     # ========================================================================
 
-    def _input(self, message: str, default: str | None = None, **kwargs) -> str:
-        return prompt_input(
-            message,
-            default=default,
-            choices=kwargs.get("choices"),
-            console=self.console,
-        )
-
-    def _input_path(self, message: str, default: str = "") -> str:
-        return prompt_input_path(message, default=default)
-
-    # ========================================================================
-    # Main Menu
-    # ========================================================================
-
-    # ========================================================================
-    # Code Generation Flow
-    # ========================================================================
-
     def _interactive_generation(self) -> None:
         """Handle the interactive code generation process."""
         try:
@@ -144,7 +123,7 @@ class CodegenInteractiveHandler:
                 return
 
             # Step 3: Root name
-            root_name = self._input("Root structure name", default="Root")
+            root_name = ask("Root structure name", default="Root")
 
             # Step 4: Generate
             result = self._generate_code(language, config, root_name)
@@ -192,7 +171,7 @@ class CodegenInteractiveHandler:
         """Interactive configuration for code generation."""
         self.console.print(f"\n⚙️ [bold]Configure {language.title()} Generation[/bold]")
 
-        config_type = self._input(
+        config_type = ask(
             "Configuration approach",
             choices=["quick", "custom", "template", "file"],
             default="quick",
@@ -213,7 +192,7 @@ class CodegenInteractiveHandler:
     def _quick_configuration(self, language: str) -> dict:
         """Quick configuration with sensible defaults."""
         config_dict = {
-            "package_name": self._input("Package/namespace name", default="main"),
+            "package_name": ask("Package/namespace name", default="main"),
             "add_comments": Confirm.ask("Generate comments?", default=True),
         }
 
@@ -231,7 +210,7 @@ class CodegenInteractiveHandler:
         config_dict = {}
 
         # Basic configuration
-        config_dict["package_name"] = self._input(
+        config_dict["package_name"] = ask(
             "Package/namespace name",
             default="main",
         )
@@ -273,7 +252,7 @@ class CodegenInteractiveHandler:
 
         # Add custom option
         choices = [*list(templates.keys()), "custom", "back"]
-        template = self._input(
+        template = ask(
             f"\nSelect {language} template",
             choices=choices,
             default=next(iter(templates.keys())) if templates else "custom",
@@ -305,7 +284,7 @@ class CodegenInteractiveHandler:
 
     def _file_configuration(self) -> dict | None:
         """Load configuration from file."""
-        config_file = self._input_path(
+        config_file = ask_path(
             "Configuration file path",
             default="codegen_config.json",
         )
@@ -391,10 +370,10 @@ class CodegenInteractiveHandler:
 
         # Show generation metadata
         if result.metadata:
-            self._display_metadata(result.metadata)
+            print_metadata(self.console, result.metadata, "📊 Generation Summary")
 
         # Main output handling
-        action = self._input(
+        action = ask(
             "\nWhat would you like to do with the generated code?",
             choices=["preview", "save", "both", "regenerate"],
             default="preview",
@@ -454,7 +433,7 @@ class CodegenInteractiveHandler:
 
             # Suggest filename
             default_filename = f"{root_name.lower()}{extension}"
-            filename = self._input_path("Save as", default=default_filename)
+            filename = ask_path("Save as", default=default_filename)
 
             # Ensure proper extension
             if not filename.endswith(extension):
@@ -468,7 +447,7 @@ class CodegenInteractiveHandler:
                 f"File {output_path} exists. Overwrite?",
                 default=False,
             ):
-                filename = self._input_path("Enter new filename")
+                filename = ask_path("Enter new filename")
                 output_path = Path(filename)
 
             output_path.write_text(code, encoding="utf-8")
@@ -486,29 +465,6 @@ class CodegenInteractiveHandler:
         self.console.print("\n[yellow]⚠️ Warnings:[/yellow]")
         for warning in warnings:
             self.console.print(f"  [yellow]•[/yellow] {warning}")
-
-    def _display_metadata(self, metadata: dict[str, Any]) -> None:
-        """Display generation metadata."""
-        metadata_table = Table(
-            title="📊 Generation Summary",
-            box=box.SIMPLE,
-            show_header=True,
-            header_style="bold cyan",
-        )
-
-        metadata_table.add_column("Property", style="bold")
-        metadata_table.add_column("Value", style="green")
-
-        for key, value in metadata.items():
-            display_key = key.replace("_", " ").title()
-            metadata_table.add_row(display_key, str(value))
-
-        self.console.print()
-        self.console.print(metadata_table)
-
-    # ========================================================================
-    # Information Displays
-    # ========================================================================
 
     def _get_language_handler(
         self,

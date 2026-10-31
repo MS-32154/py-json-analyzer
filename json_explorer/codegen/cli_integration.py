@@ -18,6 +18,7 @@ from rich.table import Table
 from json_explorer.analyzer import analyze_json
 from json_explorer.errors import JsonExplorerError
 from json_explorer.logging_config import get_logger
+from json_explorer.ui import print_metadata
 from json_explorer.utils import load_json
 
 from . import (
@@ -446,7 +447,7 @@ def _generate_and_output(
 
         # Show metadata if verbose
         if hasattr(args, "verbose") and args.verbose and result.metadata:
-            _display_metadata(result.metadata)
+            print_metadata(err_console, result.metadata, "📊 Generation Metadata")
 
         logger.info("Code generation completed successfully")
         return 0
@@ -513,23 +514,3 @@ def _display_to_stdout(code: str, language: str) -> None:
     except Exception:
         # Fallback to plain text
         console.print(code)
-
-
-def _display_metadata(metadata: dict) -> None:
-    """Display generation metadata in a formatted table."""
-    metadata_table = Table(
-        title="📊 Generation Metadata",
-        box=box.SIMPLE,
-        show_header=True,
-        header_style="bold cyan",
-    )
-
-    metadata_table.add_column("Property", style="bold")
-    metadata_table.add_column("Value", style="green")
-
-    for key, value in metadata.items():
-        display_key = key.replace("_", " ").title()
-        metadata_table.add_row(display_key, str(value))
-
-    err_console.print()
-    err_console.print(metadata_table)

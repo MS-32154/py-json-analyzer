@@ -6,13 +6,13 @@ from pathlib import Path
 from unittest.mock import Mock, patch
 
 import pytest
+from json_explorer.ui import ask as prompt_input
+from json_explorer.ui import ask_path as prompt_input_path
 from json_explorer.utils import (
     JSONLoaderError,
     load_json,
     load_json_from_file,
     load_json_from_url,
-    prompt_input,
-    prompt_input_path,
 )
 
 
@@ -271,7 +271,7 @@ class TestLoadJson:
 class TestPromptInput:
     """Test prompt_input function."""
 
-    @patch("json_explorer.utils.prompt")
+    @patch("json_explorer.ui.prompt")
     def test_basic_input(self, mock_prompt):
         """Test basic input without choices."""
         mock_prompt.return_value = "user input"
@@ -281,7 +281,7 @@ class TestPromptInput:
         assert result == "user input"
         mock_prompt.assert_called_once()
 
-    @patch("json_explorer.utils.prompt")
+    @patch("json_explorer.ui.prompt")
     def test_input_with_default(self, mock_prompt):
         """Test input with default value."""
         mock_prompt.return_value = ""
@@ -290,7 +290,7 @@ class TestPromptInput:
 
         assert result == "default_value"
 
-    @patch("json_explorer.utils.prompt")
+    @patch("json_explorer.ui.prompt")
     def test_input_with_choices(self, mock_prompt):
         """Test input with valid choices."""
         mock_prompt.return_value = "choice1"
@@ -299,7 +299,7 @@ class TestPromptInput:
 
         assert result == "choice1"
 
-    @patch("json_explorer.utils.prompt")
+    @patch("json_explorer.ui.prompt")
     def test_input_with_choices_case_insensitive(self, mock_prompt):
         """Test input with choices is case insensitive."""
         mock_prompt.side_effect = ["CHOICE1"]
@@ -308,7 +308,7 @@ class TestPromptInput:
 
         assert result == "choice1"
 
-    @patch("json_explorer.utils.prompt")
+    @patch("json_explorer.ui.prompt")
     def test_input_with_choices_prefix_match(self, mock_prompt):
         """Test input with choices allows prefix matching."""
         # Only match if there's exactly one prefix match
@@ -318,7 +318,7 @@ class TestPromptInput:
 
         assert result == "choice1"
 
-    @patch("json_explorer.utils.prompt")
+    @patch("json_explorer.ui.prompt")
     def test_input_invalid_choice_retry(self, mock_prompt):
         """Test input retries on invalid choice."""
         mock_prompt.side_effect = ["invalid", "choice1"]
@@ -328,12 +328,12 @@ class TestPromptInput:
         assert result == "choice1"
         assert mock_prompt.call_count == 2
 
-    @patch("json_explorer.utils.prompt")
+    @patch("json_explorer.ui.prompt")
     def test_fallback_to_prompt_ask(self, mock_prompt):
         """Test fallback to Prompt.ask on error."""
         mock_prompt.side_effect = Exception("prompt_toolkit error")
 
-        with patch("json_explorer.utils.Prompt.ask") as mock_ask:
+        with patch("json_explorer.ui.Prompt.ask") as mock_ask:
             mock_ask.return_value = "fallback"
             result = prompt_input("Enter value")
 
@@ -344,7 +344,7 @@ class TestPromptInput:
 class TestPromptInputPath:
     """Test prompt_input_path function."""
 
-    @patch("json_explorer.utils.prompt")
+    @patch("json_explorer.ui.prompt")
     def test_path_input(self, mock_prompt):
         """Test path input with autocompletion."""
         mock_prompt.return_value = "/path/to/file.json"
@@ -354,7 +354,7 @@ class TestPromptInputPath:
         assert result == "/path/to/file.json"
         mock_prompt.assert_called_once()
 
-    @patch("json_explorer.utils.prompt")
+    @patch("json_explorer.ui.prompt")
     def test_path_input_with_default(self, mock_prompt):
         """Test path input with default value."""
         mock_prompt.return_value = ""
@@ -364,12 +364,12 @@ class TestPromptInputPath:
 
         assert result == "" or result == "default.json"
 
-    @patch("json_explorer.utils.prompt")
+    @patch("json_explorer.ui.prompt")
     def test_path_input_fallback(self, mock_prompt):
         """Test fallback to Prompt.ask on error."""
         mock_prompt.side_effect = Exception("prompt_toolkit error")
 
-        with patch("json_explorer.utils.Prompt.ask") as mock_ask:
+        with patch("json_explorer.ui.Prompt.ask") as mock_ask:
             mock_ask.return_value = "/fallback/path.json"
             result = prompt_input_path("Enter path")
 
@@ -539,7 +539,7 @@ class TestUrlParsing:
 
 class TestPromptHistory:
     def test_history_lives_in_user_state_dir(self, tmp_path, monkeypatch):
-        from json_explorer.utils import _history, user_state_dir
+        from json_explorer.ui import _history, user_state_dir
         from prompt_toolkit.history import FileHistory
 
         monkeypatch.setenv("XDG_STATE_HOME", str(tmp_path))
@@ -552,7 +552,7 @@ class TestPromptHistory:
         assert (user_state_dir() / "input_history").exists()
 
     def test_falls_back_to_memory_when_dir_unusable(self, monkeypatch):
-        import json_explorer.utils as utils
+        import json_explorer.ui as utils
         from prompt_toolkit.history import InMemoryHistory
 
         def unusable():

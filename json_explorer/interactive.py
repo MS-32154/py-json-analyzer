@@ -14,7 +14,8 @@ from .logging_config import get_logger
 from .search import JsonSearcher
 from .stats import DataStatsAnalyzer
 from .tree_view import print_compact_tree, print_json_analysis
-from .utils import load_json, prompt_input, prompt_input_path
+from .ui import ask, ask_path
+from .utils import load_json
 from .visualizer import JSONVisualizer
 
 logger = get_logger(__name__)
@@ -79,17 +80,6 @@ class InteractiveHandler:
 
         return 0
 
-    def _input(self, message: str, default: str | None = None, **kwargs) -> str:
-        return prompt_input(
-            message,
-            default=default,
-            choices=kwargs.get("choices"),
-            console=self.console,
-        )
-
-    def _input_path(self, message: str, default: str = "") -> str:
-        return prompt_input_path(message, default=default)
-
     def _show_main_menu(self) -> None:
         """Display the main menu."""
         menu_panel = Panel.fit(
@@ -109,7 +99,7 @@ class InteractiveHandler:
     def _interactive_tree_view(self) -> None:
         """Interactive tree view options."""
         self.console.print("\n🌳 [bold]Tree View Options[/bold]")
-        tree_type = self._input(
+        tree_type = ask(
             "Select tree view type",
             choices=["compact", "analysis", "raw"],
             default="compact",
@@ -133,7 +123,7 @@ class InteractiveHandler:
             self.searcher.print_examples()
 
         # Get query from user
-        query = self._input(
+        query = ask(
             "\n[bold]Enter JMESPath query[/bold]",
             default="@",  # @ returns entire document
         )
@@ -169,7 +159,7 @@ class InteractiveHandler:
     def _interactive_visualization(self) -> None:
         """Interactive visualization options."""
         self.console.print("\n📈 [bold]Visualization Options[/bold]")
-        viz_format = self._input(
+        viz_format = ask(
             "Select visualization format",
             choices=["terminal", "html", "all"],
             default="html",
@@ -181,7 +171,7 @@ class InteractiveHandler:
 
         if viz_format in ["html", "all"]:
             if Confirm.ask("Save visualizations to file?"):
-                save_path = self._input("Enter save path (optional)", default="")
+                save_path = ask("Enter save path (optional)", default="")
                 save_path = save_path if save_path else None
 
             open_browser = Confirm.ask(
@@ -215,16 +205,14 @@ class InteractiveHandler:
     def _load_new_data(self) -> None:
         """Load new JSON data from file or URL."""
         self.console.print("\n📂 [bold]Load New Data[/bold]")
-        source_type = self._input(
-            "Data source", choices=["file", "url"], default="file"
-        )
+        source_type = ask("Data source", choices=["file", "url"], default="file")
 
         try:
             if source_type == "file":
-                file_path = self._input_path("Enter file path")
+                file_path = ask_path("Enter file path")
                 self.source, self.data = load_json(file_path, None)
             else:
-                url = self._input("Enter URL")
+                url = ask("Enter URL")
                 self.source, self.data = load_json(None, url)
 
             self.console.print(f"✅ [green]Successfully loaded: {self.source}[/green]")
@@ -237,7 +225,7 @@ class InteractiveHandler:
         Args:
             result: SearchResult object to save.
         """
-        filename = self._input(
+        filename = ask(
             "Enter filename",
             default=f"search_result_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json",
         )
