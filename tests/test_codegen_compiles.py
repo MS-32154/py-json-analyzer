@@ -35,7 +35,6 @@ CASES: dict[str, typing.Any] = {
 TARGETS = ("dataclass", "pydantic", "typeddict", "go")
 
 BUG_1 = "#1 nested type referenced by a suffixed name that doesn't exist"
-BUG_2 = "#2 dataclass: required field after optional (default) field"
 BUG_6 = "#6 digit-leading key becomes an _underscore name"
 BUG_7 = "#7 JSON key not escaped in generated code"
 
@@ -44,16 +43,15 @@ KNOWN_BUGS: dict[tuple[str, str], str] = {
     ("nested", "pydantic"): BUG_1,
     ("nested", "typeddict"): BUG_1,
     ("nested", "go"): BUG_1,
-    ("optional_before_required", "dataclass"): BUG_2,
     ("digit_key", "pydantic"): BUG_6,
     ("digit_key", "go"): BUG_6,
     ("quote_key", "pydantic"): BUG_7,
     ("quote_key", "go"): BUG_7,
-    ("001_sample_project", "dataclass"): f"{BUG_2}; then {BUG_1}",
+    ("001_sample_project", "dataclass"): BUG_1,
     ("001_sample_project", "pydantic"): BUG_1,
     ("001_sample_project", "typeddict"): BUG_1,
     ("001_sample_project", "go"): BUG_1,
-    ("002_sample_project", "dataclass"): f"{BUG_2}; then {BUG_1}",
+    ("002_sample_project", "dataclass"): BUG_1,
     ("002_sample_project", "pydantic"): BUG_1,
     ("002_sample_project", "typeddict"): BUG_1,
     ("002_sample_project", "go"): BUG_1,

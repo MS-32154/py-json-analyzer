@@ -130,6 +130,15 @@ class PythonGenerator(CodeGenerator):
             if field_data:
                 fields.append(field_data)
 
+        # Positional dataclass fields with a default must come after those
+        # without one, or Python raises TypeError when the class is created.
+        # Stable sort: JSON order is kept within each group.
+        if (
+            self.python_config.style == PythonStyle.DATACLASS
+            and not self.python_config.dataclass_kw_only
+        ):
+            fields.sort(key=lambda f: bool(f.get("use_default")))
+
         logger.debug("Generated class: %s with %s fields", class_name, len(fields))
 
         class_data = {

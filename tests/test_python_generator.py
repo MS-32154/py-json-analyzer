@@ -227,3 +227,29 @@ class TestPythonStyles:
         assert "class Root" in code
         assert "id_:" in code or "id :" in code
         assert "name:" in code or "name :" in code
+
+
+# a and c are optional (missing from the second item); b is required
+FIELD_ORDER_DATA = [{"a": 1, "b": "x", "c": True}, {"b": "y"}]
+
+
+class TestDataclassFieldOrder:
+    @staticmethod
+    def field_names(code: str) -> list[str]:
+        return [
+            line.split(":")[0].strip()
+            for line in code.splitlines()
+            if line.startswith("    ")
+            and ":" in line
+            and not line.strip().startswith(("#", '"'))
+        ]
+
+    def test_required_fields_come_first_json_order_kept(self):
+        code = quick_generate(FIELD_ORDER_DATA, "python", style="dataclass")
+        assert self.field_names(code) == ["b", "a", "c"]
+
+    def test_kw_only_keeps_json_order(self):
+        code = quick_generate(
+            FIELD_ORDER_DATA, "python", style="dataclass", dataclass_kw_only=True
+        )
+        assert self.field_names(code) == ["a", "b", "c"]
