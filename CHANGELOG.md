@@ -44,6 +44,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `py.typed` marker: type information is now shipped with the package.
 
 ### Fixed
+- An unknown or invalid generator option crashed with a raw `TypeError` (or was silently accepted,
+  e.g. `int_type: "int8"`). It now fails with a `ConfigError` naming the option and the valid
+  options or values.
 - `--language-info` failed without a data file and rejected aliases such as `py`.
 - Nested arrays lost a dimension: `[[1, 2]]` was generated as `[]int64` / `list[int]`. All levels are
   kept now (`[][]int64`, `list[list[int]]`), and their element types are named after the key.

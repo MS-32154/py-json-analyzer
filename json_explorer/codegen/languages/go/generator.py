@@ -5,7 +5,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-from ...core.config import GeneratorConfig
+from ...core.config import GeneratorConfig, build_language_config
 from ...core.generator import CodeGenerator
 from ...core.naming import NamePlan, plan_names
 from ...core.schema import Field, FieldType, Schema
@@ -32,7 +32,7 @@ class GoGenerator(CodeGenerator):
 
     def __init__(self, config: GeneratorConfig):
         super().__init__(config)
-        self.go_config = GoConfig(**config.language_config)
+        self.go_config = build_language_config(GoConfig, config.language_config, "go")
 
     def generate(self, schemas: dict[str, Schema], root_schema_name: str) -> str:
         run = _Run(

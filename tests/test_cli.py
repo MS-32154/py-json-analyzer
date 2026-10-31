@@ -182,3 +182,12 @@ def test_language_info_unknown_language(run, capsys):
 def test_generate_accepts_alias(run, capsys):
     assert run(FLAT_SAMPLE, "--generate", "py") == 0
     assert "@dataclass" in capsys.readouterr().out
+
+
+def test_bad_config_file_reports_clear_error(run, tmp_path, capsys):
+    config = tmp_path / "config.json"
+    config.write_text(json.dumps({"language_config": {"int_type": "int8"}}))
+    assert run(FLAT_SAMPLE, "--generate", "go", "--config", config) == 1
+    err = capsys.readouterr().err
+    assert "int_type" in err
+    assert "int, int32, int64" in err

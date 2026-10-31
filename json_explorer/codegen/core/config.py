@@ -8,7 +8,9 @@ Handles loading, validation, and merging of configuration from multiple sources:
 """
 
 import json
+import typing
 from dataclasses import asdict, dataclass, field, fields
+from enum import Enum
 from pathlib import Path
 from typing import Any
 
@@ -117,6 +119,55 @@ class GeneratorConfig:
     def to_json(self, indent: int = 2) -> str:
         """Convert config to JSON string."""
         return json.dumps(self.to_dict(), indent=indent)
+
+
+# ============================================================================
+# Language option validation
+# ============================================================================
+
+
+def build_language_config[T](cls: type[T], options: dict[str, Any], language: str) -> T:
+    """Create a language's option dataclass from ``options``, with clear errors.
+
+    Rejects unknown option names (listing the valid ones) and values outside a
+    ``Literal``/``Enum`` choice or of the wrong basic type.
+    """
+    language_fields = [f for f in fields(cls) if f.init]  # type: ignore[arg-type]
+    valid = sorted(f.name for f in language_fields)
+    unknown = sorted(set(options) - set(valid))
+    if unknown:
+        common = sorted(
+            f.name for f in fields(GeneratorConfig) if f.name != "language_config"
+        )
+        raise ConfigError(
+            f"Unknown {language} option(s): {', '.join(unknown)}. "
+            f"Valid {language} options: {', '.join(valid)}; "
+            f"common options: {', '.join(common)}"
+        )
+    hints = typing.get_type_hints(cls)
+    for f in language_fields:
+        if f.name not in options:
+            continue
+        value, hint = options[f.name], hints[f.name]
+        if typing.get_origin(hint) is typing.Literal:
+            choices = typing.get_args(hint)
+        elif isinstance(hint, type) and issubclass(hint, Enum):
+            choices = tuple(m.value for m in hint)
+            value = value.value if isinstance(value, hint) else value
+        elif hint is bool:
+            if not isinstance(value, bool):
+                raise ConfigError(
+                    f"{language} option {f.name} must be true or false, got {value!r}"
+                )
+            continue
+        else:
+            continue
+        if value not in choices:
+            raise ConfigError(
+                f"Invalid value {value!r} for {language} option {f.name}; "
+                f"choose one of: {', '.join(map(str, choices))}"
+            )
+    return cls(**options)
 
 
 # ============================================================================

@@ -317,6 +317,7 @@ def _validate_language(language: str, silent: bool = False) -> bool:
         )
     return False
 
+
 def _get_input_data(args: argparse.Namespace) -> dict | list | None:
     """Get JSON input data from various sources."""
     try:

@@ -93,3 +93,34 @@ class TestConfigLoading:
             assert loaded.package_name == "save_test"
         finally:
             Path(temp_path).unlink()
+
+
+class TestLanguageOptionValidation:
+    """#14: bad language options fail with a clear ConfigError."""
+
+    @pytest.mark.parametrize(
+        ("language", "options", "message"),
+        [
+            ("go", {"style": "pydantic"}, "Unknown go option(s): style"),
+            ("python", {"pakage_name": "x"}, "Valid python options:"),
+            ("go", {"int_type": "int8"}, "choose one of: int, int32, int64"),
+            (
+                "python",
+                {"style": "attrs"},
+                "choose one of: dataclass, pydantic, typeddict",
+            ),
+            ("python", {"dataclass_frozen": "yes"}, "must be true or false"),
+        ],
+    )
+    def test_rejected(self, language, options, message):
+        from json_explorer.codegen import create_generator
+
+        with pytest.raises(
+            ConfigError, match=message.replace("(", r"\(").replace(")", r"\)")
+        ):
+            create_generator(language, options)
+
+    def test_valid_options_accepted(self):
+        from json_explorer.codegen import create_generator
+
+        assert create_generator("go", {"int_type": "int"}).go_config.int_type == "int"
