@@ -2,7 +2,7 @@
 
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any
+from typing import Any, override
 
 from ...core.config import GeneratorConfig, build_language_config
 from ...core.generator import CodeGenerator
@@ -46,6 +46,7 @@ class PythonGenerator(CodeGenerator):
     def style(self) -> PythonStyle:
         return self.python_config.style
 
+    @override
     def generate(self, schemas: dict[str, Schema], root_schema_name: str) -> str:
         run = _Run(
             names=plan_names(

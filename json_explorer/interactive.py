@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 import json
 from datetime import datetime
 from pathlib import Path
@@ -172,7 +170,7 @@ class InteractiveHandler:
         if viz_format in ["html", "all"]:
             if Confirm.ask("Save visualizations to file?"):
                 save_path = ask("Enter save path (optional)", default="")
-                save_path = save_path if save_path else None
+                save_path = save_path or None
 
             open_browser = Confirm.ask(
                 "Open browser for HTML visualizations?", default=True

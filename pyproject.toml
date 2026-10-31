@@ -173,6 +173,7 @@ select = [
     "LOG",
     "G",       # logging format: lazy %-style args, no f-strings
     "RUF",
+    "FURB",    # refurb: modern idioms
 ]
 ignore = [
     "E501",    # long lines: the formatter handles code; long strings are fine

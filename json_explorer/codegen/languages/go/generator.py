@@ -3,7 +3,7 @@
 import json
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any
+from typing import Any, override
 
 from ...core.config import GeneratorConfig, build_language_config
 from ...core.generator import CodeGenerator
@@ -34,6 +34,7 @@ class GoGenerator(CodeGenerator):
         super().__init__(config)
         self.go_config = build_language_config(GoConfig, config.language_config, "go")
 
+    @override
     def generate(self, schemas: dict[str, Schema], root_schema_name: str) -> str:
         run = _Run(
             names=plan_names(
@@ -52,6 +53,7 @@ class GoGenerator(CodeGenerator):
             },
         )
 
+    @override
     def format_code(self, code: str) -> str:
         """gofmt keeps at most one blank line in a row."""
         lines = super().format_code(code).split("\n")
