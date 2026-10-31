@@ -71,15 +71,6 @@ class TestSchema:
         assert len(schema.fields) == 1
         assert schema.fields[0].name == "id"
 
-    def test_get_field(self):
-        schema = Schema(name="User", original_name="User")
-        field = Field("id", "id", FieldType.INTEGER)
-        schema.add_field(field)
-
-        found = schema.get_field("id")
-        assert found is not None
-        assert found.name == "id"
-
 
 class TestConvertAnalyzerOutput:
     """analyze_json() output -> Schema."""

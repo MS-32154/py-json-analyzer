@@ -117,10 +117,6 @@ class GeneratorConfig:
         """Convert config to dictionary."""
         return asdict(self)
 
-    def to_json(self, indent: int = 2) -> str:
-        """Convert config to JSON string."""
-        return json.dumps(self.to_dict(), indent=indent)
-
 
 # ============================================================================
 # Language option validation

@@ -156,10 +156,6 @@ class Schema:
         self.fields.append(field)
         logger.debug("Added field '%s' to schema '%s'", field.name, self.name)
 
-    def get_field(self, name: str) -> Field | None:
-        """Get field by name."""
-        return next((f for f in self.fields if f.name == name), None)
-
 
 # ============================================================================
 # Type names
