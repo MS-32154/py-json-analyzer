@@ -208,7 +208,8 @@ JSON Schema:
     analysis_group.add_argument(
         "--json-schema",
         action="store_true",
-        help="Print a JSON Schema (draft 2020-12) of the data (or write it to --output)",
+        help="Print a JSON Schema (draft 2020-12) of the data, or write it to --output "
+        "(runs on its own: other actions are ignored)",
     )
     analysis_group.add_argument(
         "--detailed", action="store_true", help="Show detailed analysis/statistics"

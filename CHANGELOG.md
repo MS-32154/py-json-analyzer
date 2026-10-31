@@ -6,12 +6,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Added
-- JSON Schema export (draft 2020-12): `json_explorer data.json --json-schema`, or
-  `json_schema(data)` / `to_json_schema(node)` in Python. The schema describes the whole document,
-  allows `null` only where it was seen, marks keys `required` only when always present, and uses
-  `format` for `date-time`, `date` and `duration`.
-
 ## [0.5.0] - 2026-10-31
 
 ### Upgrading from 0.4
@@ -102,6 +96,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Lint and format with ruff (replaces black, isort and flake8).
 
 ### Added
+- JSON Schema export (draft 2020-12): `json_explorer data.json --json-schema`, or
+  `json_schema(data)` / `to_json_schema(node)` in Python. The schema describes the whole document,
+  allows `null` only where it was seen, marks keys `required` only when always present, and uses
+  `format` for `date-time`, `date` and `duration`.
 - The package type-checks cleanly with mypy; CI runs mypy on every push.
 - Documentation tests (`tests/test_docs.py`): README and API docs examples must parse, their imports,
   CLI flags and function signatures must match the code, and their config examples must load.
