@@ -704,119 +704,86 @@ The codegen module provides multi-language code generation from JSON schemas wit
 
 ### 1. Core Generator Interface
 
-#### `CodeGenerator` (Abstract Base Class)
+#### `CodeGenerator` (abstract base class)
 
-Base class for all language generators.
+Base class for language generators (`json_explorer.codegen.core`).
 
-**Abstract Properties:**
+**Class attributes:**
 
-- `language_name` (str): Language name (e.g., "go", "python")
-- `file_extension` (str): File extension (e.g., ".go", ".py")
+- `language_name` (str): e.g. `"go"`
+- `file_extension` (str): e.g. `".go"`
+- `template_dir` (Path): directory with the generator's Jinja2 templates
 
-**Abstract Methods:**
+**Abstract method:**
 
-- `generate(schemas, root_schema_name)`: Generate code for schemas
+- `generate(schemas, root_schema_name) -> str`: the source code for all schemas
 
-**Example Implementation:**
+**Provided:** `render_template(name, context)`, `dependency_order(schemas)` (nested types
+first), `validate_schemas(schemas)` (warnings), `format_code(code)`.
+
+Per-run state (names, imports) belongs in `generate()`'s locals, so a generator instance can be
+reused. Use `plan_names()` (`json_explorer.codegen.core.naming`) to give every type and field its
+identifier once.
+
+**Example:**
 
 ```python
-from json_explorer.codegen.core import CodeGenerator, GenerationResult
+from pathlib import Path
+
+from json_explorer.codegen.core import CodeGenerator
+
 
 class MyGenerator(CodeGenerator):
-    @property
-    def language_name(self) -> str:
-        return "mylang"
-
-    @property
-    def file_extension(self) -> str:
-        return ".ml"
+    language_name = "mylang"
+    file_extension = ".ml"
+    template_dir = Path(__file__).parent / "templates"
 
     def generate(self, schemas, root_schema_name):
-        # Implementation
-        code = "..."
-        return GenerationResult(
-            success=True,
-            code=code,
-            language="mylang"
-        )
+        return self.render_template("file.ml.j2", {"schemas": list(schemas.values())})
 ```
 
 ---
 
-### 2. Registry System
+### 2. Registry and Plugins
 
-#### `GeneratorRegistry` Class
-
-Manages registration and retrieval of code generators.
-
-##### Class Methods
-
-**`register(language, generator_class, aliases=None)`**
-
-Register a generator class.
-
-**Parameters:**
-
-- `language` (str): Primary language name
-- `generator_class` (type): Generator class
-- `aliases` (list[str], optional): Alternative names
-
-**`create_generator(language, config=None)`**
-
-Create a generator instance.
-
-**Parameters:**
-
-- `language` (str): Language name or alias
-- `config` (GeneratorConfig | dict, optional): Configuration
-
-**Returns:**
-
-- `CodeGenerator`: Generator instance
-
-**`list_languages()`**
-
-Get list of supported languages.
-
-**Returns:**
-
-- `list[str]`: Language names
-
-**`get_generator_info(language)`**
-
-Get information about a generator.
-
-**Returns:**
-
-- `dict`: Generator metadata
-
-#### Global Registry Functions
+Each language is a `LanguagePlugin`: its generator, aliases, interactive handler, CLI flags
+(`CliOption`) and usage examples. Built-in plugins are registered on first use; other packages can
+provide one through the `json_explorer.languages` entry-point group.
 
 ```python
 from json_explorer.codegen import (
-    register,
+    CliOption,
+    LanguagePlugin,
     create_generator,
+    get_language_info,
+    is_supported,
     list_languages,
-    get_language_info
+    register,
 )
 
-# List available languages
-languages = list_languages()
-print(languages)  # ['go', 'python']
+list_languages()          # ['go', 'python']
+is_supported("golang")    # True (alias)
+get_language_info("py")
+# {'name': 'python', 'class': 'PythonGenerator', 'file_extension': '.py',
+#  'aliases': ['py'], 'module': 'json_explorer.codegen.languages.python.generator'}
 
-# Get generator
-generator = create_generator("go", config)
+generator = create_generator("go", {"use_pointers_for_optional": False})
 
-# Get language info
-info = get_language_info("python")
-print(info)
-# {
-#     'name': 'python',
-#     'description': 'Python code generator',
-#     'styles': ['dataclass', 'pydantic', 'typeddict'],
-#     ...
-# }
+# Registering a language
+register(
+    LanguagePlugin(
+        name="mylang",
+        generator=MyGenerator,
+        aliases=("ml",),
+        cli_options=(CliOption("--ml-strict", "strict", "Strict mode"),),
+        examples=(("Generate", "--generate mylang"),),
+    )
+)
 ```
+
+`create_generator(language, config)` accepts a `GeneratorConfig`, an options dict, a path to a JSON
+config file, or `None` (defaults). Unknown or invalid options raise `ConfigError` with the valid
+choices. Unknown languages raise `RegistryError`.
 
 ---
 
@@ -1006,15 +973,25 @@ Name         string      `json:"name"`            // Required, no pointer
 
 #### Example Output
 
+For this input (`--root-name User --package-name models`):
+
+```json
+[
+  {"userId": 1, "name": "Alice", "email": null, "tags": ["admin"]},
+  {"userId": 2, "name": "Bob", "email": "bob@example.com", "tags": []}
+]
+```
+
 ```go
+// Code generated by json_explorer. DO NOT EDIT.
+
 package models
 
-// User represents the root data structure
 type User struct {
-    UserID int64    `json:"user_id"`
-    Name   string   `json:"name"`
-    Email  *string  `json:"email,omitempty"`
-    Tags   []string `json:"tags"`
+	UserId int64    `json:"userId"`
+	Name   string   `json:"name"`
+	Email  *string  `json:"email,omitempty"`
+	Tags   []string `json:"tags"`
 }
 ```
 
@@ -1089,10 +1066,16 @@ Python generator defaults to Python conventions:
 # Input: {"userId": 1, "userName": "Alice"}
 
 # Generated output:
-@dataclass(slots=True)
+# Code generated by json_explorer. DO NOT EDIT.
+"""Generated dataclasses from JSON schema."""
+
+from dataclasses import dataclass
+
+
+@dataclass(slots=True, kw_only=True)
 class Root:
-    user_id: int      # ✅ Converted to snake_case
-    user_name: str    # ✅ Converted to snake_case
+    user_id: int
+    user_name: str
 ```
 
 #### Pydantic Field() Usage
@@ -1121,45 +1104,59 @@ user_id: int  # No Field() needed
 
 #### Example Outputs
 
-**Dataclass:**
+For the same input as the Go example:
+
+**Dataclass** (keyword-only; dataclasses don't parse values, so formatted strings stay `str`):
 
 ```python
+# Code generated by json_explorer. DO NOT EDIT.
+"""Generated dataclasses from JSON schema."""
+
 from dataclasses import dataclass
 
-@dataclass(slots=True)
+
+@dataclass(slots=True, kw_only=True)
 class User:
-    """User represents the root data structure"""
     user_id: int
     name: str
     email: str | None = None
     tags: list[str]
 ```
 
-**Pydantic:**
+**Pydantic** (aliases map fields to JSON keys):
 
 ```python
-from pydantic import BaseModel, Field
+# Code generated by json_explorer. DO NOT EDIT.
+"""Generated Pydantic models from JSON schema."""
+
+from pydantic import BaseModel, Field, ConfigDict
+
 
 class User(BaseModel):
-    """User represents the root data structure"""
+    model_config = ConfigDict(
+        extra="ignore",
+        populate_by_name=True,
+    )
     user_id: int = Field(alias="userId")
     name: str
     email: str | None = Field(default=None)
     tags: list[str]
-
-    model_config = {"populate_by_name": True}
 ```
 
-**TypedDict:**
+**TypedDict** (original keys; `NotRequired` for optional keys):
 
 ```python
-from typing import TypedDict, NotRequired
+# Code generated by json_explorer. DO NOT EDIT.
+"""Generated TypedDict classes from JSON schema."""
+
+from typing import NotRequired
+from typing import TypedDict
+
 
 class User(TypedDict):
-    """User represents the root data structure"""
-    user_id: int
+    userId: int
     name: str
-    email: NotRequired[str | None]
+    email: NotRequired[str]
     tags: list[str]
 ```
 
@@ -1528,17 +1525,17 @@ go_code = quick_generate(data, language="go")
 # Output:
 # type Root struct {
 #     Name  string  `json:"name"`
-#     Email *string `json:"email,omitempty"`  // Optional
+#     Email *string `json:"email,omitempty"` // Optional
 #     Age   int64   `json:"age"`
 # }
 
 # Python with None defaults
 python_code = quick_generate(data, language="python")
 # Output:
-# @dataclass(slots=True)
-# class RootItem:
+# @dataclass(slots=True, kw_only=True)
+# class Root:
 #     name: str
-#     email: str | None = None  // Optional
+#     email: str | None = None  # Optional
 #     age: int
 ```
 

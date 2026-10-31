@@ -6,6 +6,51 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Upgrading from 0.4
+
+**Python and installation**
+- Python 3.15+ (3.14+ on Windows). `pip install py-json-analyzer[dev]` no longer exists; use the
+  `dev` dependency group (`uv sync`, or `pip install --group dev` with pip >= 25.1).
+
+**Command line**
+- Removed flags: `--struct-case`, `--field-case`, `--json-tag-case` (naming follows the language),
+  `--no-json-tags` (tags are always generated), `--no-pydantic-field` (aliases are always generated),
+  `--verbose-logging`/`-vl` (use `--log-level DEBUG`).
+- `--kw-only` is now the default; use `--no-kw-only` for positional dataclass fields.
+- `--plot-format interactive` is gone; `html` (the new default) opens the report in the browser
+  unless `--no-browser`. The curses terminal view is replaced by text charts (`terminal`).
+- `--generate` without `--output` prints the raw code when piped; messages go to stderr.
+
+**Generated code**
+- Type names come from keys (`RootUserProfile` -> `Profile`, `RootProjectsItem` -> `Project`); a root
+  array of objects is named after `--root-name`. Python fields are snake_case; Go fields PascalCase.
+- Go uses `any` (Go 1.18+). Dataclasses are keyword-only. TypedDicts keep the JSON keys.
+- Timestamps: only RFC 3339 formats are detected. Go `time.Time` is used for date-times only;
+  Pydantic uses `datetime`/`date`/`time`/`timedelta`; dataclasses and TypedDicts use `str`.
+
+**Configuration files**
+- Removed options are ignored with a warning: `struct_case`, `field_case`, `json_tag_case`,
+  `indent_size`, `use_tabs`, `line_ending`, `generate_json_tags`, `string_type`, `bool_type`,
+  `unknown_type`, `use_optional`, `pydantic_use_field`, `pydantic_use_alias`, `typeddict_total`,
+  `datetime_type`. Go `int_type`/`float_type`/`time_type` remain; Python `int_type`/`float_type` are
+  gone. Unknown or invalid options now raise `ConfigError`.
+
+**Python API**
+- `analyze_json()` returns a `Node` (use `.kind`, `.fields`, `.items`, `.to_dict()`), not a dict.
+  `detect_timestamp()` -> `detect_format()`. `FieldType.TIMESTAMP` -> `DATE_TIME`, `LOCAL_DATE_TIME`,
+  `DATE`, `TIME`, `DURATION`.
+- Generators: use `create_generator(language, config)` instead of `create_go_generator()`,
+  `create_web_api_generator()`, `create_strict_generator()`, `create_python_generator()`,
+  `create_dataclass_generator()`, `create_pydantic_generator()`, `create_typeddict_generator()` and
+  the `get_*_config()` presets.
+- Registry: `get_generator` -> `create_generator`, `list_supported_languages` -> `list_languages`,
+  `is_language_supported` -> `is_supported`; `register()` takes a `LanguagePlugin`.
+- Naming: `NameTracker`/`sanitize_name` -> `plan_names()`; per-language `go_identifier`,
+  `python_class_name`, `python_field_name`.
+- Prompts: `json_explorer.utils.prompt_input`/`prompt_input_path` -> `json_explorer.ui.ask`/`ask_path`.
+- Search: `search_multiple()` and `compile_query` are gone; call `search()` per query.
+- All package errors derive from `JsonExplorerError`.
+
 ### Changed
 - The prompt helpers moved from `json_explorer.utils` to `json_explorer.ui` (`prompt_input` ->
   `ask`, `prompt_input_path` -> `ask_path`); `json_explorer.utils` now only loads JSON.

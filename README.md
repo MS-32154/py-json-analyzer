@@ -12,7 +12,9 @@
 
 ### Analysis & Exploration
 
-- **Structural Analysis**: Deep JSON structure analysis with type detection and conflict resolution
+- **Structural Analysis**: infers one type per position from every value seen (optional keys, nullable
+  values, int/float widening, mixed types) and detects standard string formats (RFC 3339 date-times,
+  dates, times, durations)
 - **JMESPath Search**: Industry-standard query language for powerful JSON searching and filtering
 - **Tree Visualization**: Multiple view modes (compact, analytical, raw) with rich terminal output
 - **Statistical Analysis**: Comprehensive data quality metrics and structural insights
@@ -21,20 +23,23 @@
 
 ### Code Generation
 
-- **Multi-Language Support**: Generate strongly-typed code from JSON schemas
-  - **Go**: Structs with JSON tags, pointer handling, configurable types
-  - **Python**: Dataclasses, Pydantic v2 models, TypedDict with type hints
-  - **Coming Soon**: TypeScript interfaces, Rust structs with Serde
-- **Smart Type Detection**: Automatic conflict resolution and optional field handling
-- **Flexible Configuration**: Template-based system with extensive customization
-- **Interactive Configuration**: Guided setup with real-time preview and validation
+- **Go**: structs with JSON tags, pointers for optional fields, `time.Time` for RFC 3339 date-times;
+  gofmt-clean output
+- **Python**: dataclasses, Pydantic v2 models (aliases for renamed keys, `datetime`/`date`/`time`/
+  `timedelta`) or TypedDicts (original keys); ruff/black-formatted output
+- **Correct names**: types named after their keys (`TeamLead`, `Project`), every name planned once so
+  declarations and references agree, keys escaped or mapped with aliases
+- **Verified output**: the test suite compiles the generated code and decodes the source data with it
+- **Configuration**: JSON config file, CLI flags, or guided interactive setup with presets;
+  invalid options fail with a clear message
 
 ### Library Features
 
 - **Modular Architecture**: Use individual components independently
-- **Extensible Design**: Plugin-based generator system for custom languages
-- **Production Ready**: Comprehensive error handling and logging
-- **Well Documented**: Extensive API documentation and examples
+- **Language plugins**: add a target language as a package (or install one through the
+  `json_explorer.languages` entry point)
+- **Typed**: ships `py.typed`; type-checks cleanly with mypy
+- **Quiet as a library**: logs only when the application configures logging
 
 ---
 
@@ -528,8 +533,10 @@ json_explorer/
 ├── stats.py                 # Statistical analysis
 ├── tree_view.py             # Tree visualization
 ├── visualizer.py            # Terminal text charts and Plotly HTML report
-├── utils.py                 # File/URL loading utilities
-├── logging_config.py        # Centralized logging
+├── utils.py                 # File/URL loading
+├── ui.py                    # Prompts and shared terminal helpers
+├── errors.py                # JsonExplorerError base exception
+├── logging_config.py        # Logging setup (silent unless configured)
 │
 └── codegen/
     ├── __init__.py          # Code generation API
@@ -538,14 +545,16 @@ json_explorer/
     ├── interactive.py       # Interactive codegen UI
     │
     ├── core/                # Core codegen infrastructure
-    │   ├── naming.py        # Naming convention system
-    │   ├── config.py        # Configuration management
-    │   ├── templates.py     # Template engine
-    │   ├── schema.py        # Internal schema representation
-    │   └── generator.py     # Base generator interface
+    │   ├── naming.py        # Word splitting and the name plan
+    │   ├── config.py        # Configuration and option validation
+    │   ├── templates.py     # Jinja2 rendering
+    │   ├── schema.py        # Schema built from the analysis
+    │   ├── plugin.py        # LanguagePlugin / CliOption
+    │   └── generator.py     # Base generator
     │
     └── languages/           # Language-specific generators
         ├── go/
+        │   ├── plugin.py    # Registration, CLI flags, examples
         │   ├── generator.py
         │   ├── config.py
         │   ├── naming.py
@@ -553,6 +562,7 @@ json_explorer/
         │   └── templates/   # Jinja2 templates
         │
         └── python/
+            ├── plugin.py
             ├── generator.py
             ├── config.py
             ├── naming.py
@@ -562,11 +572,10 @@ json_explorer/
 
 ### Key Design Patterns
 
-- **Registry Pattern**: Extensible generator system
-- **Template Method**: Base generator defines workflow
-- **Strategy Pattern**: Multiple naming conventions and styles
-- **Factory Pattern**: Generator creation and configuration
-- **Builder Pattern**: Schema construction from analysis
+- **Typed analysis**: `analyze_json()` returns `Node` trees merged by one rule
+- **Name plan**: every type and field is named once before rendering
+- **Language plugins**: each language is one `LanguagePlugin` (generator, flags, examples, interactive
+  handler), registered by the registry or an entry point
 
 ---
 
@@ -587,10 +596,12 @@ pytest --cov=json_explorer --cov-report=html
 Test categories:
 
 - **Core modules**: analyzer, search, stats, tree_view, visualizer
-- **Codegen core**: naming, schema, config, templates
+- **Codegen core**: naming, schema, config, templates, registry/plugins
 - **Generators**: Go and Python (all styles)
-- **Integration**: End-to-end workflows
-- **Edge cases**: None handling, conflicts, deep nesting
+- **Compile and decode tests** (`test_codegen_compiles.py`): generated Python is executed and must be
+  ruff-format clean; generated Go must pass `go vet` and `gofmt`; Go and Pydantic must decode the
+  source data. Go checks are skipped when Go isn't installed (`JSON_EXPLORER_GO` can point to one)
+- **CLI**: end-to-end runs of `json_explorer` (`test_cli.py`)
 
 ---
 
@@ -598,10 +609,10 @@ Test categories:
 
 | Language       | Status          | Features                                                 |
 | -------------- | --------------- | -------------------------------------------------------- |
-| **Go**         | ✅ Full Support | Structs, JSON tags, pointers, customizable type mappings |
+| **Go**         | ✅ Full Support | Structs, JSON tags, pointers, configurable int/float/time types |
 | **Python**     | ✅ Full Support | Dataclasses, Pydantic v2, TypedDict, modern type hints   |
-| **TypeScript** | 🚧 Coming Soon  | Interfaces, types, optional properties                   |
-| **Rust**       | 🚧 Coming Soon  | Structs, Serde annotations, Option types                 |
+
+Other languages can be added as plugins (see below).
 
 ---
 
@@ -641,17 +652,19 @@ uv run pytest
 uv run ruff check --fix json_explorer/ tests/
 uv run ruff format json_explorer/ tests/
 
-# Type checking (if using mypy)
+# Type checking
 uv run mypy json_explorer/
 ```
 
 ### Adding a New Language Generator
 
-1. Create `json_explorer/codegen/languages/yourlang/`
-2. Implement `generator.py` extending `CodeGenerator`
-3. Create templates in `templates/`
-4. Register in `json_explorer/codegen/languages/__init__.py`
-5. Add tests in `tests/codegen/languages/test_yourlang.py`
+1. Create a package with a generator extending `CodeGenerator` (set `language_name`,
+   `file_extension`, `template_dir`; implement `generate()`) and its Jinja2 templates
+2. Define `PLUGIN = LanguagePlugin(name=..., generator=..., aliases=..., cli_options=..., examples=...)`
+3. Register it: built-in languages are listed in `_BUILTIN_PLUGINS` in
+   `json_explorer/codegen/registry.py`; external packages declare an entry point in the
+   `json_explorer.languages` group that points to the plugin
+4. Add the language to `tests/test_codegen_compiles.py` so its output is compiled and checked
 
 ---
 
