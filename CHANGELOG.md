@@ -97,6 +97,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 - The package type-checks cleanly with mypy; CI runs mypy on every push.
+- Documentation tests (`tests/test_docs.py`): README and API docs examples must parse, their imports,
+  CLI flags and function signatures must match the code, and their config examples must load.
 - Language plugins: each target language is one `LanguagePlugin` (generator, aliases, interactive
   handler, CLI flags, examples). Third-party languages can be installed through the
   `json_explorer.languages` entry-point group. `register()` now takes a plugin.
